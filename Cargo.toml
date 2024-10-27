@@ -64,6 +64,7 @@ fancy-no-backtrace = [
 ]
 fancy = ["fancy-no-backtrace", "backtrace", "backtrace-ext"]
 syntect-highlighter = ["fancy-no-backtrace", "syntect"]
+track_caller = []
 
 [workspace]
 members = ["miette-derive"]
