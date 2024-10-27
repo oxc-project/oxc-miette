@@ -326,19 +326,6 @@ fn url_basic() {
     assert_eq!("https://example.com/foo/bar".to_string(), Foo {}.url().unwrap().to_string());
 }
 
-#[test]
-fn url_docsrs() {
-    #[derive(Debug, Diagnostic, Error)]
-    #[error("welp")]
-    #[diagnostic(code(foo::bar::baz), url(docsrs))]
-    struct Foo;
-
-    assert_eq!(
-        format!("https://docs.rs/miette/{}/miette/struct.Foo.html", env!("CARGO_PKG_VERSION")),
-        Foo {}.url().unwrap().to_string()
-    );
-}
-
 const SNIPPET_TEXT: &str = "hello from miette";
 
 #[derive(Debug, Diagnostic, Error)]

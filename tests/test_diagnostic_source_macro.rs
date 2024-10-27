@@ -209,6 +209,7 @@ fn test_nested_diagnostic_source_is_output() {
     assert_eq!(expected, out);
 }
 
+#[allow(unused)]
 #[derive(Debug, miette::Diagnostic, thiserror::Error)]
 #[error("A multi-error happened")]
 struct MultiError {

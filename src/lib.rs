@@ -784,7 +784,7 @@
 //! [`SourceCode`]: https://docs.rs/miette/latest/miette/trait.SourceCode.html
 //! [`SourceSpan`]: https://docs.rs/miette/latest/miette/struct.SourceSpan.html
 #[cfg(feature = "derive")]
-pub use miette_derive::*;
+pub use oxc_miette_derive::*;
 
 pub use error::*;
 pub use eyreish::*;
