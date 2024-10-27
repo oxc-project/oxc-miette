@@ -10,16 +10,10 @@ jobs:
     name: Check fmt & build docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          components: rustfmt
-      - name: rustfmt
-        run: cargo fmt --all -- --check
-      - name: docs
-        run: cargo doc --no-deps
+      - uses: taiki-e/checkout-action@v1
+      - uses: Boshen/setup-rust@main
+      - run: cargo fmt --all -- --check
+      - run: cargo doc --no-deps
 
   build_and_test:
     name: Build & Test
@@ -34,12 +28,10 @@ jobs:
             rust: 1.70.0
 
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - uses: taiki-e/checkout-action@v1
+      - uses: Boshen/setup-rust@main
         with:
-          toolchain: ${{ matrix.rust }}
-          components: clippy
+          save-cache: ${{ github.ref_name == 'main' }}
       - name: Clippy
         run: cargo clippy --all -- -D warnings
       - name: Run tests
@@ -53,26 +45,31 @@ jobs:
     name: Check Wasm build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - uses: taiki-e/checkout-action@v1
+      - uses: Boshen/setup-rust@main
         with:
-          toolchain: stable
-          targets: wasm32-unknown-unknown
+          save-cache: ${{ github.ref_name == 'main' }}
+          cache-key: wasm
       - name: Check wasm target
-        run: cargo check --target wasm32-unknown-unknown --features fancy-no-syscall
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo check --target wasm32-unknown-unknown --features fancy-no-syscall
 
   miri:
     name: Miri
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - uses: taiki-e/checkout-action@v1
+      - uses: Boshen/setup-rust@main
         with:
-          toolchain: nightly
-          components: miri,rust-src
+          save-cache: ${{ github.ref_name == 'main' }}
+          cache-key: miri
+      - name: Install Miri
+        run: |
+          rustup toolchain install nightly --component miri
+          rustup override set nightly
+          cargo miri setup
       - name: Run tests with miri
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
@@ -86,10 +83,14 @@ jobs:
         os: [ubuntu-latest, macOS-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - uses: taiki-e/checkout-action@v1
+      - uses: Boshen/setup-rust@main
         with:
-          toolchain: nightly
+          save-cache: ${{ github.ref_name == 'main' }}
+          cache-key: wasm
+      - name: Install Nightly
+        run: |
+          rustup toolchain install nightly
+          rustup override set nightly
       - name: Run minimal version build
         run: cargo build -Z direct-minimal-versions --features fancy,no-format-args-capture
