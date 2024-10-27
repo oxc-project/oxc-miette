@@ -282,30 +282,30 @@ impl MietteHandlerOpts {
             } else {
                 ThemeStyles::none()
             };
-            #[cfg(not(feature = "syntect-highlighter"))]
-            let highlighter = self.highlighter.unwrap_or_else(MietteHighlighter::nocolor);
-            #[cfg(feature = "syntect-highlighter")]
-            let highlighter = if self.color == Some(false) {
-                MietteHighlighter::nocolor()
-            } else if self.color == Some(true) || syscall::supports_color() {
-                match self.highlighter {
-                    Some(highlighter) => highlighter,
-                    None => match self.rgb_colors {
-                        // Because the syntect highlighter currently only supports 24-bit truecolor,
-                        // respect RgbColor::Never by disabling the highlighter.
-                        // TODO: In the future, find a way to convert the RGB syntect theme
-                        // into an ANSI color theme.
-                        RgbColors::Never => MietteHighlighter::nocolor(),
-                        _ => MietteHighlighter::syntect_truecolor(),
-                    },
-                }
-            } else {
-                MietteHighlighter::nocolor()
-            };
+            // #[cfg(not(feature = "syntect-highlighter"))]
+            // let highlighter = self.highlighter.unwrap_or_else(MietteHighlighter::nocolor);
+            // #[cfg(feature = "syntect-highlighter")]
+            // let highlighter = if self.color == Some(false) {
+            // MietteHighlighter::nocolor()
+            // } else if self.color == Some(true) || syscall::supports_color() {
+            // match self.highlighter {
+            // Some(highlighter) => highlighter,
+            // None => match self.rgb_colors {
+            // // Because the syntect highlighter currently only supports 24-bit truecolor,
+            // // respect RgbColor::Never by disabling the highlighter.
+            // // TODO: In the future, find a way to convert the RGB syntect theme
+            // // into an ANSI color theme.
+            // RgbColors::Never => MietteHighlighter::nocolor(),
+            // _ => MietteHighlighter::syntect_truecolor(),
+            // },
+            // }
+            // } else {
+            // MietteHighlighter::nocolor()
+            // };
             let theme = self.theme.unwrap_or(GraphicalTheme { characters, styles });
             let mut handler =
                 GraphicalReportHandler::new_themed(theme).with_width(width).with_links(linkify);
-            handler.highlighter = highlighter;
+            // handler.highlighter = highlighter;
             if let Some(with_cause_chain) = self.with_cause_chain {
                 if with_cause_chain {
                     handler = handler.with_cause_chain();

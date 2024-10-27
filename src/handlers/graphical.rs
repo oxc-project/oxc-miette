@@ -1,41 +1,50 @@
 use std::fmt::{self, Write};
+use std::io::IsTerminal;
 
-use owo_colors::{OwoColorize, Style, StyledList};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use owo_colors::{OwoColorize, Style};
+use unicode_width::UnicodeWidthChar;
 
-use crate::diagnostic_chain::{DiagnosticChain, ErrorKind};
-use crate::handlers::theme::*;
-use crate::highlighters::{Highlighter, MietteHighlighter};
-use crate::protocol::{Diagnostic, Severity};
-use crate::{LabeledSpan, ReportHandler, SourceCode, SourceSpan, SpanContents};
+use crate::{
+    Diagnostic, GraphicalTheme, LabeledSpan, ReportHandler, Severity, SourceCode, SourceSpan,
+    SpanContents, ThemeCharacters,
+};
 
-/**
-A [`ReportHandler`] that displays a given [`Report`](crate::Report) in a
-quasi-graphical way, using terminal colors, unicode drawing characters, and
-other such things.
-
-This is the default reporter bundled with `miette`.
-
-This printer can be customized by using [`new_themed()`](GraphicalReportHandler::new_themed) and handing it a
-[`GraphicalTheme`] of your own creation (or using one of its own defaults!)
-
-See [`set_hook()`](crate::set_hook) for more details on customizing your global
-printer.
-*/
 #[derive(Debug, Clone)]
 pub struct GraphicalReportHandler {
+    /// How to render links.
+    ///
+    /// Default: [`LinkStyle::Link`]
     pub(crate) links: LinkStyle,
+    /// Terminal width to wrap at.
+    ///
+    /// Default: `400`
     pub(crate) termwidth: usize,
+    /// How to style reports
     pub(crate) theme: GraphicalTheme,
     pub(crate) footer: Option<String>,
+    /// Number of source lines to render before/after the line(s) covered by errors.
+    ///
+    /// Default: `1`
     pub(crate) context_lines: usize,
+    /// Tab print width
+    ///
+    /// Default: `4`
     pub(crate) tab_width: usize,
+    /// Unused.
     pub(crate) with_cause_chain: bool,
+    /// Whether to wrap lines to fit the width.
+    ///
+    /// Default: `true`
     pub(crate) wrap_lines: bool,
+    /// Whether to break words during wrapping.
+    ///
+    /// When `false`, line breaks will happen before the first word that would overflow `termwidth`.
+    ///
+    /// Default: `true`
     pub(crate) break_words: bool,
     pub(crate) word_separator: Option<textwrap::WordSeparator>,
     pub(crate) word_splitter: Option<textwrap::WordSplitter>,
-    pub(crate) highlighter: MietteHighlighter,
+    // pub(crate) highlighter: MietteHighlighter,
     pub(crate) link_display_text: Option<String>,
 }
 
@@ -50,24 +59,25 @@ impl GraphicalReportHandler {
     /// Create a new `GraphicalReportHandler` with the default
     /// [`GraphicalTheme`]. This will use both unicode characters and colors.
     pub fn new() -> Self {
+        let is_terminal = std::io::stdout().is_terminal() && std::io::stderr().is_terminal();
         Self {
-            links: LinkStyle::Link,
-            termwidth: 200,
-            theme: GraphicalTheme::default(),
+            links: if is_terminal { LinkStyle::Link } else { LinkStyle::Text },
+            termwidth: 400,
+            theme: GraphicalTheme::new(is_terminal),
             footer: None,
             context_lines: 1,
             tab_width: 4,
-            with_cause_chain: true,
+            with_cause_chain: false,
             wrap_lines: true,
             break_words: true,
             word_separator: None,
             word_splitter: None,
-            highlighter: MietteHighlighter::default(),
+            // highlighter: MietteHighlighter::default(),
             link_display_text: None,
         }
     }
 
-    ///Create a new `GraphicalReportHandler` with a given [`GraphicalTheme`].
+    /// Create a new `GraphicalReportHandler` with a given [`GraphicalTheme`].
     pub fn new_themed(theme: GraphicalTheme) -> Self {
         Self {
             links: LinkStyle::Link,
@@ -81,7 +91,7 @@ impl GraphicalReportHandler {
             break_words: true,
             word_separator: None,
             word_splitter: None,
-            highlighter: MietteHighlighter::default(),
+            // highlighter: MietteHighlighter::default(),
             link_display_text: None,
         }
     }
@@ -173,22 +183,22 @@ impl GraphicalReportHandler {
         self
     }
 
-    /// Enable syntax highlighting for source code snippets, using the given
-    /// [`Highlighter`]. See the [crate::highlighters] crate for more details.
-    pub fn with_syntax_highlighting(
-        mut self,
-        highlighter: impl Highlighter + Send + Sync + 'static,
-    ) -> Self {
-        self.highlighter = MietteHighlighter::from(highlighter);
-        self
-    }
+    // /// Enable syntax highlighting for source code snippets, using the given
+    // /// [`Highlighter`]. See the [crate::highlighters] crate for more details.
+    // pub fn with_syntax_highlighting(
+    // mut self,
+    // highlighter: impl Highlighter + Send + Sync + 'static,
+    // ) -> Self {
+    // self.highlighter = MietteHighlighter::from(highlighter);
+    // self
+    // }
 
-    /// Disable syntax highlighting. This uses the
-    /// [`crate::highlighters::BlankHighlighter`] as a no-op highlighter.
-    pub fn without_syntax_highlighting(mut self) -> Self {
-        self.highlighter = MietteHighlighter::nocolor();
-        self
-    }
+    // /// Disable syntax highlighting. This uses the
+    // /// [`crate::highlighters::BlankHighlighter`] as a no-op highlighter.
+    // pub fn without_syntax_highlighting(mut self) -> Self {
+    // self.highlighter = MietteHighlighter::nocolor();
+    // self
+    // }
 
     /// Sets the display text for links.
     /// Miette displays `(link)` if this option is not set.
@@ -213,7 +223,8 @@ impl GraphicalReportHandler {
         f: &mut impl fmt::Write,
         diagnostic: &(dyn Diagnostic),
     ) -> fmt::Result {
-        self.render_header(f, diagnostic)?;
+        // self.render_header(f, diagnostic)?;
+        writeln!(f)?;
         self.render_causes(f, diagnostic)?;
         let src = diagnostic.source_code();
         self.render_snippets(f, diagnostic, src)?;
@@ -221,7 +232,7 @@ impl GraphicalReportHandler {
         self.render_related(f, diagnostic, src)?;
         if let Some(footer) = &self.footer {
             writeln!(f)?;
-            let width = self.termwidth.saturating_sub(2);
+            let width = self.termwidth.saturating_sub(4);
             let mut opts = textwrap::Options::new(width)
                 .initial_indent("  ")
                 .subsequent_indent("  ")
@@ -261,6 +272,7 @@ impl GraphicalReportHandler {
             );
             write!(header, "{}", link)?;
             writeln!(f, "{}", header)?;
+            writeln!(f)?;
         } else if let Some(code) = diagnostic.code() {
             write!(header, "{}", code.style(severity_style),)?;
             if self.links == LinkStyle::Text && diagnostic.url().is_some() {
@@ -268,8 +280,8 @@ impl GraphicalReportHandler {
                 write!(header, " ({})", url.style(self.theme.styles.link))?;
             }
             writeln!(f, "{}", header)?;
+            writeln!(f)?;
         }
-        writeln!(f)?;
         Ok(())
     }
 
@@ -294,76 +306,91 @@ impl GraphicalReportHandler {
             opts = opts.word_splitter(word_splitter);
         }
 
-        writeln!(f, "{}", self.wrap(&diagnostic.to_string(), opts))?;
-
-        if !self.with_cause_chain {
-            return Ok(());
-        }
-
-        if let Some(mut cause_iter) = diagnostic
-            .diagnostic_source()
-            .map(DiagnosticChain::from_diagnostic)
-            .or_else(|| diagnostic.source().map(DiagnosticChain::from_stderror))
-            .map(|it| it.peekable())
-        {
-            while let Some(error) = cause_iter.next() {
-                let is_last = cause_iter.peek().is_none();
-                let char = if !is_last {
-                    self.theme.characters.lcross
-                } else {
-                    self.theme.characters.lbot
-                };
-                let initial_indent = format!(
-                    "  {}{}{} ",
-                    char, self.theme.characters.hbar, self.theme.characters.rarrow
-                )
-                .style(severity_style)
-                .to_string();
-                let rest_indent =
-                    format!("  {}   ", if is_last { ' ' } else { self.theme.characters.vbar })
-                        .style(severity_style)
-                        .to_string();
-                let mut opts = textwrap::Options::new(width)
-                    .initial_indent(&initial_indent)
-                    .subsequent_indent(&rest_indent)
-                    .break_words(self.break_words);
-                if let Some(word_separator) = self.word_separator {
-                    opts = opts.word_separator(word_separator);
-                }
-                if let Some(word_splitter) = self.word_splitter.clone() {
-                    opts = opts.word_splitter(word_splitter);
-                }
-
-                match error {
-                    ErrorKind::Diagnostic(diag) => {
-                        let mut inner = String::new();
-
-                        let mut inner_renderer = self.clone();
-                        // Don't print footer for inner errors
-                        inner_renderer.footer = None;
-                        // Cause chains are already flattened, so don't double-print the nested error
-                        inner_renderer.with_cause_chain = false;
-                        // Since everything from here on is indented, shrink the virtual terminal
-                        inner_renderer.termwidth -= rest_indent.width();
-                        inner_renderer.render_report(&mut inner, diag)?;
-
-                        // If there was no header, remove the leading newline
-                        let inner = inner.trim_start_matches('\n');
-                        writeln!(f, "{}", self.wrap(&inner, opts))?;
-                    }
-                    ErrorKind::StdError(err) => {
-                        writeln!(f, "{}", self.wrap(&err.to_string(), opts))?;
-                    }
-                }
+        let title = match (self.links, diagnostic.url(), diagnostic.code()) {
+            (LinkStyle::Link, Some(url), Some(code)) => {
+                // magic unicode escape sequences to make the terminal print a hyperlink
+                const CTL: &str = "\u{1b}]8;;";
+                const END: &str = "\u{1b}]8;;\u{1b}\\";
+                let code = code.style(severity_style);
+                let message = diagnostic.to_string();
+                let title = message.style(severity_style);
+                format!("{CTL}{url}\u{1b}\\{code}{END}: {title}",)
             }
-        }
+            (_, _, Some(code)) => {
+                let title = format!("{code}: {}", diagnostic);
+                format!("{}", title.style(severity_style))
+            }
+            _ => {
+                format!("{}", diagnostic.to_string().style(severity_style))
+            }
+        };
+        let title = textwrap::fill(&title, opts);
+        writeln!(f, "{}", title)?;
+
+        // if !self.with_cause_chain {
+        // return Ok(());
+        // }
+
+        // if let Some(mut cause_iter) = diagnostic
+        // .diagnostic_source()
+        // .map(DiagnosticChain::from_diagnostic)
+        // .or_else(|| diagnostic.source().map(DiagnosticChain::from_stderror))
+        // .map(|it| it.peekable())
+        // {
+        // while let Some(error) = cause_iter.next() {
+        // let is_last = cause_iter.peek().is_none();
+        // let char = if !is_last {
+        // self.theme.characters.lcross
+        // } else {
+        // self.theme.characters.lbot
+        // };
+        // let initial_indent = format!(
+        // "  {}{}{} ",
+        // char, self.theme.characters.hbar, self.theme.characters.rarrow
+        // )
+        // .style(severity_style)
+        // .to_string();
+        // let rest_indent =
+        // format!("  {}   ", if is_last { ' ' } else { self.theme.characters.vbar })
+        // .style(severity_style)
+        // .to_string();
+        // let mut opts = textwrap::Options::new(width)
+        // .initial_indent(&initial_indent)
+        // .subsequent_indent(&rest_indent)
+        // .break_words(self.break_words);
+        // if let Some(word_separator) = self.word_separator {
+        // opts = opts.word_separator(word_separator);
+        // }
+        // if let Some(word_splitter) = self.word_splitter.clone() {
+        // opts = opts.word_splitter(word_splitter);
+        // }
+
+        // match error {
+        // ErrorKind::Diagnostic(diag) => {
+        // let mut inner = String::new();
+
+        // let mut inner_renderer = self.clone();
+        // // Don't print footer for inner errors
+        // inner_renderer.footer = None;
+        // // Cause chains are already flattened, so don't double-print the nested error
+        // inner_renderer.with_cause_chain = false;
+        // inner_renderer.render_report(&mut inner, diag)?;
+
+        // writeln!(f, "{}", self.wrap(&inner, opts))?;
+        // }
+        // ErrorKind::StdError(err) => {
+        // writeln!(f, "{}", self.wrap(&err.to_string(), opts))?;
+        // }
+        // }
+        // }
+        // }
 
         Ok(())
     }
 
     fn render_footer(&self, f: &mut impl fmt::Write, diagnostic: &(dyn Diagnostic)) -> fmt::Result {
         if let Some(help) = diagnostic.help() {
-            let width = self.termwidth.saturating_sub(2);
+            let width = self.termwidth.saturating_sub(4);
             let initial_indent = "  help: ".style(self.theme.styles.help).to_string();
             let mut opts = textwrap::Options::new(width)
                 .initial_indent(&initial_indent)
@@ -391,8 +418,8 @@ impl GraphicalReportHandler {
             let mut inner_renderer = self.clone();
             // Re-enable the printing of nested cause chains for related errors
             inner_renderer.with_cause_chain = true;
+            writeln!(f)?;
             for rel in related {
-                writeln!(f)?;
                 match rel.severity() {
                     Some(Severity::Error) | None => write!(f, "Error: ")?,
                     Some(Severity::Warning) => write!(f, "Warning: ")?,
@@ -429,22 +456,9 @@ impl GraphicalReportHandler {
 
         let mut contexts = Vec::with_capacity(labels.len());
         for right in labels.iter().cloned() {
-            let right_conts =
-                match source.read_span(right.inner(), self.context_lines, self.context_lines) {
-                    Ok(cont) => cont,
-                    Err(err) => {
-                        writeln!(
-                            f,
-                            "  [{} `{}` (offset: {}, length: {}): {:?}]",
-                            "Failed to read contents for label".style(self.theme.styles.error),
-                            right.label().unwrap_or("<none>").style(self.theme.styles.link),
-                            right.offset().style(self.theme.styles.link),
-                            right.len().style(self.theme.styles.link),
-                            err.style(self.theme.styles.warning)
-                        )?;
-                        return Ok(());
-                    }
-                };
+            let right_conts = source
+                .read_span(right.inner(), self.context_lines, self.context_lines)
+                .map_err(|_| fmt::Error)?;
 
             if contexts.is_empty() {
                 contexts.push((right, right_conts));
@@ -508,7 +522,7 @@ impl GraphicalReportHandler {
             .map(|(label, st)| FancySpan::new(label.label().map(String::from), *label.inner(), st))
             .collect::<Vec<_>>();
 
-        let mut highlighter_state = self.highlighter.start_highlighter_state(&*contents);
+        // let mut highlighter_state = self.highlighter.start_highlighter_state(&*contents);
 
         // The max number of gutter-lines that will be active at any given
         // point. We need this to figure out indentation, so we do one loop
@@ -576,9 +590,10 @@ impl GraphicalReportHandler {
             self.render_line_gutter(f, max_gutter, line, &labels)?;
 
             // And _now_ we can print out the line text itself!
-            let styled_text =
-                StyledList::from(highlighter_state.highlight_line(&line.text)).to_string();
-            self.render_line_text(f, &styled_text)?;
+            // let styled_text =
+            // StyledList::from(highlighter_state.highlight_line(&line.text)).to_string();
+            let styled_text = &line.text;
+            self.render_line_text(f, styled_text)?;
 
             // Next, we write all the highlights that apply to this particular line.
             let (single_line, multi_line): (Vec<_>, Vec<_>) = labels
@@ -645,7 +660,7 @@ impl GraphicalReportHandler {
                     f,
                     max_gutter,
                     line,
-                    &labels,
+                    labels,
                     LabelRenderMode::SingleLine,
                 )?;
 
@@ -661,15 +676,15 @@ impl GraphicalReportHandler {
                     f,
                     max_gutter,
                     line,
-                    &labels,
-                    LabelRenderMode::MultiLineFirst,
+                    labels,
+                    LabelRenderMode::BlockFirst,
                 )?;
 
                 self.render_multi_line_end_single(
                     f,
                     first,
                     label.style,
-                    LabelRenderMode::MultiLineFirst,
+                    LabelRenderMode::BlockFirst,
                 )?;
                 for label_line in rest {
                     // no line number!
@@ -679,26 +694,20 @@ impl GraphicalReportHandler {
                         f,
                         max_gutter,
                         line,
-                        &labels,
-                        LabelRenderMode::MultiLineRest,
+                        labels,
+                        LabelRenderMode::BlockRest,
                     )?;
                     self.render_multi_line_end_single(
                         f,
                         label_line,
                         label.style,
-                        LabelRenderMode::MultiLineRest,
+                        LabelRenderMode::BlockRest,
                     )?;
                 }
             }
         } else {
             // gutter _again_
-            self.render_highlight_gutter(
-                f,
-                max_gutter,
-                line,
-                &labels,
-                LabelRenderMode::SingleLine,
-            )?;
+            self.render_highlight_gutter(f, max_gutter, line, labels, LabelRenderMode::SingleLine)?;
             // has no label
             writeln!(f, "{}", self.theme.characters.hbar.style(label.style))?;
         }
@@ -790,7 +799,7 @@ impl GraphicalReportHandler {
         let applicable = highlights.iter().filter(|hl| line.span_applies_gutter(hl));
         for (i, hl) in applicable.enumerate() {
             if !line.span_line_only(hl) && line.span_ends(hl) {
-                if render_mode == LabelRenderMode::MultiLineRest {
+                if render_mode == LabelRenderMode::BlockRest {
                     // this is to make multiline labels work. We want to make the right amount
                     // of horizontal space for them, but not actually draw the lines
                     let horizontal_space = max_gutter.saturating_sub(i) + 2;
@@ -818,7 +827,7 @@ impl GraphicalReportHandler {
                                 num_repeat
                                     // if we are rendering a multiline label, then leave a bit of space for the
                                     // rcross character
-                                    - if render_mode == LabelRenderMode::MultiLineFirst {
+                                    - if render_mode == LabelRenderMode::BlockFirst {
                                         1
                                     } else {
                                         0
@@ -1065,9 +1074,9 @@ impl GraphicalReportHandler {
                             hl,
                             label_line,
                             if first {
-                                LabelRenderMode::MultiLineFirst
+                                LabelRenderMode::BlockFirst
                             } else {
-                                LabelRenderMode::MultiLineRest
+                                LabelRenderMode::BlockRest
                             },
                         )?;
                         first = false;
@@ -1116,10 +1125,10 @@ impl GraphicalReportHandler {
                     LabelRenderMode::SingleLine => {
                         format!("{}{} {}", chars.lbot, chars.hbar.to_string().repeat(2), label,)
                     }
-                    LabelRenderMode::MultiLineFirst => {
+                    LabelRenderMode::BlockFirst => {
                         format!("{}{}{} {}", chars.lbot, chars.hbar, chars.rcross, label,)
                     }
-                    LabelRenderMode::MultiLineRest => {
+                    LabelRenderMode::BlockRest => {
                         format!("  {} {}", chars.vbar, label,)
                     }
                 };
@@ -1141,10 +1150,10 @@ impl GraphicalReportHandler {
             LabelRenderMode::SingleLine => {
                 writeln!(f, "{} {}", self.theme.characters.hbar.style(style), label)?;
             }
-            LabelRenderMode::MultiLineFirst => {
+            LabelRenderMode::BlockFirst => {
                 writeln!(f, "{} {}", self.theme.characters.rcross.style(style), label)?;
             }
-            LabelRenderMode::MultiLineRest => {
+            LabelRenderMode::BlockRest => {
                 writeln!(f, "{} {}", self.theme.characters.vbar.style(style), label)?;
             }
         }
@@ -1165,9 +1174,9 @@ impl GraphicalReportHandler {
         let mut column = context_data.column();
         let mut offset = context_data.span().offset();
         let mut line_offset = offset;
+        let mut line_str = String::with_capacity(context.len());
+        let mut lines = Vec::with_capacity(1);
         let mut iter = context.chars().peekable();
-        let mut line_str = String::new();
-        let mut lines = Vec::new();
         while let Some(char) = iter.next() {
             offset += char.len_utf8();
             let mut at_end_of_file = false;
@@ -1232,9 +1241,9 @@ enum LabelRenderMode {
     /// we're rendering a single line label (or not rendering in any special way)
     SingleLine,
     /// we're rendering a multiline label
-    MultiLineFirst,
+    BlockFirst,
     /// we're rendering the rest of a multiline label
-    MultiLineRest,
+    BlockRest,
 }
 
 #[derive(Debug)]

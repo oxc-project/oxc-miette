@@ -21,7 +21,27 @@ pub struct GraphicalTheme {
     pub styles: ThemeStyles,
 }
 
+impl Default for GraphicalTheme {
+    fn default() -> Self {
+        match std::env::var("NO_COLOR") {
+            _ if !std::io::stdout().is_terminal() || !std::io::stderr().is_terminal() => {
+                Self::none()
+            }
+            Ok(string) if string != "0" => Self::unicode_nocolor(),
+            _ => Self::unicode(),
+        }
+    }
+}
+
 impl GraphicalTheme {
+    pub fn new(is_terminal: bool) -> Self {
+        match std::env::var("NO_COLOR") {
+            _ if !is_terminal => Self::none(),
+            Ok(string) if string != "0" => Self::unicode_nocolor(),
+            _ => Self::unicode(),
+        }
+    }
+
     /// ASCII-art-based graphical drawing, with ANSI styling.
     pub fn ascii() -> Self {
         Self { characters: ThemeCharacters::ascii(), styles: ThemeStyles::ansi() }
@@ -36,7 +56,7 @@ impl GraphicalTheme {
     /// Such themes typically remap ansi codes properly, treating them more
     /// like CSS classes than specific colors.
     pub fn unicode() -> Self {
-        Self { characters: ThemeCharacters::unicode(), styles: ThemeStyles::ansi() }
+        Self { characters: ThemeCharacters::unicode(), styles: ThemeStyles::rgb() }
     }
 
     /// Graphical theme that draws in monochrome, while still using unicode
@@ -52,18 +72,6 @@ impl GraphicalTheme {
     /// your own [`ReportHandler`](crate::ReportHandler)
     pub fn none() -> Self {
         Self { characters: ThemeCharacters::ascii(), styles: ThemeStyles::none() }
-    }
-}
-
-impl Default for GraphicalTheme {
-    fn default() -> Self {
-        match std::env::var("NO_COLOR") {
-            _ if !std::io::stdout().is_terminal() || !std::io::stderr().is_terminal() => {
-                Self::none()
-            }
-            Ok(string) if string != "0" => Self::unicode_nocolor(),
-            _ => Self::unicode(),
-        }
     }
 }
 
@@ -99,11 +107,11 @@ impl ThemeStyles {
     /// [Credit](http://terminal.sexy/#FRUV0NDQFRUVrEFCkKlZ9L91ap-1qnWfdbWq0NDQUFBQrEFCkKlZ9L91ap-1qnWfdbWq9fX1).
     pub fn rgb() -> Self {
         Self {
-            error: style().fg_rgb::<255, 30, 30>(),
-            warning: style().fg_rgb::<244, 191, 117>(),
+            error: style().fg_rgb::<225, 80, 80>().bold(), // CHANGED: <255, 30, 30>
+            warning: style().fg_rgb::<244, 191, 117>().bold(),
             advice: style().fg_rgb::<106, 159, 181>(),
             help: style().fg_rgb::<106, 159, 181>(),
-            link: style().fg_rgb::<92, 157, 255>().underline().bold(),
+            link: style().fg_rgb::<92, 157, 255>().bold(),
             linum: style().dimmed(),
             highlights: vec![
                 style().fg_rgb::<246, 87, 248>(),
