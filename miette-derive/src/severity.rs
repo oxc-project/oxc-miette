@@ -39,10 +39,7 @@ impl Parse for Severity {
                 Ok(Severity(syn::Ident::new(&sev, str.span())))
             }
         } else {
-            Err(syn::Error::new(
-                ident.span(),
-                "MIETTE BUG: not a severity option",
-            ))
+            Err(syn::Error::new(ident.span(), "MIETTE BUG: not a severity option"))
         }
     }
 }

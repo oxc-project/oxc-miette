@@ -59,16 +59,10 @@ impl Dropped {
 }
 
 fn make_chain() -> (Report, Dropped) {
-    let dropped = Dropped {
-        low: Flag::new(),
-        mid: Flag::new(),
-        high: Flag::new(),
-    };
+    let dropped = Dropped { low: Flag::new(), mid: Flag::new(), high: Flag::new() };
 
-    let low = LowLevel {
-        message: "no such file or directory",
-        drop: DetectDrop::new(&dropped.low),
-    };
+    let low =
+        LowLevel { message: "no such file or directory", drop: DetectDrop::new(&dropped.low) };
 
     // impl Report for Result<T, E>
     let mid = Err::<(), LowLevel>(low)

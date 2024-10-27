@@ -28,10 +28,7 @@ impl Related {
                     let related = if let Some(ident) = field.ident.clone() {
                         syn::Member::Named(ident)
                     } else {
-                        syn::Member::Unnamed(syn::Index {
-                            index: i as u32,
-                            span: field.span(),
-                        })
+                        syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
                     };
                     return Ok(Some(Related(related)));
                 }

@@ -94,11 +94,7 @@ impl GraphicalReportHandler {
 
     /// Whether to enable error code linkification using [`Diagnostic::url()`].
     pub fn with_links(mut self, links: bool) -> Self {
-        self.links = if links {
-            LinkStyle::Link
-        } else {
-            LinkStyle::Text
-        };
+        self.links = if links { LinkStyle::Link } else { LinkStyle::Text };
         self
     }
 
@@ -323,16 +319,10 @@ impl GraphicalReportHandler {
                 )
                 .style(severity_style)
                 .to_string();
-                let rest_indent = format!(
-                    "  {}   ",
-                    if is_last {
-                        ' '
-                    } else {
-                        self.theme.characters.vbar
-                    }
-                )
-                .style(severity_style)
-                .to_string();
+                let rest_indent =
+                    format!("  {}   ", if is_last { ' ' } else { self.theme.characters.vbar })
+                        .style(severity_style)
+                        .to_string();
                 let mut opts = textwrap::Options::new(width)
                     .initial_indent(&initial_indent)
                     .subsequent_indent(&rest_indent)
@@ -447,10 +437,7 @@ impl GraphicalReportHandler {
                             f,
                             "  [{} `{}` (offset: {}, length: {}): {:?}]",
                             "Failed to read contents for label".style(self.theme.styles.error),
-                            right
-                                .label()
-                                .unwrap_or("<none>")
-                                .style(self.theme.styles.link),
+                            right.label().unwrap_or("<none>").style(self.theme.styles.link),
                             right.offset().style(self.theme.styles.link),
                             right.len().style(self.theme.styles.link),
                             err.style(self.theme.styles.warning)
@@ -511,10 +498,8 @@ impl GraphicalReportHandler {
                 && l.inner().offset() + l.inner().len()
                     <= context.inner().offset() + context.inner().len()
         });
-        let primary_label = ctx_labels
-            .clone()
-            .find(|label| label.primary())
-            .or_else(|| ctx_labels.clone().next());
+        let primary_label =
+            ctx_labels.clone().find(|label| label.primary()).or_else(|| ctx_labels.clone().next());
 
         // sorting is your friend
         let labels = labels
@@ -561,9 +546,7 @@ impl GraphicalReportHandler {
         // If there is a primary label, then use its span
         // as the reference point for line/column information.
         let primary_contents = match primary_label {
-            Some(label) => source
-                .read_span(label.inner(), 0, 0)
-                .map_err(|_| fmt::Error)?,
+            Some(label) => source.read_span(label.inner(), 0, 0).map_err(|_| fmt::Error)?,
             None => contents,
         };
 
@@ -579,12 +562,7 @@ impl GraphicalReportHandler {
         } else if lines.len() <= 1 {
             writeln!(f, "{}", self.theme.characters.hbar.to_string().repeat(3))?;
         } else {
-            writeln!(
-                f,
-                "[{}:{}]",
-                primary_contents.line() + 1,
-                primary_contents.column() + 1
-            )?;
+            writeln!(f, "[{}:{}]", primary_contents.line() + 1, primary_contents.column() + 1)?;
         }
 
         // Now it's time for the fun part--actually rendering everything!
@@ -923,13 +901,7 @@ impl GraphicalReportHandler {
     }
 
     fn write_no_linum(&self, f: &mut impl fmt::Write, width: usize) -> fmt::Result {
-        write!(
-            f,
-            " {:width$} {} ",
-            "",
-            self.theme.characters.vbar_break,
-            width = width
-        )?;
+        write!(f, " {:width$} {} ", "", self.theme.characters.vbar_break, width = width)?;
         Ok(())
     }
 
@@ -1141,12 +1113,9 @@ impl GraphicalReportHandler {
                 curr_offset += 1;
             } else {
                 let lines = match render_mode {
-                    LabelRenderMode::SingleLine => format!(
-                        "{}{} {}",
-                        chars.lbot,
-                        chars.hbar.to_string().repeat(2),
-                        label,
-                    ),
+                    LabelRenderMode::SingleLine => {
+                        format!("{}{} {}", chars.lbot, chars.hbar.to_string().repeat(2), label,)
+                    }
                     LabelRenderMode::MultiLineFirst => {
                         format!("{}{}{} {}", chars.lbot, chars.hbar, chars.rcross, label,)
                     }
@@ -1355,11 +1324,7 @@ fn split_label(v: String) -> Vec<String> {
 
 impl FancySpan {
     fn new(label: Option<String>, span: SourceSpan, style: Style) -> Self {
-        FancySpan {
-            label: label.map(split_label),
-            span,
-            style,
-        }
+        FancySpan { label: label.map(split_label), span, style }
     }
 
     fn style(&self) -> Style {
@@ -1367,17 +1332,11 @@ impl FancySpan {
     }
 
     fn label(&self) -> Option<String> {
-        self.label
-            .as_ref()
-            .map(|l| l.join("\n").style(self.style()).to_string())
+        self.label.as_ref().map(|l| l.join("\n").style(self.style()).to_string())
     }
 
     fn label_parts(&self) -> Option<Vec<String>> {
-        self.label.as_ref().map(|l| {
-            l.iter()
-                .map(|i| i.style(self.style()).to_string())
-                .collect()
-        })
+        self.label.as_ref().map(|l| l.iter().map(|i| i.style(self.style()).to_string()).collect())
     }
 
     fn offset(&self) -> usize {

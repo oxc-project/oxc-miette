@@ -269,31 +269,19 @@ impl LabeledSpan {
     /// Makes a new labeled span.
     #[must_use]
     pub const fn new(label: Option<String>, offset: ByteOffset, len: usize) -> Self {
-        Self {
-            label,
-            span: SourceSpan::new(SourceOffset(offset), len),
-            primary: false,
-        }
+        Self { label, span: SourceSpan::new(SourceOffset(offset), len), primary: false }
     }
 
     /// Makes a new labeled span using an existing span.
     #[must_use]
     pub fn new_with_span(label: Option<String>, span: impl Into<SourceSpan>) -> Self {
-        Self {
-            label,
-            span: span.into(),
-            primary: false,
-        }
+        Self { label, span: span.into(), primary: false }
     }
 
     /// Makes a new labeled primary span using an existing span.
     #[must_use]
     pub fn new_primary_with_span(label: Option<String>, span: impl Into<SourceSpan>) -> Self {
-        Self {
-            label,
-            span: span.into(),
-            primary: true,
-        }
+        Self { label, span: span.into(), primary: true }
     }
 
     /// Change the text of the label
@@ -497,15 +485,7 @@ impl<'a> MietteSpanContents<'a> {
         column: usize,
         line_count: usize,
     ) -> MietteSpanContents<'a> {
-        MietteSpanContents {
-            data,
-            span,
-            line,
-            column,
-            line_count,
-            name: None,
-            language: None,
-        }
+        MietteSpanContents { data, span, line, column, line_count, name: None, language: None }
     }
 
     /// Make a new [`MietteSpanContents`] object, with a name for its 'file'.
@@ -573,10 +553,7 @@ pub struct SourceSpan {
 impl SourceSpan {
     /// Create a new [`SourceSpan`].
     pub const fn new(start: SourceOffset, length: usize) -> Self {
-        Self {
-            offset: start,
-            length,
-        }
+        Self { offset: start, length }
     }
 
     /// The absolute offset, in bytes, from the beginning of a [`SourceCode`].
@@ -598,10 +575,7 @@ impl SourceSpan {
 
 impl From<(ByteOffset, usize)> for SourceSpan {
     fn from((start, len): (ByteOffset, usize)) -> Self {
-        Self {
-            offset: start.into(),
-            length: len,
-        }
+        Self { offset: start.into(), length: len }
     }
 }
 
@@ -613,10 +587,7 @@ impl From<(SourceOffset, usize)> for SourceSpan {
 
 impl From<std::ops::Range<ByteOffset>> for SourceSpan {
     fn from(range: std::ops::Range<ByteOffset>) -> Self {
-        Self {
-            offset: range.start.into(),
-            length: range.len(),
-        }
+        Self { offset: range.start.into(), length: range.len() }
     }
 }
 
@@ -628,10 +599,7 @@ impl From<SourceOffset> for SourceSpan {
 
 impl From<ByteOffset> for SourceSpan {
     fn from(offset: ByteOffset) -> Self {
-        Self {
-            offset: offset.into(),
-            length: 0,
-        }
+        Self { offset: offset.into(), length: 0 }
     }
 }
 
@@ -640,10 +608,7 @@ impl From<ByteOffset> for SourceSpan {
 fn test_serialize_source_span() {
     use serde_json::json;
 
-    assert_eq!(
-        json!(SourceSpan::from(0)),
-        json!({ "offset": 0, "length": 0})
-    );
+    assert_eq!(json!(SourceSpan::from(0)), json!({ "offset": 0, "length": 0}));
 }
 
 #[cfg(feature = "serde")]
@@ -743,10 +708,7 @@ fn test_source_offset_from_location() {
     assert_eq!(SourceOffset::from_location(source, 4, 4).offset(), 10);
 
     // Out-of-range
-    assert_eq!(
-        SourceOffset::from_location(source, 5, 1).offset(),
-        source.len()
-    );
+    assert_eq!(SourceOffset::from_location(source, 5, 1).offset(), source.len());
 }
 
 #[cfg(feature = "serde")]

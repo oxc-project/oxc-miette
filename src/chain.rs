@@ -35,19 +35,13 @@ pub struct Chain<'a> {
 
 #[derive(Clone)]
 pub(crate) enum ChainState<'a> {
-    Linked {
-        next: Option<&'a (dyn StdError + 'static)>,
-    },
-    Buffered {
-        rest: vec::IntoIter<&'a (dyn StdError + 'static)>,
-    },
+    Linked { next: Option<&'a (dyn StdError + 'static)> },
+    Buffered { rest: vec::IntoIter<&'a (dyn StdError + 'static)> },
 }
 
 impl<'a> Chain<'a> {
     pub(crate) fn new(head: &'a (dyn StdError + 'static)) -> Self {
-        Chain {
-            state: ChainState::Linked { next: Some(head) },
-        }
+        Chain { state: ChainState::Linked { next: Some(head) } }
     }
 }
 
@@ -108,10 +102,6 @@ impl ExactSizeIterator for Chain<'_> {
 
 impl Default for Chain<'_> {
     fn default() -> Self {
-        Chain {
-            state: ChainState::Buffered {
-                rest: Vec::new().into_iter(),
-            },
-        }
+        Chain { state: ChainState::Buffered { rest: Vec::new().into_iter() } }
     }
 }

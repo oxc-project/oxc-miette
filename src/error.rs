@@ -31,9 +31,9 @@ impl Diagnostic for MietteError {
     fn help<'a>(&'a self) -> Option<Box<dyn fmt::Display + 'a>> {
         match self {
             MietteError::IoError(_) => None,
-            MietteError::OutOfBounds => Some(Box::new(
-                "Double-check your spans. Do you have an off-by-one error?",
-            )),
+            MietteError::OutOfBounds => {
+                Some(Box::new("Double-check your spans. Do you have an off-by-one error?"))
+            }
         }
     }
 

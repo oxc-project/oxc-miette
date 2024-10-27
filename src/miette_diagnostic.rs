@@ -48,10 +48,7 @@ impl Error for MietteDiagnostic {}
 
 impl Diagnostic for MietteDiagnostic {
     fn code<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
-        self.code
-            .as_ref()
-            .map(Box::new)
-            .map(|c| c as Box<dyn Display>)
+        self.code.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
     }
 
     fn severity(&self) -> Option<Severity> {
@@ -59,17 +56,11 @@ impl Diagnostic for MietteDiagnostic {
     }
 
     fn help<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
-        self.help
-            .as_ref()
-            .map(Box::new)
-            .map(|c| c as Box<dyn Display>)
+        self.help.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
     }
 
     fn url<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
-        self.url
-            .as_ref()
-            .map(Box::new)
-            .map(|c| c as Box<dyn Display>)
+        self.url.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
     }
 
     fn labels(&self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + '_>> {
@@ -282,10 +273,7 @@ fn test_serialize_miette_diagnostic() {
         code = "code",
         help = "help",
         url = "url",
-        labels = [
-            LabeledSpan::at_offset(0, "label1"),
-            LabeledSpan::at(1..3, "label2")
-        ],
+        labels = [LabeledSpan::at_offset(0, "label1"), LabeledSpan::at(1..3, "label2")],
         severity = Severity::Warning,
         "message"
     );
@@ -342,10 +330,7 @@ fn test_deserialize_miette_diagnostic() {
         code = "code",
         help = "help",
         url = "url",
-        labels = [
-            LabeledSpan::at_offset(0, "label1"),
-            LabeledSpan::at(1..3, "label2")
-        ],
+        labels = [LabeledSpan::at_offset(0, "label1"), LabeledSpan::at(1..3, "label2")],
         severity = Severity::Warning,
         "message"
     );

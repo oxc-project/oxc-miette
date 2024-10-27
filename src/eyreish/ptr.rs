@@ -28,15 +28,11 @@ where
     T: ?Sized,
 {
     pub(crate) fn new(ptr: Box<T>) -> Self {
-        Own {
-            ptr: unsafe { NonNull::new_unchecked(Box::into_raw(ptr)) },
-        }
+        Own { ptr: unsafe { NonNull::new_unchecked(Box::into_raw(ptr)) } }
     }
 
     pub(crate) fn cast<U: CastTo>(self) -> Own<U::Target> {
-        Own {
-            ptr: self.ptr.cast(),
-        }
+        Own { ptr: self.ptr.cast() }
     }
 
     pub(crate) unsafe fn boxed(self) -> Box<T> {
@@ -44,17 +40,11 @@ where
     }
 
     pub(crate) const fn by_ref<'a>(&self) -> Ref<'a, T> {
-        Ref {
-            ptr: self.ptr,
-            lifetime: PhantomData,
-        }
+        Ref { ptr: self.ptr, lifetime: PhantomData }
     }
 
     pub(crate) fn by_mut<'a>(self) -> Mut<'a, T> {
-        Mut {
-            ptr: self.ptr,
-            lifetime: PhantomData,
-        }
+        Mut { ptr: self.ptr, lifetime: PhantomData }
     }
 }
 
@@ -85,31 +75,19 @@ where
     T: ?Sized,
 {
     pub(crate) fn new(ptr: &'a T) -> Self {
-        Ref {
-            ptr: NonNull::from(ptr),
-            lifetime: PhantomData,
-        }
+        Ref { ptr: NonNull::from(ptr), lifetime: PhantomData }
     }
 
     pub(crate) const fn from_raw(ptr: NonNull<T>) -> Self {
-        Ref {
-            ptr,
-            lifetime: PhantomData,
-        }
+        Ref { ptr, lifetime: PhantomData }
     }
 
     pub(crate) fn cast<U: CastTo>(self) -> Ref<'a, U::Target> {
-        Ref {
-            ptr: self.ptr.cast(),
-            lifetime: PhantomData,
-        }
+        Ref { ptr: self.ptr.cast(), lifetime: PhantomData }
     }
 
     pub(crate) fn by_mut(self) -> Mut<'a, T> {
-        Mut {
-            ptr: self.ptr,
-            lifetime: PhantomData,
-        }
+        Mut { ptr: self.ptr, lifetime: PhantomData }
     }
 
     pub(crate) const fn as_ptr(self) -> *const T {
@@ -148,24 +126,15 @@ where
     T: ?Sized,
 {
     pub(crate) fn cast<U: CastTo>(self) -> Mut<'a, U::Target> {
-        Mut {
-            ptr: self.ptr.cast(),
-            lifetime: PhantomData,
-        }
+        Mut { ptr: self.ptr.cast(), lifetime: PhantomData }
     }
 
     pub(crate) const fn by_ref(self) -> Ref<'a, T> {
-        Ref {
-            ptr: self.ptr,
-            lifetime: PhantomData,
-        }
+        Ref { ptr: self.ptr, lifetime: PhantomData }
     }
 
     pub(crate) fn extend<'b>(self) -> Mut<'b, T> {
-        Mut {
-            ptr: self.ptr,
-            lifetime: PhantomData,
-        }
+        Mut { ptr: self.ptr, lifetime: PhantomData }
     }
 
     pub(crate) unsafe fn deref_mut(self) -> &'a mut T {

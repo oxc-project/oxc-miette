@@ -232,20 +232,12 @@ mod tests {
         let inner_source = "hello world";
         let outer_source = "abc";
 
-        let report = Report::from(Inner {
-            at: (0..5).into(),
-            source_code: Some(inner_source.to_string()),
-        })
-        .with_source_code(outer_source.to_string());
+        let report =
+            Report::from(Inner { at: (0..5).into(), source_code: Some(inner_source.to_string()) })
+                .with_source_code(outer_source.to_string());
 
         let underlined = String::from_utf8(
-            report
-                .source_code()
-                .unwrap()
-                .read_span(&(0..5).into(), 0, 0)
-                .unwrap()
-                .data()
-                .to_vec(),
+            report.source_code().unwrap().read_span(&(0..5).into(), 0, 0).unwrap().data().to_vec(),
         )
         .unwrap();
         assert_eq!(underlined, "hello");
@@ -259,14 +251,8 @@ mod tests {
 
         let report = Report::from(Outer {
             errors: vec![
-                Inner {
-                    at: (0..5).into(),
-                    source_code: Some(inner_source.to_string()),
-                },
-                Inner {
-                    at: (1..2).into(),
-                    source_code: None,
-                },
+                Inner { at: (0..5).into(), source_code: Some(inner_source.to_string()) },
+                Inner { at: (1..2).into(), source_code: None },
             ],
         })
         .with_source_code(outer_source.to_string());

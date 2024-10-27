@@ -23,11 +23,7 @@ impl NarratableReportHandler {
     /// options.
     #[must_use]
     pub const fn new() -> Self {
-        Self {
-            footer: None,
-            context_lines: 1,
-            with_cause_chain: true,
-        }
+        Self { footer: None, context_lines: 1, with_cause_chain: true }
     }
 
     /// Include the cause chain of the top-level error in the report, if
@@ -235,26 +231,16 @@ impl NarratableReportHandler {
         if let Some(filename) = contents.name() {
             write!(f, " for {filename}")?;
         }
-        writeln!(
-            f,
-            " starting at line {}, column {}",
-            contents.line() + 1,
-            contents.column() + 1
-        )?;
+        writeln!(f, " starting at line {}, column {}", contents.line() + 1, contents.column() + 1)?;
         writeln!(f)?;
         for line in &lines {
             writeln!(f, "snippet line {}: {}", line.line_number, line.text)?;
-            let relevant = labels
-                .iter()
-                .filter_map(|l| line.span_attach(l.inner()).map(|a| (a, l)));
+            let relevant =
+                labels.iter().filter_map(|l| line.span_attach(l.inner()).map(|a| (a, l)));
             for (attach, label) in relevant {
                 match attach {
                     SpanAttach::Contained { col_start, col_end } if col_start == col_end => {
-                        write!(
-                            f,
-                            "    label at line {}, column {}",
-                            line.line_number, col_start,
-                        )?;
+                        write!(f, "    label at line {}, column {}", line.line_number, col_start,)?;
                     }
                     SpanAttach::Contained { col_start, col_end } => {
                         write!(
@@ -378,19 +364,16 @@ enum SpanAttach {
 /// Returns column at offset, and nearest boundary if offset is in the middle of
 /// the character
 fn safe_get_column(text: &str, offset: usize, start: bool) -> usize {
-    let mut column = text
-        .get(0..offset)
-        .map(UnicodeWidthStr::width)
-        .unwrap_or_else(|| {
-            let mut column = 0;
-            for (idx, c) in text.char_indices() {
-                if offset <= idx {
-                    break;
-                }
-                column += c.width().unwrap_or(0);
+    let mut column = text.get(0..offset).map(UnicodeWidthStr::width).unwrap_or_else(|| {
+        let mut column = 0;
+        for (idx, c) in text.char_indices() {
+            if offset <= idx {
+                break;
             }
-            column
-        });
+            column += c.width().unwrap_or(0);
+        }
+        column
+    });
     if start {
         // Offset are zero-based, so plus one
         column += 1;

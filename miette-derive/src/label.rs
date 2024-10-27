@@ -76,11 +76,7 @@ impl Parse for LabelAttr {
                 } else {
                     fmt::parse_token_expr(&content, false)?
                 };
-                let display = Display {
-                    fmt,
-                    args,
-                    has_bonus_display: false,
-                };
+                let display = Display { fmt, args, has_bonus_display: false };
                 (attr, Some(display))
             } else if !content.is_empty() {
                 return Err(syn::Error::new(input.span(), "Invalid argument to label() attribute. The argument must be a literal string or either the keyword `primary` or `collection`."));
@@ -124,19 +120,14 @@ impl Labels {
                     let span = if let Some(ident) = field.ident.clone() {
                         syn::Member::Named(ident)
                     } else {
-                        syn::Member::Unnamed(syn::Index {
-                            index: i as u32,
-                            span: field.span(),
-                        })
+                        syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
                     };
                     use quote::ToTokens;
                     let LabelAttr { label, lbl_ty } =
                         syn::parse2::<LabelAttr>(attr.meta.to_token_stream())?;
 
                     if lbl_ty == LabelType::Primary
-                        && labels
-                            .iter()
-                            .any(|l: &Label| l.lbl_ty == LabelType::Primary)
+                        && labels.iter().any(|l: &Label| l.lbl_ty == LabelType::Primary)
                     {
                         return Err(syn::Error::new(
                             field.span(),
@@ -144,12 +135,7 @@ impl Labels {
                         ));
                     }
 
-                    labels.push(Label {
-                        label,
-                        span,
-                        ty: field.ty.clone(),
-                        lbl_ty,
-                    });
+                    labels.push(Label { label, span, ty: field.ty.clone(), lbl_ty });
                 }
             }
         }
@@ -163,12 +149,7 @@ impl Labels {
     pub(crate) fn gen_struct(&self, fields: &syn::Fields) -> Option<TokenStream> {
         let (display_pat, display_members) = display_pat_members(fields);
         let labels = self.0.iter().filter_map(|highlight| {
-            let Label {
-                span,
-                label,
-                ty,
-                lbl_ty,
-            } = highlight;
+            let Label { span, label, ty, lbl_ty } = highlight;
             if *lbl_ty == LabelType::Collection {
                 return None;
             }
@@ -194,12 +175,7 @@ impl Labels {
             })
         });
         let collections_chain = self.0.iter().filter_map(|label| {
-            let Label {
-                span,
-                label,
-                ty: _,
-                lbl_ty,
-            } = label;
+            let Label { span, label, ty: _, lbl_ty } = label;
             if *lbl_ty != LabelType::Collection {
                 return None;
             }

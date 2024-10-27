@@ -11,10 +11,7 @@ struct LocationHandler {
 
 impl LocationHandler {
     fn new(expected: &'static str) -> Self {
-        LocationHandler {
-            actual: None,
-            expected,
-        }
+        LocationHandler { actual: None, expected }
     }
 }
 

@@ -17,10 +17,7 @@ fn test_boxed_str_diagnostic() {
     assert_eq!("oh no!", error.to_string());
     assert_eq!(
         "oh no!",
-        error
-            .downcast_ref::<Box<dyn Diagnostic + Send + Sync>>()
-            .unwrap()
-            .to_string()
+        error.downcast_ref::<Box<dyn Diagnostic + Send + Sync>>().unwrap().to_string()
     );
 }
 
@@ -31,24 +28,17 @@ fn test_boxed_str_stderr() {
     assert_eq!("oh no!", error.to_string());
     assert_eq!(
         "oh no!",
-        error
-            .downcast_ref::<Box<dyn StdError + Send + Sync>>()
-            .unwrap()
-            .to_string()
+        error.downcast_ref::<Box<dyn StdError + Send + Sync>>().unwrap().to_string()
     );
 }
 
 #[test]
 fn test_boxed_thiserror() {
-    let error = MyError {
-        source: io::Error::new(io::ErrorKind::Other, "oh no!"),
-    };
+    let error = MyError { source: io::Error::new(io::ErrorKind::Other, "oh no!") };
     let report: Report = miette!(error);
     assert_eq!("oh no!", report.source().unwrap().to_string());
 
-    let error = MyError {
-        source: io::Error::new(io::ErrorKind::Other, "oh no!!!!"),
-    };
+    let error = MyError { source: io::Error::new(io::ErrorKind::Other, "oh no!!!!") };
     let error: Box<dyn Diagnostic + Send + Sync + 'static> = Box::new(error);
     let report = Report::new_boxed(error);
     assert_eq!("oh no!!!!", report.source().unwrap().to_string());
@@ -78,18 +68,12 @@ impl CustomDiagnostic {
     const SOURCE_CODE: &'static str = "this-is-some-source-code";
 
     fn new() -> Self {
-        Self {
-            source: None,
-            related: Vec::new(),
-        }
+        Self { source: None, related: Vec::new() }
     }
 
     fn with_source<E: StdError + Send + Sync + 'static>(self, source: E) -> Self {
         let source = miette!(source);
-        Self {
-            source: Some(source),
-            related: Vec::new(),
-        }
+        Self { source: Some(source), related: Vec::new() }
     }
 
     fn with_related<D: Diagnostic + Send + Sync + 'static>(mut self, diagnostic: D) -> Self {
@@ -145,15 +129,11 @@ impl Diagnostic for CustomDiagnostic {
     }
 
     fn related<'a>(&'a self) -> Option<Box<dyn Iterator<Item = &'a dyn Diagnostic> + 'a>> {
-        Some(Box::new(
-            self.related.iter().map(|d| &**d as &'a dyn Diagnostic),
-        ))
+        Some(Box::new(self.related.iter().map(|d| &**d as &'a dyn Diagnostic)))
     }
 
     fn diagnostic_source(&self) -> Option<&dyn Diagnostic> {
-        self.source
-            .as_ref()
-            .map(|source| &**source as &dyn Diagnostic)
+        self.source.as_ref().map(|source| &**source as &dyn Diagnostic)
     }
 }
 
@@ -173,17 +153,10 @@ fn test_boxed_custom_diagnostic() {
             report.help().map(|help| help.to_string()),
             Some(CustomDiagnostic::HELP.to_owned())
         );
-        assert_eq!(
-            report.url().map(|url| url.to_string()),
-            Some(CustomDiagnostic::URL.to_owned())
-        );
+        assert_eq!(report.url().map(|url| url.to_string()), Some(CustomDiagnostic::URL.to_owned()));
         assert_eq!(
             report.labels().map(std::iter::Iterator::collect),
-            Some(vec![LabeledSpan::new(
-                Some(CustomDiagnostic::LABEL.to_owned()),
-                0,
-                7
-            )]),
+            Some(vec![LabeledSpan::new(Some(CustomDiagnostic::LABEL.to_owned()), 0, 7)]),
         );
         let span = SourceSpan::from(0..CustomDiagnostic::SOURCE_CODE.len());
         assert_eq!(
@@ -195,9 +168,7 @@ fn test_boxed_custom_diagnostic() {
             Some(CustomDiagnostic::SOURCE_CODE.to_owned().into_bytes())
         );
         assert_eq!(
-            report
-                .diagnostic_source()
-                .map(std::string::ToString::to_string),
+            report.diagnostic_source().map(std::string::ToString::to_string),
             Some("oh no!".to_owned()),
         );
     }
@@ -222,20 +193,10 @@ fn test_boxed_custom_diagnostic() {
 #[test]
 #[ignore = "I don't know why this isn't working but it needs fixing."]
 fn test_boxed_sources() {
-    let error = MyError {
-        source: io::Error::new(io::ErrorKind::Other, "oh no!"),
-    };
+    let error = MyError { source: io::Error::new(io::ErrorKind::Other, "oh no!") };
     let error = Box::<dyn Diagnostic + Send + Sync>::from(error);
     let error: Report = miette!(error).wrap_err("it failed");
     assert_eq!("it failed", error.to_string());
     assert_eq!("outer", error.source().unwrap().to_string());
-    assert_eq!(
-        "oh no!",
-        error
-            .source()
-            .expect("outer")
-            .source()
-            .expect("inner")
-            .to_string()
-    );
+    assert_eq!("oh no!", error.source().expect("outer").source().expect("inner").to_string());
 }

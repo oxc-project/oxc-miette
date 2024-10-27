@@ -52,10 +52,7 @@ struct EnvVarGuard<'a> {
 
 impl EnvVarGuard<'_> {
     fn new(var: &str) -> EnvVarGuard<'_> {
-        EnvVarGuard {
-            var,
-            old_value: std::env::var_os(var),
-        }
+        EnvVarGuard { var, old_value: std::env::var_os(var) }
     }
 }
 
@@ -88,10 +85,7 @@ fn check_colors<F: Fn(MietteHandlerOpts) -> MietteHandlerOpts>(
     // to ensure that only one test that modifies these env vars runs at a time.
     let lock = COLOR_ENV_VARS.lock().unwrap();
 
-    let guards = (
-        EnvVarGuard::new("NO_COLOR"),
-        EnvVarGuard::new("FORCE_COLOR"),
-    );
+    let guards = (EnvVarGuard::new("NO_COLOR"), EnvVarGuard::new("FORCE_COLOR"));
     // Clear color environment variables that may be set outside of 'cargo test'
     std::env::remove_var("NO_COLOR");
     std::env::remove_var("FORCE_COLOR");
@@ -136,12 +130,7 @@ fn color_always() {
 #[test]
 fn rgb_preferred() {
     use ColorFormat::*;
-    check_colors(
-        |opts| opts.rgb_colors(RgbColors::Preferred),
-        NoColor,
-        Ansi,
-        Rgb,
-    );
+    check_colors(|opts| opts.rgb_colors(RgbColors::Preferred), NoColor, Ansi, Rgb);
 }
 
 #[test]
@@ -153,10 +142,5 @@ fn rgb_always() {
 #[test]
 fn color_always_rgb_always() {
     use ColorFormat::*;
-    check_colors(
-        |opts| opts.color(true).rgb_colors(RgbColors::Always),
-        Rgb,
-        Rgb,
-        Rgb,
-    );
+    check_colors(|opts| opts.color(true).rgb_colors(RgbColors::Always), Rgb, Rgb, Rgb);
 }

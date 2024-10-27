@@ -56,11 +56,7 @@ struct TestArcedError(#[diagnostic_source] std::sync::Arc<dyn Diagnostic>);
 #[test]
 fn test_diagnostic_source() {
     let error = TestStructError {
-        asdf_inner_foo: SourceError {
-            code: String::new(),
-            help: String::new(),
-            label: (0, 0),
-        },
+        asdf_inner_foo: SourceError { code: String::new(), help: String::new(), label: (0, 0) },
     };
     assert!(error.diagnostic_source().is_some());
 
@@ -239,9 +235,8 @@ fn test_nested_cause_chains_for_related_errors_are_output() {
         help: String::from("Get a grip..."),
         label: (3, 4),
     };
-    let multi_error = MultiError {
-        related_errs: vec![Box::new(first_error), Box::new(second_error)],
-    };
+    let multi_error =
+        MultiError { related_errs: vec![Box::new(first_error), Box::new(second_error)] };
     let diag = NestedError {
         code: String::from("the outside world"),
         label: (6, 4),

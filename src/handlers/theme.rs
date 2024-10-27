@@ -24,10 +24,7 @@ pub struct GraphicalTheme {
 impl GraphicalTheme {
     /// ASCII-art-based graphical drawing, with ANSI styling.
     pub fn ascii() -> Self {
-        Self {
-            characters: ThemeCharacters::ascii(),
-            styles: ThemeStyles::ansi(),
-        }
+        Self { characters: ThemeCharacters::ascii(), styles: ThemeStyles::ansi() }
     }
 
     /// Graphical theme that draws using both ansi colors and unicode
@@ -39,19 +36,13 @@ impl GraphicalTheme {
     /// Such themes typically remap ansi codes properly, treating them more
     /// like CSS classes than specific colors.
     pub fn unicode() -> Self {
-        Self {
-            characters: ThemeCharacters::unicode(),
-            styles: ThemeStyles::ansi(),
-        }
+        Self { characters: ThemeCharacters::unicode(), styles: ThemeStyles::ansi() }
     }
 
     /// Graphical theme that draws in monochrome, while still using unicode
     /// characters.
     pub fn unicode_nocolor() -> Self {
-        Self {
-            characters: ThemeCharacters::unicode(),
-            styles: ThemeStyles::none(),
-        }
+        Self { characters: ThemeCharacters::unicode(), styles: ThemeStyles::none() }
     }
 
     /// A "basic" graphical theme that skips colors and unicode characters and
@@ -60,10 +51,7 @@ impl GraphicalTheme {
     /// [`NarratableReportHandler`](crate::NarratableReportHandler), or write
     /// your own [`ReportHandler`](crate::ReportHandler)
     pub fn none() -> Self {
-        Self {
-            characters: ThemeCharacters::ascii(),
-            styles: ThemeStyles::none(),
-        }
+        Self { characters: ThemeCharacters::ascii(), styles: ThemeStyles::none() }
     }
 }
 

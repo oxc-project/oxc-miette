@@ -35,11 +35,7 @@ impl Parse for Url {
                     } else {
                         fmt::parse_token_expr(&content, false)?
                     };
-                    let display = Display {
-                        fmt,
-                        args,
-                        has_bonus_display: false,
-                    };
+                    let display = Display { fmt, args, has_bonus_display: false };
                     Ok(Url::Display(display))
                 } else {
                     let option = content.parse::<syn::Ident>()?;

@@ -11,10 +11,7 @@ fn test_error_size() {
 
 #[test]
 fn test_null_pointer_optimization() {
-    assert_eq!(
-        mem::size_of::<Result<(), Report>>(),
-        mem::size_of::<usize>()
-    );
+    assert_eq!(mem::size_of::<Result<(), Report>>(), mem::size_of::<usize>());
 }
 
 #[test]

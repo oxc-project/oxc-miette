@@ -64,20 +64,12 @@ impl Highlighter for SyntectHighlighter {
 impl SyntectHighlighter {
     /// Create a syntect highlighter with the given theme and syntax set.
     pub fn new(syntax_set: syntect::SyntaxSet, theme: syntect::Theme, use_bg_color: bool) -> Self {
-        Self {
-            theme,
-            syntax_set,
-            use_bg_color,
-        }
+        Self { theme, syntax_set, use_bg_color }
     }
 
     /// Create a syntect highlighter with the given theme and the default syntax set.
     pub fn new_themed(theme: syntect::Theme, use_bg_color: bool) -> Self {
-        Self::new(
-            syntect::SyntaxSet::load_defaults_nonewlines(),
-            theme,
-            use_bg_color,
-        )
+        Self::new(syntect::SyntaxSet::load_defaults_nonewlines(), theme, use_bg_color)
     }
 
     /// Determine syntect SyntaxReference to use for given SourceCode
@@ -89,17 +81,12 @@ impl SyntectHighlighter {
         // otherwise try to use any file extension provided in the name
         if let Some(name) = contents.name() {
             if let Some(ext) = Path::new(name).extension() {
-                return self
-                    .syntax_set
-                    .find_syntax_by_extension(ext.to_string_lossy().as_ref());
+                return self.syntax_set.find_syntax_by_extension(ext.to_string_lossy().as_ref());
             }
         }
         // finally, attempt to guess syntax based on first line
         return self.syntax_set.find_syntax_by_first_line(
-            &std::str::from_utf8(contents.data())
-                .ok()?
-                .split('\n')
-                .next()?,
+            &std::str::from_utf8(contents.data()).ok()?.split('\n').next()?,
         );
     }
 }

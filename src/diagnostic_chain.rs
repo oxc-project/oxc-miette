@@ -13,15 +13,11 @@ pub(crate) struct DiagnosticChain<'a> {
 
 impl<'a> DiagnosticChain<'a> {
     pub(crate) fn from_diagnostic(head: &'a dyn Diagnostic) -> Self {
-        DiagnosticChain {
-            state: Some(ErrorKind::Diagnostic(head)),
-        }
+        DiagnosticChain { state: Some(ErrorKind::Diagnostic(head)) }
     }
 
     pub(crate) fn from_stderror(head: &'a (dyn std::error::Error + 'static)) -> Self {
-        DiagnosticChain {
-            state: Some(ErrorKind::StdError(head)),
-        }
+        DiagnosticChain { state: Some(ErrorKind::StdError(head)) }
     }
 }
 

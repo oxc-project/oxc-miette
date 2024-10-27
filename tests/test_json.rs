@@ -9,9 +9,7 @@ mod json_report_handler {
 
     fn fmt_report(diag: Report) -> String {
         let mut out = String::new();
-        JSONReportHandler::new()
-            .render_report(&mut out, diag.as_ref())
-            .unwrap();
+        JSONReportHandler::new().render_report(&mut out, diag.as_ref()).unwrap();
         out
     }
 
@@ -28,10 +26,7 @@ mod json_report_handler {
         }
 
         let src = "source\n  👼🏼text\n    here".to_string();
-        let err = MyBad {
-            src: NamedSource::new("bad_file.rs", src),
-            highlight: (9, 6).into(),
-        };
+        let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 6).into() };
         let out = fmt_report(err.into());
         println!("Error: {out}");
         let expected: String = r#"
@@ -73,10 +68,7 @@ mod json_report_handler {
         }
 
         let src = "source\n  text\n    here".to_string();
-        let err = MyBad {
-            src: NamedSource::new("bad_file.rs", src),
-            highlight: (9, 4).into(),
-        };
+        let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
         let out = fmt_report(err.into());
         println!("Error: {out}");
         let expected: String = r#"
@@ -118,10 +110,7 @@ mod json_report_handler {
         }
 
         let src = "source\n  text\n    here".to_string();
-        let err = MyBad {
-            src: NamedSource::new("bad_file.rs", src),
-            highlight: (0, 0).into(),
-        };
+        let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (0, 0).into() };
         let out = fmt_report(err.into());
         println!("Error: {out}");
         let expected: String = r#"
@@ -163,10 +152,7 @@ mod json_report_handler {
         }
 
         let src = "source\n  text\n    here".to_string();
-        let err = MyBad {
-            src: NamedSource::new("bad_file.rs", src),
-            highlight: (9, 0).into(),
-        };
+        let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 0).into() };
         let out = fmt_report(err.into());
         println!("Error: {out}");
         let expected: String = r#"
@@ -208,10 +194,7 @@ mod json_report_handler {
         }
 
         let src = "source\n  text\n    here".to_string();
-        let err = MyBad {
-            src: NamedSource::new("bad_file.rs", src),
-            highlight: (9, 4).into(),
-        };
+        let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
         let out = fmt_report(err.into());
         println!("Error: {out}");
         let expected: String = r#"
@@ -252,10 +235,7 @@ mod json_report_handler {
         }
 
         let src = "source\ntext\n  here".to_string();
-        let err = MyBad {
-            src: NamedSource::new("bad_file.rs", src),
-            highlight: (7, 4).into(),
-        };
+        let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (7, 4).into() };
         let out = fmt_report(err.into());
         println!("Error: {out}");
         let expected: String = r#"
@@ -362,10 +342,7 @@ mod json_report_handler {
         }
 
         let src = "source\n  text\n    here".to_string();
-        let err = MyBad {
-            src: NamedSource::new("bad_file.rs", src),
-            highlight: (9, 11).into(),
-        };
+        let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 11).into() };
         let out = fmt_report(err.into());
         println!("Error: {out}");
         let expected: String = r#"
@@ -843,12 +820,8 @@ mod json_report_handler {
             src: NamedSource::new("bad_file.rs", src),
             highlight: (9, 4).into(),
             related: vec![
-                InnerError {
-                    highlight: (0, 6).into(),
-                },
-                InnerError {
-                    highlight: (0, 6).into(),
-                },
+                InnerError { highlight: (0, 6).into() },
+                InnerError { highlight: (0, 6).into() },
             ],
         };
         let out = fmt_report(err.into());

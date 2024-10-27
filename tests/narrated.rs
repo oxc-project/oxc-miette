@@ -15,9 +15,7 @@ fn fmt_report(diag: Report) -> String {
             .render_report(&mut out, diag.as_ref())
             .unwrap();
     } else {
-        NarratableReportHandler::new()
-            .render_report(&mut out, diag.as_ref())
-            .unwrap();
+        NarratableReportHandler::new().render_report(&mut out, diag.as_ref()).unwrap();
     };
     out
 }
@@ -35,10 +33,7 @@ fn single_line_with_wide_char() -> Result<(), MietteError> {
     }
 
     let src = "source\n  👼🏼text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 6).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 6).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops!
@@ -71,10 +66,7 @@ fn single_line_highlight() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops!
@@ -107,10 +99,7 @@ fn single_line_highlight_offset_zero() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (0, 0).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (0, 0).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops!
@@ -142,10 +131,7 @@ fn single_line_highlight_with_empty_span() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 0).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 0).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops!
@@ -178,10 +164,7 @@ fn single_line_highlight_no_label() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops!
@@ -214,10 +197,7 @@ fn single_line_highlight_at_line_start() -> Result<(), MietteError> {
     }
 
     let src = "source\ntext\n  here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (7, 4).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (7, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops!
@@ -294,10 +274,7 @@ fn multiline_highlight_adjacent() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 11).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 11).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops!
@@ -633,9 +610,7 @@ fn related_source_code_propagation() -> Result<(), MietteError> {
     let err = MyBad {
         src: NamedSource::new("bad_file.rs", src),
         highlight: (9, 4).into(),
-        related: vec![InnerError {
-            highlight: (0, 6).into(),
-        }],
+        related: vec![InnerError { highlight: (0, 6).into() }],
     };
     let out = fmt_report(err.into());
     println!("Error: {}", out);

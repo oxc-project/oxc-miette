@@ -104,10 +104,7 @@ impl Forward {
                 if iter.next().is_some() {
                     return Err(make_err());
                 }
-                let field_name = field
-                    .ident
-                    .clone()
-                    .unwrap_or_else(|| format_ident!("unnamed"));
+                let field_name = field.ident.clone().unwrap_or_else(|| format_ident!("unnamed"));
                 Ok(Self::Named(field_name))
             }
             syn::Fields::Unnamed(unnamed) => {

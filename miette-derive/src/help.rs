@@ -35,11 +35,7 @@ impl Parse for Help {
                 } else {
                     fmt::parse_token_expr(&content, false)?
                 };
-                let display = Display {
-                    fmt,
-                    args,
-                    has_bonus_display: false,
-                };
+                let display = Display { fmt, args, has_bonus_display: false };
                 Ok(Help::Display(display))
             } else {
                 input.parse::<Token![=]>()?;
@@ -73,10 +69,7 @@ impl Help {
                     let help = if let Some(ident) = field.ident.clone() {
                         syn::Member::Named(ident)
                     } else {
-                        syn::Member::Unnamed(syn::Index {
-                            index: i as u32,
-                            span: field.span(),
-                        })
+                        syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
                     };
                     return Ok(Some(Help::Field(help, Box::new(field.ty.clone()))));
                 }

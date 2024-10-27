@@ -28,10 +28,7 @@ impl Parse for MemberOrString {
         } else if lookahead.peek(syn::LitStr) {
             Ok(MemberOrString::String(input.parse()?))
         } else {
-            Err(syn::Error::new(
-                input.span(),
-                "Expected a string or a field reference.",
-            ))
+            Err(syn::Error::new(input.span(), "Expected a string or a field reference."))
         }
     }
 }
@@ -49,10 +46,9 @@ pub(crate) fn gen_all_variants_with(
     let pairs = variants
         .iter()
         .filter_map(|def| {
-            def.args
-                .forward_or_override_enum(&def.ident, which_fn, |concrete| {
-                    f(&def.ident, &def.fields, concrete)
-                })
+            def.args.forward_or_override_enum(&def.ident, which_fn, |concrete| {
+                f(&def.ident, &def.fields, concrete)
+            })
         })
         .collect::<Vec<_>>();
     if pairs.is_empty() {
@@ -85,13 +81,10 @@ pub(crate) fn gen_unused_pat(fields: &syn::Fields) -> TokenStream {
 /// Goes in the slot `let Self #pat = self;` or `match self { Self #pat => ...
 /// }`.
 fn gen_fields_pat(fields: &syn::Fields) -> TokenStream {
-    let member_idents = fields.iter().enumerate().map(|(i, field)| {
-        field
-            .ident
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| format_ident!("_{}", i))
-    });
+    let member_idents = fields
+        .iter()
+        .enumerate()
+        .map(|(i, field)| field.ident.as_ref().cloned().unwrap_or_else(|| format_ident!("_{}", i)));
     match fields {
         syn::Fields::Named(_) => quote! {
             { #(#member_idents),* }
@@ -115,10 +108,7 @@ pub(crate) fn display_pat_members(fields: &syn::Fields) -> (TokenStream, HashSet
             if let Some(ident) = field.ident.as_ref().cloned() {
                 syn::Member::Named(ident)
             } else {
-                syn::Member::Unnamed(syn::Index {
-                    index: i as u32,
-                    span: field.span(),
-                })
+                syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
             }
         })
         .collect();

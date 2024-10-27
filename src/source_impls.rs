@@ -80,11 +80,7 @@ fn context_info<'a>(
             &input[starting_offset..offset],
             (starting_offset, offset - starting_offset).into(),
             start_line,
-            if context_lines_before == 0 {
-                start_column
-            } else {
-                0
-            },
+            if context_lines_before == 0 { start_column } else { 0 },
             line_count,
         ))
     } else {
@@ -172,8 +168,7 @@ impl<T: ?Sized + SourceCode> SourceCode for Arc<T> {
         context_lines_before: usize,
         context_lines_after: usize,
     ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
-        self.as_ref()
-            .read_span(span, context_lines_before, context_lines_after)
+        self.as_ref().read_span(span, context_lines_before, context_lines_after)
     }
 }
 
@@ -192,8 +187,7 @@ where
         context_lines_before: usize,
         context_lines_after: usize,
     ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
-        self.as_ref()
-            .read_span(span, context_lines_before, context_lines_after)
+        self.as_ref().read_span(span, context_lines_before, context_lines_after)
     }
 }
 
@@ -255,10 +249,7 @@ mod tests {
     fn with_context() -> Result<(), MietteError> {
         let src = String::from("xxx\nfoo\nbar\nbaz\n\nyyy\n");
         let contents = src.read_span(&(8, 3).into(), 1, 1)?;
-        assert_eq!(
-            "foo\nbar\nbaz\n",
-            std::str::from_utf8(contents.data()).unwrap()
-        );
+        assert_eq!("foo\nbar\nbaz\n", std::str::from_utf8(contents.data()).unwrap());
         assert_eq!(1, contents.line());
         assert_eq!(0, contents.column());
         Ok(())
@@ -268,10 +259,7 @@ mod tests {
     fn multiline_with_context() -> Result<(), MietteError> {
         let src = String::from("aaa\nxxx\n\nfoo\nbar\nbaz\n\nyyy\nbbb\n");
         let contents = src.read_span(&(9, 11).into(), 1, 1)?;
-        assert_eq!(
-            "\nfoo\nbar\nbaz\n\n",
-            std::str::from_utf8(contents.data()).unwrap()
-        );
+        assert_eq!("\nfoo\nbar\nbaz\n\n", std::str::from_utf8(contents.data()).unwrap());
         assert_eq!(2, contents.line());
         assert_eq!(0, contents.column());
         let span: SourceSpan = (8, 14).into();
@@ -283,10 +271,7 @@ mod tests {
     fn multiline_with_context_line_start() -> Result<(), MietteError> {
         let src = String::from("one\ntwo\n\nthree\nfour\nfive\n\nsix\nseven\n");
         let contents = src.read_span(&(2, 0).into(), 2, 2)?;
-        assert_eq!(
-            "one\ntwo\n\n",
-            std::str::from_utf8(contents.data()).unwrap()
-        );
+        assert_eq!("one\ntwo\n\n", std::str::from_utf8(contents.data()).unwrap());
         assert_eq!(0, contents.line());
         assert_eq!(0, contents.column());
         let span: SourceSpan = (0, 9).into();

@@ -1,8 +1,4 @@
-#![allow(
-    clippy::needless_doctest_main,
-    clippy::new_ret_no_self,
-    clippy::wrong_self_convention
-)]
+#![allow(clippy::needless_doctest_main, clippy::new_ret_no_self, clippy::wrong_self_convention)]
 use core::fmt::Display;
 
 use std::error::Error as StdError;

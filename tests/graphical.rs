@@ -16,9 +16,7 @@ fn fmt_report(diag: Report) -> String {
             .render_report(&mut out, diag.as_ref())
             .unwrap();
     } else if std::env::var("NARRATED").is_ok() {
-        NarratableReportHandler::new()
-            .render_report(&mut out, diag.as_ref())
-            .unwrap();
+        NarratableReportHandler::new().render_report(&mut out, diag.as_ref()).unwrap();
     } else if let Ok(w) = std::env::var("REPLACE_TABS") {
         GraphicalReportHandler::new_themed(GraphicalTheme::unicode_nocolor())
             .without_syntax_highlighting()
@@ -42,9 +40,8 @@ fn fmt_report_with_settings(
 ) -> String {
     let mut out = String::new();
 
-    let handler = with_settings(GraphicalReportHandler::new_themed(
-        GraphicalTheme::unicode_nocolor(),
-    ));
+    let handler =
+        with_settings(GraphicalReportHandler::new_themed(GraphicalTheme::unicode_nocolor()));
 
     handler.render_report(&mut out, diag.as_ref()).unwrap();
 
@@ -423,10 +420,7 @@ fn empty_source() -> Result<(), MietteError> {
     }
 
     let src = "".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (0, 0).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (0, 0).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     // For an empty string, the label cannot be rendered.
@@ -501,10 +495,7 @@ fn single_line_highlight_span_full_line() {
         #[label("This bit here")]
         bad_bit: SourceSpan,
     }
-    let err = MyBad {
-        src: NamedSource::new("issue", "source\ntext"),
-        bad_bit: (7, 4).into(),
-    };
+    let err = MyBad { src: NamedSource::new("issue", "source\ntext"), bad_bit: (7, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
 
@@ -535,10 +526,7 @@ fn single_line_with_wide_char() -> Result<(), MietteError> {
     }
 
     let src = "source\n  👼🏼text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (13, 8).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (13, 8).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -574,10 +562,7 @@ fn single_line_with_two_tabs() -> Result<(), MietteError> {
     std::env::set_var("REPLACE_TABS", "4");
 
     let src = "source\n\t\ttext\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -613,10 +598,7 @@ fn single_line_with_tab_in_middle() -> Result<(), MietteError> {
     std::env::set_var("REPLACE_TABS", "4");
 
     let src = "source\ntext =\ttext\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (14, 4).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (14, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -650,10 +632,7 @@ fn single_line_highlight() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -685,10 +664,8 @@ fn external_source() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = Report::from(MyBad {
-        highlight: (9, 4).into(),
-    })
-    .with_source_code(NamedSource::new("bad_file.rs", src));
+    let err = Report::from(MyBad { highlight: (9, 4).into() })
+        .with_source_code(NamedSource::new("bad_file.rs", src));
     let out = fmt_report(err);
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -722,10 +699,7 @@ fn single_line_highlight_offset_zero() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (0, 0).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (0, 0).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -758,10 +732,7 @@ fn single_line_highlight_offset_end_of_line() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (6, 0).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (6, 0).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -794,10 +765,7 @@ fn single_line_highlight_include_end_of_line() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 5).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 5).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -831,10 +799,7 @@ fn single_line_highlight_include_end_of_line_crlf() -> Result<(), MietteError> {
     }
 
     let src = "source\r\n  text\r\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (10, 6).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (10, 6).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -868,10 +833,7 @@ fn single_line_highlight_with_empty_span() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 0).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 0).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -905,10 +867,7 @@ fn single_line_highlight_no_label() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -941,10 +900,7 @@ fn single_line_highlight_at_line_start() -> Result<(), MietteError> {
     }
 
     let src = "source\ntext\n  here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (7, 4).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (7, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -978,10 +934,7 @@ fn multiline_label() -> Result<(), MietteError> {
     }
 
     let src = "source\ntext\n  here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (7, 4).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (7, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -1158,10 +1111,7 @@ fn multiline_highlight_adjacent() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 11).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 11).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -1194,10 +1144,7 @@ fn multiline_highlight_multiline_label() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 11).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 11).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -1592,9 +1539,7 @@ fn related_source_code_propagation() -> Result<(), MietteError> {
     let err = MyBad {
         src: NamedSource::new("bad_file.rs", src),
         highlight: (9, 4).into(),
-        related: vec![InnerError {
-            highlight: (0, 6).into(),
-        }],
+        related: vec![InnerError { highlight: (0, 6).into() }],
     };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
@@ -1835,10 +1780,7 @@ fn single_line_with_wide_char_unaligned_span_start() -> Result<(), MietteError> 
     }
 
     let src = "source\n  👼🏼text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (10, 5).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (10, 5).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -1872,10 +1814,7 @@ fn single_line_with_wide_char_unaligned_span_end() -> Result<(), MietteError> {
     }
 
     let src = "source\n  text 👼🏼\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 6).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 6).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -1909,10 +1848,7 @@ fn single_line_with_wide_char_unaligned_span_empty() -> Result<(), MietteError> 
     }
 
     let src = "source\n  👼🏼text\n    here".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (10, 0).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (10, 0).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = r#"oops::my::bad
@@ -1951,10 +1887,7 @@ fn syntax_highlighter() {
         "fn main() {\n    println!(\"Hello, World!\");\n}\n".to_string(),
     )
     .with_language("Rust");
-    let err = Test {
-        src,
-        src_span: (16, 26).into(),
-    };
+    let err = Test { src, src_span: (16, 26).into() };
     let mut out = String::new();
     GraphicalReportHandler::new_themed(GraphicalTheme::unicode())
         .render_report(&mut out, &err)
@@ -2137,10 +2070,7 @@ fn invalid_span_bad_offset() -> Result<(), MietteError> {
     }
 
     let src = "blabla blibli".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight1: (50, 6).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight1: (50, 6).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = "oops::my::bad
@@ -2166,10 +2096,7 @@ fn invalid_span_bad_length() -> Result<(), MietteError> {
     }
 
     let src = "blabla blibli".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight1: (0, 50).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight1: (0, 50).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = "oops::my::bad
@@ -2195,10 +2122,7 @@ fn invalid_span_no_label() -> Result<(), MietteError> {
     }
 
     let src = "blabla blibli".to_string();
-    let err = MyBad {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight1: (50, 6).into(),
-    };
+    let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight1: (50, 6).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
     let expected = "oops::my::bad

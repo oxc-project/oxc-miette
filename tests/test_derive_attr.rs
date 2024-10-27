@@ -17,10 +17,7 @@ fn enum_uses_base_attr() {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad::Only {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad::Only { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     assert_eq!(err.code().unwrap().to_string(), "error::on::base");
 }
 
@@ -39,10 +36,7 @@ fn enum_uses_variant_attr() {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad::Only {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad::Only { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     assert_eq!(err.code().unwrap().to_string(), "error::on::variant");
 }
 
@@ -62,10 +56,7 @@ fn multiple_attrs_allowed_on_item() {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad::Only {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad::Only { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     assert_eq!(err.code().unwrap().to_string(), "error::on::base");
     assert_eq!(err.help().unwrap().to_string(), "try doing it correctly");
 }
@@ -86,10 +77,7 @@ fn multiple_attrs_allowed_on_variant() {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad::Only {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad::Only { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     assert_eq!(err.code().unwrap().to_string(), "error::on::variant");
     assert_eq!(err.help().unwrap().to_string(), "try doing it correctly");
 }
@@ -111,16 +99,10 @@ fn attrs_can_be_split_between_item_and_variants() {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad::Only {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad::Only { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     assert_eq!(err.code().unwrap().to_string(), "error::on::base");
     assert_eq!(err.help().unwrap().to_string(), "try doing it correctly");
-    assert_eq!(
-        err.url().unwrap().to_string(),
-        "https://example.com/foo/bar".to_string()
-    );
+    assert_eq!(err.url().unwrap().to_string(), "https://example.com/foo/bar".to_string());
 }
 
 #[test]
@@ -137,10 +119,7 @@ fn attr_not_required() {
     }
 
     let src = "source\n  text\n    here".to_string();
-    let err = MyBad::Only {
-        src: NamedSource::new("bad_file.rs", src),
-        highlight: (9, 4).into(),
-    };
+    let err = MyBad::Only { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let err_span = err.labels().unwrap().next().unwrap();
     let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
     assert_eq!(err_span, expectation);

@@ -33,10 +33,7 @@ impl SourceCode {
                         ..
                     }) = &field.ty
                     {
-                        segments
-                            .last()
-                            .map(|seg| seg.ident == "Option")
-                            .unwrap_or(false)
+                        segments.last().map(|seg| seg.ident == "Option").unwrap_or(false)
                     } else {
                         false
                     };
@@ -44,15 +41,9 @@ impl SourceCode {
                     let source_code = if let Some(ident) = field.ident.clone() {
                         syn::Member::Named(ident)
                     } else {
-                        syn::Member::Unnamed(syn::Index {
-                            index: i as u32,
-                            span: field.span(),
-                        })
+                        syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
                     };
-                    return Ok(Some(SourceCode {
-                        source_code,
-                        is_option,
-                    }));
+                    return Ok(Some(SourceCode { source_code, is_option }));
                 }
             }
         }

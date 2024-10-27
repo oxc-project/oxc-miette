@@ -257,9 +257,7 @@ impl MietteHandlerOpts {
                     handler = handler.without_cause_chain();
                 }
             }
-            MietteHandler {
-                inner: Box::new(handler),
-            }
+            MietteHandler { inner: Box::new(handler) }
         } else {
             let linkify = self.use_links();
             let characters = match self.unicode {
@@ -305,9 +303,8 @@ impl MietteHandlerOpts {
                 MietteHighlighter::nocolor()
             };
             let theme = self.theme.unwrap_or(GraphicalTheme { characters, styles });
-            let mut handler = GraphicalReportHandler::new_themed(theme)
-                .with_width(width)
-                .with_links(linkify);
+            let mut handler =
+                GraphicalReportHandler::new_themed(theme).with_width(width).with_links(linkify);
             handler.highlighter = highlighter;
             if let Some(with_cause_chain) = self.with_cause_chain {
                 if with_cause_chain {
@@ -338,9 +335,7 @@ impl MietteHandlerOpts {
                 handler = handler.with_word_splitter(s)
             }
 
-            MietteHandler {
-                inner: Box::new(handler),
-            }
+            MietteHandler { inner: Box::new(handler) }
         }
     }
 
@@ -367,8 +362,7 @@ impl MietteHandlerOpts {
     }
 
     pub(crate) fn get_width(&self) -> usize {
-        self.width
-            .unwrap_or_else(|| syscall::terminal_width().unwrap_or(80))
+        self.width.unwrap_or_else(|| syscall::terminal_width().unwrap_or(80))
     }
 }
 

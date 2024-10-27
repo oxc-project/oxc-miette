@@ -28,10 +28,7 @@ impl DiagnosticSource {
                     let diagnostic_source = if let Some(ident) = field.ident.clone() {
                         syn::Member::Named(ident)
                     } else {
-                        syn::Member::Unnamed(syn::Index {
-                            index: i as u32,
-                            span: field.span(),
-                        })
+                        syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
                     };
                     return Ok(Some(DiagnosticSource(diagnostic_source)));
                 }
@@ -44,11 +41,7 @@ impl DiagnosticSource {
         gen_all_variants_with(
             variants,
             WhichFn::DiagnosticSource,
-            |ident,
-             fields,
-             DiagnosticConcreteArgs {
-                 diagnostic_source, ..
-             }| {
+            |ident, fields, DiagnosticConcreteArgs { diagnostic_source, .. }| {
                 let (display_pat, _display_members) = display_pat_members(fields);
                 diagnostic_source.as_ref().map(|diagnostic_source| {
                     let rel = match &diagnostic_source.0 {

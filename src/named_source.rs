@@ -27,11 +27,7 @@ impl<S: SourceCode + 'static> NamedSource<S> {
     where
         S: Send + Sync,
     {
-        Self {
-            source,
-            name: name.as_ref().to_string(),
-            language: None,
-        }
+        Self { source, name: name.as_ref().to_string(), language: None }
     }
 
     /// Gets the name of this `NamedSource`.
@@ -61,8 +57,7 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
         context_lines_after: usize,
     ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
         let inner_contents =
-            self.inner()
-                .read_span(span, context_lines_before, context_lines_after)?;
+            self.inner().read_span(span, context_lines_before, context_lines_after)?;
         let mut contents = MietteSpanContents::new_named(
             self.name.clone(),
             inner_contents.data(),

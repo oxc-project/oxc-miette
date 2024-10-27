@@ -112,10 +112,8 @@ impl DiagnosticConcreteArgs {
                 }
                 DiagnosticArg::Code(new_code) => {
                     if self.code.is_some() {
-                        errors.push(syn::Error::new_spanned(
-                            attr,
-                            "code has already been specified",
-                        ));
+                        errors
+                            .push(syn::Error::new_spanned(attr, "code has already been specified"));
                     }
                     self.code = Some(new_code);
                 }
@@ -130,19 +128,15 @@ impl DiagnosticConcreteArgs {
                 }
                 DiagnosticArg::Help(hl) => {
                     if self.help.is_some() {
-                        errors.push(syn::Error::new_spanned(
-                            attr,
-                            "help has already been specified",
-                        ));
+                        errors
+                            .push(syn::Error::new_spanned(attr, "help has already been specified"));
                     }
                     self.help = Some(hl);
                 }
                 DiagnosticArg::Url(u) => {
                     if self.url.is_some() {
-                        errors.push(syn::Error::new_spanned(
-                            attr,
-                            "url has already been specified",
-                        ));
+                        errors
+                            .push(syn::Error::new_spanned(attr, "url has already been specified"));
                     }
                     self.url = Some(u);
                 }
@@ -198,9 +192,7 @@ impl DiagnosticDefArgs {
                 errors.push(syn::Error::new_spanned(attr, error_message));
             }
 
-            let args = args
-                .into_iter()
-                .filter(|x| !matches!(x, DiagnosticArg::Transparent));
+            let args = args.into_iter().filter(|x| !matches!(x, DiagnosticArg::Transparent));
 
             concrete.add_args(attr, args, &mut errors);
         }
@@ -248,17 +240,9 @@ impl Diagnostic {
                         .extend(var.attrs.iter().filter(|x| x.path().is_ident("diagnostic")));
                     let args =
                         DiagnosticDefArgs::parse(&var.ident, &var.fields, &variant_attrs, true)?;
-                    vars.push(DiagnosticDef {
-                        ident: var.ident,
-                        fields: var.fields,
-                        args,
-                    });
+                    vars.push(DiagnosticDef { ident: var.ident, fields: var.fields, args });
                 }
-                Diagnostic::Enum {
-                    ident: input.ident,
-                    generics: input.generics,
-                    variants: vars,
-                }
+                Diagnostic::Enum { ident: input.ident, generics: input.generics, variants: vars }
             }
             syn::Data::Union(_) => {
                 return Err(syn::Error::new(
@@ -271,12 +255,7 @@ impl Diagnostic {
 
     pub fn gen(&self) -> TokenStream {
         match self {
-            Self::Struct {
-                ident,
-                fields,
-                generics,
-                args,
-            } => {
+            Self::Struct { ident, fields, generics, args } => {
                 let (impl_generics, ty_generics, where_clause) = &generics.split_for_impl();
                 match args {
                     DiagnosticDefArgs::Transparent(forward) => {
@@ -305,10 +284,7 @@ impl Diagnostic {
                     }
                     DiagnosticDefArgs::Concrete(concrete) => {
                         let forward = |which| {
-                            concrete
-                                .forward
-                                .as_ref()
-                                .map(|fwd| fwd.gen_struct_method(which))
+                            concrete.forward.as_ref().map(|fwd| fwd.gen_struct_method(which))
                         };
                         let code_body = concrete
                             .code
@@ -365,11 +341,7 @@ impl Diagnostic {
                     }
                 }
             }
-            Self::Enum {
-                ident,
-                generics,
-                variants,
-            } => {
+            Self::Enum { ident, generics, variants } => {
                 let (impl_generics, ty_generics, where_clause) = &generics.split_for_impl();
                 let code_body = Code::gen_enum(variants);
                 let help_body = Help::gen_enum(variants);
