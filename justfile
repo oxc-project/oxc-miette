@@ -22,7 +22,7 @@ ready:
   cargo shear
   cargo fmt
   cargo check
-  cargo test
   cargo clippy
+  cargo test --features fancy
   cargo doc
   git status
