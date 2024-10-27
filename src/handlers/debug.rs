@@ -34,12 +34,12 @@ impl DebugReportHandler {
         diagnostic: &(dyn Diagnostic),
     ) -> fmt::Result {
         let mut diag = f.debug_struct("Diagnostic");
-        diag.field("message", &format!("{}", diagnostic));
+        diag.field("message", &format!("{diagnostic}"));
         if let Some(code) = diagnostic.code() {
             diag.field("code", &code.to_string());
         }
         if let Some(severity) = diagnostic.severity() {
-            diag.field("severity", &format!("{:?}", severity));
+            diag.field("severity", &format!("{severity:?}"));
         }
         if let Some(url) = diagnostic.url() {
             diag.field("url", &url.to_string());
@@ -49,10 +49,10 @@ impl DebugReportHandler {
         }
         if let Some(labels) = diagnostic.labels() {
             let labels: Vec<_> = labels.collect();
-            diag.field("labels", &format!("{:?}", labels));
+            diag.field("labels", &format!("{labels:?}"));
         }
         if let Some(cause) = diagnostic.diagnostic_source() {
-            diag.field("caused by", &format!("{:?}", cause));
+            diag.field("caused by", &format!("{cause:?}"));
         }
         diag.finish()?;
         writeln!(f)?;

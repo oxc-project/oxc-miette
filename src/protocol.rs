@@ -267,6 +267,7 @@ pub struct LabeledSpan {
 
 impl LabeledSpan {
     /// Makes a new labeled span.
+    #[must_use]
     pub const fn new(label: Option<String>, offset: ByteOffset, len: usize) -> Self {
         Self {
             label,
@@ -276,6 +277,7 @@ impl LabeledSpan {
     }
 
     /// Makes a new labeled span using an existing span.
+    #[must_use]
     pub fn new_with_span(label: Option<String>, span: impl Into<SourceSpan>) -> Self {
         Self {
             label,
@@ -285,6 +287,7 @@ impl LabeledSpan {
     }
 
     /// Makes a new labeled primary span using an existing span.
+    #[must_use]
     pub fn new_primary_with_span(label: Option<String>, span: impl Into<SourceSpan>) -> Self {
         Self {
             label,
@@ -311,6 +314,7 @@ impl LabeledSpan {
     ///     LabeledSpan::new(Some("should be Rust".to_string()), 0, 3)
     /// )
     /// ```
+    #[must_use]
     pub fn at(span: impl Into<SourceSpan>, label: impl Into<String>) -> Self {
         Self::new_with_span(Some(label.into()), span)
     }
@@ -342,6 +346,7 @@ impl LabeledSpan {
     /// let label = LabeledSpan::underline(12..16);
     /// assert_eq!(label, LabeledSpan::new(None, 12, 4))
     /// ```
+    #[must_use]
     pub fn underline(span: impl Into<SourceSpan>) -> Self {
         Self::new_with_span(None, span)
     }
@@ -524,6 +529,7 @@ impl<'a> MietteSpanContents<'a> {
     }
 
     /// Sets the `language` for syntax highlighting.
+    #[must_use]
     pub fn with_language(mut self, language: impl Into<String>) -> Self {
         self.language = Some(language.into());
         self

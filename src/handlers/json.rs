@@ -80,7 +80,7 @@ impl JSONReportHandler {
             Some(Severity::Warning) => "warning",
             Some(Severity::Advice) => "advice",
         };
-        write!(f, r#""severity": "{:}","#, severity)?;
+        write!(f, r#""severity": "{severity:}","#)?;
         if let Some(cause_iter) = diagnostic
             .diagnostic_source()
             .map(DiagnosticChain::from_diagnostic)

@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)]
+
 use std::panic::Location;
 
 use miette::{Diagnostic, IntoDiagnostic, WrapErr};
@@ -47,7 +49,7 @@ fn test_wrap_err() {
         .unwrap_err();
 
     // should panic if the location isn't in our crate
-    println!("{:?}", err);
+    println!("{err:?}");
 }
 
 #[test]
@@ -63,7 +65,7 @@ fn test_wrap_err_with() {
         .unwrap_err();
 
     // should panic if the location isn't in our crate
-    println!("{:?}", err);
+    println!("{err:?}");
 }
 
 #[test]
@@ -79,7 +81,7 @@ fn test_context() {
         .unwrap_err();
 
     // should panic if the location isn't in our crate
-    println!("{:?}", err);
+    println!("{err:?}");
 }
 
 #[test]
@@ -95,5 +97,5 @@ fn test_with_context() {
         .unwrap_err();
 
     // should panic if the location isn't in our crate
-    println!("{:?}", err);
+    println!("{err:?}");
 }

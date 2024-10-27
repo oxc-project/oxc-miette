@@ -14,6 +14,7 @@ fn test_convert() {
 }
 
 #[test]
+#[allow(clippy::unnecessary_wraps)]
 fn test_question_mark() -> Result<(), Box<dyn Diagnostic>> {
     fn f() -> Result<()> {
         Ok(())

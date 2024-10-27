@@ -21,6 +21,7 @@ pub struct NarratableReportHandler {
 impl NarratableReportHandler {
     /// Create a new [`NarratableReportHandler`]. There are no customization
     /// options.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             footer: None,
@@ -31,24 +32,28 @@ impl NarratableReportHandler {
 
     /// Include the cause chain of the top-level error in the report, if
     /// available.
+    #[must_use]
     pub const fn with_cause_chain(mut self) -> Self {
         self.with_cause_chain = true;
         self
     }
 
     /// Do not include the cause chain of the top-level error in the report.
+    #[must_use]
     pub const fn without_cause_chain(mut self) -> Self {
         self.with_cause_chain = false;
         self
     }
 
     /// Set the footer to be displayed at the end of the report.
+    #[must_use]
     pub fn with_footer(mut self, footer: String) -> Self {
         self.footer = Some(footer);
         self
     }
 
     /// Sets the number of lines of context to show around each error.
+    #[must_use]
     pub const fn with_context_lines(mut self, lines: usize) -> Self {
         self.context_lines = lines;
         self
@@ -80,13 +85,13 @@ impl NarratableReportHandler {
         self.render_footer(f, diagnostic)?;
         self.render_related(f, diagnostic, src)?;
         if let Some(footer) = &self.footer {
-            writeln!(f, "{}", footer)?;
+            writeln!(f, "{footer}")?;
         }
         Ok(())
     }
 
     fn render_header(&self, f: &mut impl fmt::Write, diagnostic: &(dyn Diagnostic)) -> fmt::Result {
-        writeln!(f, "{}", diagnostic)?;
+        writeln!(f, "{diagnostic}")?;
         let severity = match diagnostic.severity() {
             Some(Severity::Error) | None => "error",
             Some(Severity::Warning) => "warning",
@@ -103,7 +108,7 @@ impl NarratableReportHandler {
             .or_else(|| diagnostic.source().map(DiagnosticChain::from_stderror))
         {
             for error in cause_iter {
-                writeln!(f, "    Caused by: {}", error)?;
+                writeln!(f, "    Caused by: {error}")?;
             }
         }
 
@@ -112,13 +117,13 @@ impl NarratableReportHandler {
 
     fn render_footer(&self, f: &mut impl fmt::Write, diagnostic: &(dyn Diagnostic)) -> fmt::Result {
         if let Some(help) = diagnostic.help() {
-            writeln!(f, "diagnostic help: {}", help)?;
+            writeln!(f, "diagnostic help: {help}")?;
         }
         if let Some(code) = diagnostic.code() {
-            writeln!(f, "diagnostic code: {}", code)?;
+            writeln!(f, "diagnostic code: {code}")?;
         }
         if let Some(url) = diagnostic.url() {
-            writeln!(f, "For more details, see:\n{}", url)?;
+            writeln!(f, "For more details, see:\n{url}")?;
         }
         Ok(())
     }
@@ -228,7 +233,7 @@ impl NarratableReportHandler {
         let (contents, lines) = self.get_lines(source, context.inner())?;
         write!(f, "Begin snippet")?;
         if let Some(filename) = contents.name() {
-            write!(f, " for {}", filename,)?;
+            write!(f, " for {filename}")?;
         }
         writeln!(
             f,
@@ -274,7 +279,7 @@ impl NarratableReportHandler {
                     }
                 }
                 if let Some(label) = label.label() {
-                    write!(f, ": {}", label)?;
+                    write!(f, ": {label}")?;
                 }
                 writeln!(f)?;
             }
@@ -373,16 +378,19 @@ enum SpanAttach {
 /// Returns column at offset, and nearest boundary if offset is in the middle of
 /// the character
 fn safe_get_column(text: &str, offset: usize, start: bool) -> usize {
-    let mut column = text.get(0..offset).map(|s| s.width()).unwrap_or_else(|| {
-        let mut column = 0;
-        for (idx, c) in text.char_indices() {
-            if offset <= idx {
-                break;
+    let mut column = text
+        .get(0..offset)
+        .map(UnicodeWidthStr::width)
+        .unwrap_or_else(|| {
+            let mut column = 0;
+            for (idx, c) in text.char_indices() {
+                if offset <= idx {
+                    break;
+                }
+                column += c.width().unwrap_or(0);
             }
-            column += c.width().unwrap_or(0);
-        }
-        column
-    });
+            column
+        });
     if start {
         // Offset are zero-based, so plus one
         column += 1;

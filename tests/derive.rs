@@ -1,3 +1,5 @@
+#![allow(clippy::items_after_statements)]
+
 use miette::{Diagnostic, Report, Severity, SourceSpan};
 use thiserror::Error;
 
@@ -366,7 +368,7 @@ fn url_basic() {
     #[derive(Debug, Diagnostic, Error)]
     #[error("welp")]
     #[diagnostic(code(foo::bar::baz), url("https://example.com/foo/bar"))]
-    struct Foo {}
+    struct Foo;
 
     assert_eq!(
         "https://example.com/foo/bar".to_string(),
@@ -379,7 +381,7 @@ fn url_docsrs() {
     #[derive(Debug, Diagnostic, Error)]
     #[error("welp")]
     #[diagnostic(code(foo::bar::baz), url(docsrs))]
-    struct Foo {}
+    struct Foo;
 
     assert_eq!(
         format!(
@@ -419,7 +421,10 @@ impl ForwardsTo {
 
 fn check_all(diag: &impl Diagnostic) {
     // check Diagnostic impl forwards all these methods
-    assert_eq!(diag.code().as_ref().map(|x| x.to_string()), None);
+    assert_eq!(
+        diag.code().as_ref().map(std::string::ToString::to_string),
+        None
+    );
     assert_eq!(diag.url().unwrap().to_string(), "https://example.com");
     assert_eq!(diag.help().unwrap().to_string(), "help");
     assert_eq!(diag.severity().unwrap(), miette::Severity::Warning);
@@ -601,7 +606,7 @@ fn test_optional_source_code() {
     }
     assert!(Struct { src: None }.source_code().is_none());
     assert!(Struct {
-        src: Some("".to_string())
+        src: Some(String::new())
     }
     .source_code()
     .is_some());
@@ -621,13 +626,13 @@ fn test_optional_source_code() {
     }
     assert!(Enum::Variant1 { src: None }.source_code().is_none());
     assert!(Enum::Variant1 {
-        src: Some("".to_string())
+        src: Some(String::new())
     }
     .source_code()
     .is_some());
     assert!(Enum::Variant2 { src: None }.source_code().is_none());
     assert!(Enum::Variant2 {
-        src: Some("".to_string())
+        src: Some(String::new())
     }
     .source_code()
     .is_some());

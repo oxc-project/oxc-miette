@@ -92,6 +92,7 @@ impl MietteDiagnostic {
     /// assert_eq!(diag.to_string(), "Oops, something went wrong!");
     /// assert_eq!(diag.message, "Oops, something went wrong!");
     /// ```
+    #[must_use]
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
@@ -113,6 +114,7 @@ impl MietteDiagnostic {
     /// assert_eq!(diag.message, "Oops, something went wrong!");
     /// assert_eq!(diag.code, Some("foo::bar::baz".to_string()));
     /// ```
+    #[must_use]
     pub fn with_code(mut self, code: impl Into<String>) -> Self {
         self.code = Some(code.into());
         self
@@ -128,6 +130,7 @@ impl MietteDiagnostic {
     /// assert_eq!(diag.message, "I warn you to stop!");
     /// assert_eq!(diag.severity, Some(Severity::Warning));
     /// ```
+    #[must_use]
     pub fn with_severity(mut self, severity: Severity) -> Self {
         self.severity = Some(severity);
         self
@@ -143,6 +146,7 @@ impl MietteDiagnostic {
     /// assert_eq!(diag.message, "PC is not working");
     /// assert_eq!(diag.help, Some("Try to reboot it again".to_string()));
     /// ```
+    #[must_use]
     pub fn with_help(mut self, help: impl Into<String>) -> Self {
         self.help = Some(help.into());
         self
@@ -162,6 +166,7 @@ impl MietteDiagnostic {
     ///     Some("https://letmegooglethat.com/?q=Why+my+pc+doesn%27t+work".to_string())
     /// );
     /// ```
+    #[must_use]
     pub fn with_url(mut self, url: impl Into<String>) -> Self {
         self.url = Some(url.into());
         self
@@ -182,6 +187,7 @@ impl MietteDiagnostic {
     /// assert_eq!(diag.message, "Wrong best language");
     /// assert_eq!(diag.labels, Some(vec![label]));
     /// ```
+    #[must_use]
     pub fn with_label(mut self, label: impl Into<LabeledSpan>) -> Self {
         self.labels = Some(vec![label.into()]);
         self
@@ -205,6 +211,7 @@ impl MietteDiagnostic {
     /// assert_eq!(diag.message, "Typos in 'hello world'");
     /// assert_eq!(diag.labels, Some(labels));
     /// ```
+    #[must_use]
     pub fn with_labels(mut self, labels: impl IntoIterator<Item = LabeledSpan>) -> Self {
         self.labels = Some(labels.into_iter().collect());
         self
@@ -226,6 +233,7 @@ impl MietteDiagnostic {
     /// assert_eq!(diag.message, "Typos in 'hello world'");
     /// assert_eq!(diag.labels, Some(vec![label1, label2]));
     /// ```
+    #[must_use]
     pub fn and_label(mut self, label: impl Into<LabeledSpan>) -> Self {
         let mut labels = self.labels.unwrap_or_default();
         labels.push(label.into());
@@ -250,6 +258,7 @@ impl MietteDiagnostic {
     /// assert_eq!(diag.message, "Typos in 'hello world!'");
     /// assert_eq!(diag.labels, Some(vec![label1, label2, label3]));
     /// ```
+    #[must_use]
     pub fn and_labels(mut self, labels: impl IntoIterator<Item = LabeledSpan>) -> Self {
         let mut all_labels = self.labels.unwrap_or_default();
         all_labels.extend(labels);

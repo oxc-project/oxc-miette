@@ -106,7 +106,7 @@ impl std::fmt::Display for CustomDiagnostic {
 
 impl StdError for CustomDiagnostic {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        self.source.as_ref().map(|source| source.as_ref())
+        self.source.as_ref().map(std::convert::AsRef::as_ref)
     }
 
     fn description(&self) -> &str {
@@ -114,7 +114,7 @@ impl StdError for CustomDiagnostic {
     }
 
     fn cause(&self) -> Option<&dyn StdError> {
-        self.source.as_ref().map(|source| source.as_ref())
+        self.source.as_ref().map(std::convert::AsRef::as_ref)
     }
 }
 
@@ -161,7 +161,7 @@ impl Diagnostic for CustomDiagnostic {
 fn test_boxed_custom_diagnostic() {
     fn assert_report(report: &Report) {
         assert_eq!(
-            report.source().map(|source| source.to_string()),
+            report.source().map(std::string::ToString::to_string),
             Some("oh no!".to_owned()),
         );
         assert_eq!(
@@ -178,7 +178,7 @@ fn test_boxed_custom_diagnostic() {
             Some(CustomDiagnostic::URL.to_owned())
         );
         assert_eq!(
-            report.labels().map(|labels| labels.collect::<Vec<_>>()),
+            report.labels().map(std::iter::Iterator::collect),
             Some(vec![LabeledSpan::new(
                 Some(CustomDiagnostic::LABEL.to_owned()),
                 0,
@@ -195,7 +195,7 @@ fn test_boxed_custom_diagnostic() {
             Some(CustomDiagnostic::SOURCE_CODE.to_owned().into_bytes())
         );
         assert_eq!(
-            report.diagnostic_source().map(|source| source.to_string()),
+            report.diagnostic_source().map(std::string::ToString::to_string),
             Some("oh no!".to_owned()),
         );
     }

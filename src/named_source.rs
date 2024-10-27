@@ -46,6 +46,7 @@ impl<S: SourceCode + 'static> NamedSource<S> {
     }
 
     /// Sets the [`language`](SpanContents::language) for this source code.
+    #[must_use]
     pub fn with_language(mut self, language: impl Into<String>) -> Self {
         self.language = Some(language.into());
         self

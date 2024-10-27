@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout, clippy::unnecessary_wraps)]
+
 mod json_report_handler {
     use miette::{Diagnostic, MietteError, NamedSource, Report, SourceSpan};
 
@@ -31,7 +33,7 @@ mod json_report_handler {
             highlight: (9, 6).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -76,7 +78,7 @@ mod json_report_handler {
             highlight: (9, 4).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -121,7 +123,7 @@ mod json_report_handler {
             highlight: (0, 0).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -166,7 +168,7 @@ mod json_report_handler {
             highlight: (9, 0).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -211,7 +213,7 @@ mod json_report_handler {
             highlight: (9, 4).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -255,7 +257,7 @@ mod json_report_handler {
             highlight: (7, 4).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -306,7 +308,7 @@ mod json_report_handler {
             highlight3: (24, 4).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -365,7 +367,7 @@ mod json_report_handler {
             highlight: (9, 11).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -406,12 +408,12 @@ mod json_report_handler {
             highlight2: SourceSpan,
         }
 
-        let src = r#"line1
+        let src = r"line1
     line2
     line3
     line4
     line5
-    "#
+    "
         .to_string();
         let len = src.len();
         let err = MyBad {
@@ -420,7 +422,7 @@ mod json_report_handler {
             highlight2: (10, 9).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -478,12 +480,12 @@ mod json_report_handler {
         #[error("very much went wrong")]
         struct InnerInner;
 
-        let src = r#"line1
+        let src = r"line1
     line2
     line3
     line4
     line5
-    "#
+    "
         .to_string();
         let len = src.len();
         let err = MyBad {
@@ -493,7 +495,7 @@ mod json_report_handler {
             highlight2: (10, 9).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "wtf?!\nit broke :(",
@@ -550,7 +552,7 @@ mod json_report_handler {
             highlight2: (20, 6).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -605,7 +607,7 @@ mod json_report_handler {
             highlight2: (9, 10).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -660,7 +662,7 @@ mod json_report_handler {
             highlight2: (10, 10).into(),
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -703,7 +705,7 @@ mod json_report_handler {
 
         let err = MyBad;
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -753,7 +755,7 @@ mod json_report_handler {
             ],
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
@@ -850,7 +852,7 @@ mod json_report_handler {
             ],
         };
         let out = fmt_report(err.into());
-        println!("Error: {}", out);
+        println!("Error: {out}");
         let expected: String = r#"
         {
             "message": "oops!",
