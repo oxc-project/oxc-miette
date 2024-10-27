@@ -195,7 +195,7 @@ impl MietteDiagnostic {
     /// ```
     /// use miette::{Diagnostic, LabeledSpan, MietteDiagnostic};
     ///
-    /// let source = "helo wrld";
+    /// let source = "hello wrld";
     ///
     /// let labels = vec![
     ///     LabeledSpan::at_offset(3, "add 'l'"),
@@ -216,7 +216,7 @@ impl MietteDiagnostic {
     /// ```
     /// use miette::{Diagnostic, LabeledSpan, MietteDiagnostic};
     ///
-    /// let source = "helo wrld";
+    /// let source = "hello wrld";
     ///
     /// let label1 = LabeledSpan::at_offset(3, "add 'l'");
     /// let label2 = LabeledSpan::at_offset(6, "add 'r'");
@@ -239,7 +239,7 @@ impl MietteDiagnostic {
     /// ```
     /// use miette::{Diagnostic, LabeledSpan, MietteDiagnostic};
     ///
-    /// let source = "helo wrld";
+    /// let source = "hello wrld";
     ///
     /// let label1 = LabeledSpan::at_offset(3, "add 'l'");
     /// let label2 = LabeledSpan::at_offset(6, "add 'r'");

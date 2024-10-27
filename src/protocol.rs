@@ -338,7 +338,7 @@ impl LabeledSpan {
     /// ```
     /// use miette::LabeledSpan;
     ///
-    /// let source = "You have an eror here";
+    /// let source = "You have an error here";
     /// let label = LabeledSpan::underline(12..16);
     /// assert_eq!(label, LabeledSpan::new(None, 12, 4))
     /// ```

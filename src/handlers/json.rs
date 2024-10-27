@@ -133,10 +133,10 @@ impl JSONReportHandler {
         } else {
             write!(f, r#""labels": [],"#)?;
         }
-        if let Some(relateds) = diagnostic.related() {
+        if let Some(relates) = diagnostic.related() {
             write!(f, r#""related": ["#)?;
             let mut add_comma = false;
-            for related in relateds {
+            for related in relates {
                 if add_comma {
                     write!(f, ",")?;
                 } else {
