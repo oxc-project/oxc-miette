@@ -19,6 +19,7 @@ init:
 ready:
   git diff --exit-code --quiet
   typos
+  cargo shear
   cargo fmt
   cargo check
   cargo test

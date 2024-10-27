@@ -217,6 +217,7 @@ mod tests {
 
     #[derive(Error, Debug)]
     #[error("outer")]
+    #[allow(unused)]
     struct Outer {
         pub(crate) errors: Vec<Inner>,
     }

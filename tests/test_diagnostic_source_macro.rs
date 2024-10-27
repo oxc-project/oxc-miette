@@ -110,7 +110,7 @@ fn test_diagnostic_source_pass_extra_info() {
        2 │ World!
          ╰────
         help: Have you tried turning it on and off again?
-      
+
 
   this is a footer
 "#
@@ -144,12 +144,13 @@ fn test_diagnostic_source_is_output() {
          ·         ╰── here
          ╰────
         help: That's where the error is!
-      
+
 "#;
 
     assert_eq!(expected, out);
 }
 
+#[allow(dead_code)]
 #[derive(Debug, miette::Diagnostic, thiserror::Error)]
 #[error("A nested error happened")]
 struct NestedError {
@@ -187,7 +188,7 @@ fn test_nested_diagnostic_source_is_output() {
     let expected = r#"
   × A nested error happened
   ├─▶   × TestError
-  │   
+  │
   ╰─▶   × A complex error happened
          ╭────
        1 │ This is another error
@@ -195,7 +196,7 @@ fn test_nested_diagnostic_source_is_output() {
          ·      ╰── here
          ╰────
         help: You should fix this
-      
+
    ╭────
  1 │ right here
    ·       ──┬─
@@ -253,7 +254,7 @@ fn test_nested_cause_chains_for_related_errors_are_output() {
     let expected = r#"
   × A nested error happened
   ╰─▶   × A multi-error happened
-      
+
       Error:
         × A nested error happened
         ├─▶   × TestError
@@ -265,13 +266,13 @@ fn test_nested_cause_chains_for_related_errors_are_output() {
                ·      ╰── here
                ╰────
               help: You should fix this
-      
+
          ╭────
        1 │ right here
          ·       ──┬─
          ·         ╰── here
          ╰────
-      
+
       Error:
         × A complex error happened
          ╭────
@@ -280,7 +281,7 @@ fn test_nested_cause_chains_for_related_errors_are_output() {
          ·      ╰── here
          ╰────
         help: Get a grip...
-      
+
    ╭────
  1 │ the outside world
    ·       ──┬─

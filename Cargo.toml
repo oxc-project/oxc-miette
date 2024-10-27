@@ -43,7 +43,6 @@ futures = { version = "0.3", default-features = false }
 indenter = "0.3.3"
 rustversion = "1.0"
 trybuild = { version = "1.0.101", features = ["diff"] }
-syn = { version = "2.0.85", features = ["full"] }
 regex = "1.11"
 lazy_static = "1.5"
 
@@ -76,3 +75,6 @@ members = ["miette-derive"]
 
 [package.metadata.docs.rs]
 all-features = true
+
+[package.metadata.cargo-shear]
+ignored = ["futures", "indenter", "semver"]
