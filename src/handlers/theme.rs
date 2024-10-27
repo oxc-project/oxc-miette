@@ -244,6 +244,7 @@ impl ThemeCharacters {
             advice: "💡".into(),
         }
     }
+
     /// ASCII-art-based graphical elements. Works well on older terminals.
     pub fn ascii() -> Self {
         Self {

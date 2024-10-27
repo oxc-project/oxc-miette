@@ -1,10 +1,7 @@
 #![allow(clippy::print_stdout, clippy::unnecessary_wraps)]
 
 mod json_report_handler {
-    use miette::{Diagnostic, MietteError, NamedSource, Report, SourceSpan};
-
-    use miette::JSONReportHandler;
-
+    use miette::{Diagnostic, JSONReportHandler, MietteError, NamedSource, Report, SourceSpan};
     use thiserror::Error;
 
     fn fmt_report(diag: Report) -> String {
@@ -450,7 +447,9 @@ mod json_report_handler {
         }
 
         #[derive(Debug, Error)]
-        #[error("something went wrong\n\nHere's a more detailed explanation of everything that actually went wrong because it's actually important.\n")]
+        #[error(
+            "something went wrong\n\nHere's a more detailed explanation of everything that actually went wrong because it's actually important.\n"
+        )]
         struct Inner(#[source] InnerInner);
 
         #[derive(Debug, Error)]

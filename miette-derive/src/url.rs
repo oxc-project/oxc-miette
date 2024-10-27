@@ -8,11 +8,9 @@ use syn::{
 
 use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
-    utils::{display_pat_members, gen_all_variants_with, gen_unused_pat},
-};
-use crate::{
     fmt::{self, Display},
     forward::WhichFn,
+    utils::{display_pat_members, gen_all_variants_with, gen_unused_pat},
 };
 
 pub enum Url {
@@ -42,7 +40,10 @@ impl Parse for Url {
                     if option == "docsrs" {
                         Ok(Url::DocsRs)
                     } else {
-                        Err(syn::Error::new(option.span(), "Invalid argument to url() sub-attribute. It must be either a string or a plain `docsrs` identifier"))
+                        Err(syn::Error::new(
+                            option.span(),
+                            "Invalid argument to url() sub-attribute. It must be either a string or a plain `docsrs` identifier",
+                        ))
                     }
                 }
             } else {

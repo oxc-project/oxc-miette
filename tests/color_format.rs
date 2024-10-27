@@ -1,11 +1,14 @@
 #![cfg(feature = "fancy-no-backtrace")]
 
+use std::{
+    ffi::OsString,
+    fmt::{self, Debug},
+    sync::Mutex,
+};
+
 use lazy_static::lazy_static;
 use miette::{Diagnostic, MietteHandler, MietteHandlerOpts, ReportHandler, RgbColors};
 use regex::Regex;
-use std::ffi::OsString;
-use std::fmt::{self, Debug};
-use std::sync::Mutex;
 use thiserror::Error;
 
 #[derive(Eq, PartialEq, Debug)]

@@ -1,16 +1,17 @@
-use core::any::TypeId;
-use core::fmt::{self, Debug, Display};
-use core::mem::ManuallyDrop;
-use core::ptr::{self, NonNull};
+use core::{
+    any::TypeId,
+    fmt::{self, Debug, Display},
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+    ptr::{self, NonNull},
+};
 use std::error::Error as StdError;
 
-use super::ptr::{Mut, Own, Ref};
-use super::Report;
-use super::ReportHandler;
-use crate::chain::Chain;
-use crate::eyreish::wrapper::WithSourceCode;
-use crate::{Diagnostic, SourceCode};
-use core::ops::{Deref, DerefMut};
+use super::{
+    ptr::{Mut, Own, Ref},
+    Report, ReportHandler,
+};
+use crate::{chain::Chain, eyreish::wrapper::WithSourceCode, Diagnostic, SourceCode};
 
 impl Report {
     /// Create a new error object from any error type.

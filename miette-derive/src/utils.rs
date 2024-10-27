@@ -67,8 +67,9 @@ pub(crate) fn gen_all_variants_with(
     })
 }
 
-use crate::fmt::Display;
 use std::collections::HashSet;
+
+use crate::fmt::Display;
 
 pub(crate) fn gen_unused_pat(fields: &syn::Fields) -> TokenStream {
     match fields {

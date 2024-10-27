@@ -1,12 +1,18 @@
 mod common;
 mod drop;
 
-use self::common::*;
-use self::drop::{DetectDrop, Flag};
+use std::{
+    error::Error as StdError,
+    fmt::{self, Display},
+    io,
+};
+
 use miette::{Diagnostic, MietteDiagnostic, Report};
-use std::error::Error as StdError;
-use std::fmt::{self, Display};
-use std::io;
+
+use self::{
+    common::*,
+    drop::{DetectDrop, Flag},
+};
 
 #[test]
 fn test_downcast() {

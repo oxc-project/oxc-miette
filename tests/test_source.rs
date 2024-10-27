@@ -1,7 +1,10 @@
+use std::{
+    error::Error as StdError,
+    fmt::{self, Display},
+    io,
+};
+
 use miette::{miette, Report};
-use std::error::Error as StdError;
-use std::fmt::{self, Display};
-use std::io;
 
 #[derive(Debug)]
 enum TestError {

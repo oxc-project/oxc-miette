@@ -1,5 +1,6 @@
-use miette::{bail, Result};
 use std::io;
+
+use miette::{bail, Result};
 
 pub fn bail_literal() -> Result<()> {
     bail!("oh no!");

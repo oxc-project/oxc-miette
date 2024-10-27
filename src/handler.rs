@@ -1,14 +1,11 @@
 use std::fmt;
 
-use crate::highlighters::Highlighter;
-use crate::highlighters::MietteHighlighter;
-use crate::protocol::Diagnostic;
-use crate::GraphicalReportHandler;
-use crate::GraphicalTheme;
-use crate::NarratableReportHandler;
-use crate::ReportHandler;
-use crate::ThemeCharacters;
-use crate::ThemeStyles;
+use crate::{
+    highlighters::{Highlighter, MietteHighlighter},
+    protocol::Diagnostic,
+    GraphicalReportHandler, GraphicalTheme, NarratableReportHandler, ReportHandler,
+    ThemeCharacters, ThemeStyles,
+};
 
 /// Settings to control the color format used for graphical rendering.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -149,6 +146,7 @@ impl MietteHandlerOpts {
         self.break_words = Some(break_words);
         self
     }
+
     /// Sets the `textwrap::WordSeparator` to use when determining wrap points.
     pub fn word_separator(mut self, word_separator: textwrap::WordSeparator) -> Self {
         self.word_separator = Some(word_separator);
@@ -160,6 +158,7 @@ impl MietteHandlerOpts {
         self.word_splitter = Some(word_splitter);
         self
     }
+
     /// Include the cause chain of the top-level error in the report.
     pub fn with_cause_chain(mut self) -> Self {
         self.with_cause_chain = Some(true);

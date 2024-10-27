@@ -1,9 +1,8 @@
 #![allow(clippy::needless_doctest_main, clippy::new_ret_no_self, clippy::wrong_self_convention)]
 use core::fmt::Display;
+use std::{error::Error as StdError, sync::OnceLock};
 
-use std::error::Error as StdError;
-use std::sync::OnceLock;
-
+use error::ErrorImpl;
 #[allow(unreachable_pub)]
 pub use into_diagnostic::*;
 #[doc(hidden)]
@@ -19,15 +18,12 @@ pub use ReportHandler as EyreContext;
 #[allow(unreachable_pub)]
 pub use WrapErr as Context;
 
+use self::ptr::Own;
 #[cfg(not(feature = "fancy-base"))]
 use crate::DebugReportHandler;
 use crate::Diagnostic;
 #[cfg(feature = "fancy-base")]
 use crate::MietteHandler;
-
-use error::ErrorImpl;
-
-use self::ptr::Own;
 
 mod context;
 mod error;
@@ -446,16 +442,14 @@ pub trait WrapErr<T, E>: context::private::Sealed {
 // Private API. Referenced by macro-generated code.
 #[doc(hidden)]
 pub mod private {
-    use super::Report;
     use core::fmt::{Debug, Display};
-
     pub use core::result::Result::Err;
+
+    use super::Report;
 
     #[doc(hidden)]
     pub mod kind {
-        pub use super::super::kind::{AdhocKind, TraitKind};
-
-        pub use super::super::kind::BoxedKind;
+        pub use super::super::kind::{AdhocKind, BoxedKind, TraitKind};
     }
 
     #[track_caller]

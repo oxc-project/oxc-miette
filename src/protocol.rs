@@ -520,21 +520,27 @@ impl<'a> SpanContents<'a> for MietteSpanContents<'a> {
     fn data(&self) -> &'a [u8] {
         self.data
     }
+
     fn span(&self) -> &SourceSpan {
         &self.span
     }
+
     fn line(&self) -> usize {
         self.line
     }
+
     fn column(&self) -> usize {
         self.column
     }
+
     fn line_count(&self) -> usize {
         self.line_count
     }
+
     fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
+
     fn language(&self) -> Option<&str> {
         self.language.as_deref()
     }

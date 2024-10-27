@@ -1,10 +1,8 @@
 use core::fmt::{self, Debug, Display};
-
 use std::error::Error as StdError;
 
-use crate::{Diagnostic, LabeledSpan, Report, SourceCode};
-
 use crate as miette;
+use crate::{Diagnostic, LabeledSpan, Report, SourceCode};
 
 #[repr(transparent)]
 pub(crate) struct MessageError<M>(pub(crate) M);

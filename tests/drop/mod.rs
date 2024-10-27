@@ -1,8 +1,11 @@
-use std::error::Error as StdError;
-use std::fmt::{self, Display};
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::SeqCst;
-use std::sync::Arc;
+use std::{
+    error::Error as StdError,
+    fmt::{self, Display},
+    sync::{
+        atomic::{AtomicBool, Ordering::SeqCst},
+        Arc,
+    },
+};
 
 use miette::Diagnostic;
 

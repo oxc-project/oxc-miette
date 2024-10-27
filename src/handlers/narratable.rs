@@ -2,9 +2,11 @@ use std::fmt;
 
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-use crate::diagnostic_chain::DiagnosticChain;
-use crate::protocol::{Diagnostic, Severity};
-use crate::{LabeledSpan, MietteError, ReportHandler, SourceCode, SourceSpan, SpanContents};
+use crate::{
+    diagnostic_chain::DiagnosticChain,
+    protocol::{Diagnostic, Severity},
+    LabeledSpan, MietteError, ReportHandler, SourceCode, SourceSpan, SpanContents,
+};
 
 /**
 [`ReportHandler`] that renders plain text and avoids extraneous graphics.

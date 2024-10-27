@@ -3,8 +3,7 @@ Iterate over error `.source()` chains.
 
 NOTE: This module is taken wholesale from <https://crates.io/crates/eyre>.
 */
-use std::error::Error as StdError;
-use std::vec;
+use std::{error::Error as StdError, vec};
 
 use ChainState::*;
 

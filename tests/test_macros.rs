@@ -1,8 +1,9 @@
 #![allow(clippy::eq_op)]
 mod common;
 
-use self::common::*;
 use miette::{ensure, Result};
+
+use self::common::*;
 
 #[test]
 fn test_messages() {

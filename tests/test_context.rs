@@ -1,9 +1,11 @@
 mod drop;
 
-use crate::drop::{DetectDrop, Flag};
-use miette::{Diagnostic, IntoDiagnostic, Report, Result, WrapErr};
 use std::fmt::{self, Display};
+
+use miette::{Diagnostic, IntoDiagnostic, Report, Result, WrapErr};
 use thiserror::Error;
+
+use crate::drop::{DetectDrop, Flag};
 
 // https://github.com/dtolnay/miette/issues/18
 #[test]

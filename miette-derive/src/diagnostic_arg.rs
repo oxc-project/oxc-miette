@@ -1,10 +1,6 @@
 use syn::parse::{Parse, ParseStream};
 
-use crate::code::Code;
-use crate::forward::Forward;
-use crate::help::Help;
-use crate::severity::Severity;
-use crate::url::Url;
+use crate::{code::Code, forward::Forward, help::Help, severity::Severity, url::Url};
 
 pub enum DiagnosticArg {
     Transparent,

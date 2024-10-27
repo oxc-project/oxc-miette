@@ -1,7 +1,6 @@
+use diagnostic::Diagnostic;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
-
-use diagnostic::Diagnostic;
 
 mod code;
 mod diagnostic;

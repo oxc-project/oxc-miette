@@ -1,8 +1,10 @@
 mod drop;
 
-use self::drop::{DetectDrop, Flag};
-use miette::Report;
 use std::mem;
+
+use miette::Report;
+
+use self::drop::{DetectDrop, Flag};
 
 #[test]
 fn test_error_size() {

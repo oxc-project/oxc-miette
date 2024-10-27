@@ -56,7 +56,10 @@ impl DebugReportHandler {
         }
         diag.finish()?;
         writeln!(f)?;
-        writeln!(f, "NOTE: If you're looking for the fancy error reports, install miette with the `fancy` feature, or write your own and hook it up with miette::set_hook().")
+        writeln!(
+            f,
+            "NOTE: If you're looking for the fancy error reports, install miette with the `fancy` feature, or write your own and hook it up with miette::set_hook()."
+        )
     }
 }
 

@@ -1,6 +1,6 @@
+use std::{error::Error as StdError, io};
+
 use miette::{miette, Diagnostic, LabeledSpan, Report, SourceSpan};
-use std::error::Error as StdError;
-use std::io;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -58,14 +58,14 @@ struct CustomDiagnostic {
 }
 
 impl CustomDiagnostic {
-    const DISPLAY: &'static str = "CustomDiagnostic display";
-    const DESCRIPTION: &'static str = "CustomDiagnostic description";
     const CODE: &'static str = "A042";
-    const SEVERITY: miette::Severity = miette::Severity::Advice;
+    const DESCRIPTION: &'static str = "CustomDiagnostic description";
+    const DISPLAY: &'static str = "CustomDiagnostic display";
     const HELP: &'static str = "CustomDiagnostic help";
-    const URL: &'static str = "https://custom-diagnostic-url";
     const LABEL: &'static str = "CustomDiagnostic label";
+    const SEVERITY: miette::Severity = miette::Severity::Advice;
     const SOURCE_CODE: &'static str = "this-is-some-source-code";
+    const URL: &'static str = "https://custom-diagnostic-url";
 
     fn new() -> Self {
         Self { source: None, related: Vec::new() }

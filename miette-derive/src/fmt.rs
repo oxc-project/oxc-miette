@@ -1,12 +1,15 @@
 // NOTE: Most code in this file is taken straight from `thiserror`.
-use std::collections::HashSet as Set;
-use std::iter::FromIterator;
+use std::{collections::HashSet as Set, iter::FromIterator};
 
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use syn::ext::IdentExt;
-use syn::parse::{ParseStream, Parser};
-use syn::{braced, bracketed, parenthesized, Ident, Index, LitStr, Member, Result, Token};
+use syn::{
+    braced, bracketed,
+    ext::IdentExt,
+    parenthesized,
+    parse::{ParseStream, Parser},
+    Ident, Index, LitStr, Member, Result, Token,
+};
 
 #[derive(Clone)]
 pub struct Display {

@@ -45,9 +45,9 @@
 //     let error = $msg;
 //     (&error).miette_kind().new(error)
 
-use super::Report;
 use core::fmt::{Debug, Display};
 
+use super::Report;
 use crate::Diagnostic;
 
 pub struct Adhoc;

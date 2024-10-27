@@ -1,8 +1,7 @@
 use owo_colors::Style;
 
-use crate::SpanContents;
-
 use super::{Highlighter, HighlighterState};
+use crate::SpanContents;
 
 /// The default syntax highlighter. It applies `Style::default()` to input text.
 /// This is used by default when no syntax highlighting features are enabled.

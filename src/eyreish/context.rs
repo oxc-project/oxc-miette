@@ -1,9 +1,10 @@
-use super::error::{ContextError, ErrorImpl};
-use super::{Report, WrapErr};
 use core::fmt::{self, Debug, Display, Write};
-
 use std::error::Error as StdError;
 
+use super::{
+    error::{ContextError, ErrorImpl},
+    Report, WrapErr,
+};
 use crate::{Diagnostic, LabeledSpan};
 
 mod ext {

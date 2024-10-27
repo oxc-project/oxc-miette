@@ -13,12 +13,12 @@
 
 use std::{ops::Deref, sync::Arc};
 
-use crate::SpanContents;
+pub use blank::*;
 use owo_colors::Styled;
 
 #[cfg(feature = "syntect-highlighter")]
 pub use self::syntect::*;
-pub use blank::*;
+use crate::SpanContents;
 
 mod blank;
 #[cfg(feature = "syntect-highlighter")]
@@ -90,6 +90,7 @@ impl Default for MietteHighlighter {
             _ => Self(Arc::new(SyntectHighlighter::default())),
         }
     }
+
     #[cfg(not(feature = "syntect-highlighter"))]
     fn default() -> Self {
         return MietteHighlighter::nocolor();
@@ -110,6 +111,7 @@ impl std::fmt::Debug for MietteHighlighter {
 
 impl Deref for MietteHighlighter {
     type Target = dyn Highlighter + Send + Sync;
+
     fn deref(&self) -> &Self::Target {
         &*self.0
     }

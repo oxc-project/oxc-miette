@@ -64,7 +64,10 @@ impl Parse for LabelAttr {
                     LabelType::Collection
                 }
                 Some(_) => {
-                    return Err(syn::Error::new(input.span(), "Invalid argument to label() attribute. The argument must be a literal string or either the keyword `primary` or `collection`."));
+                    return Err(syn::Error::new(
+                        input.span(),
+                        "Invalid argument to label() attribute. The argument must be a literal string or either the keyword `primary` or `collection`.",
+                    ));
                 }
                 _ => LabelType::Default,
             };
@@ -79,7 +82,10 @@ impl Parse for LabelAttr {
                 let display = Display { fmt, args, has_bonus_display: false };
                 (attr, Some(display))
             } else if !content.is_empty() {
-                return Err(syn::Error::new(input.span(), "Invalid argument to label() attribute. The argument must be a literal string or either the keyword `primary` or `collection`."));
+                return Err(syn::Error::new(
+                    input.span(),
+                    "Invalid argument to label() attribute. The argument must be a literal string or either the keyword `primary` or `collection`.",
+                ));
             } else {
                 (attr, None)
             }

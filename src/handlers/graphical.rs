@@ -1,5 +1,7 @@
-use std::fmt::{self, Write};
-use std::io::IsTerminal;
+use std::{
+    fmt::{self, Write},
+    io::IsTerminal,
+};
 
 use owo_colors::{OwoColorize, Style};
 use unicode_width::UnicodeWidthChar;

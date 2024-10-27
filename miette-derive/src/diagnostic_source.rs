@@ -2,9 +2,9 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
 
-use crate::forward::WhichFn;
 use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
+    forward::WhichFn,
     utils::{display_pat_members, gen_all_variants_with},
 };
 

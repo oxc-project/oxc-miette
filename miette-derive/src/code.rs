@@ -42,7 +42,10 @@ impl Parse for Code {
                 Ok(Code(input.parse::<syn::LitStr>()?.value()))
             }
         } else {
-            Err(syn::Error::new(ident.span(), "diagnostic code is required. Use #[diagnostic(code = ...)] or #[diagnostic(code(...))] to define one."))
+            Err(syn::Error::new(
+                ident.span(),
+                "diagnostic code is required. Use #[diagnostic(code = ...)] or #[diagnostic(code(...))] to define one.",
+            ))
         }
     }
 }

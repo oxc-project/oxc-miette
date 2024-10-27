@@ -783,9 +783,6 @@
 //! [`Result`]: https://docs.rs/miette/latest/miette/type.Result.html
 //! [`SourceCode`]: https://docs.rs/miette/latest/miette/trait.SourceCode.html
 //! [`SourceSpan`]: https://docs.rs/miette/latest/miette/struct.SourceSpan.html
-#[cfg(feature = "derive")]
-pub use oxc_miette_derive::*;
-
 pub use error::*;
 pub use eyreish::*;
 #[cfg(feature = "fancy-base")]
@@ -793,6 +790,8 @@ pub use handler::*;
 pub use handlers::*;
 pub use miette_diagnostic::*;
 pub use named_source::*;
+#[cfg(feature = "derive")]
+pub use oxc_miette_derive::*;
 #[cfg(feature = "fancy")]
 pub use panic::*;
 pub use protocol::*;

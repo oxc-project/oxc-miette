@@ -1,5 +1,6 @@
-use miette::{bail, Result, WrapErr};
 use std::io;
+
+use miette::{bail, Result, WrapErr};
 
 fn f() -> Result<()> {
     bail!(io::Error::new(io::ErrorKind::PermissionDenied, "oh no!"));

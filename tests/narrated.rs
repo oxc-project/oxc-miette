@@ -1,9 +1,9 @@
 #![cfg(feature = "fancy-no-backtrace")]
 
-use miette::{Diagnostic, MietteError, NamedSource, NarratableReportHandler, Report, SourceSpan};
-
-use miette::{GraphicalReportHandler, GraphicalTheme};
-
+use miette::{
+    Diagnostic, GraphicalReportHandler, GraphicalTheme, MietteError, NamedSource,
+    NarratableReportHandler, Report, SourceSpan,
+};
 use thiserror::Error;
 
 fn fmt_report(diag: Report) -> String {
@@ -363,7 +363,9 @@ fn multiline_highlight_no_label() -> Result<(), MietteError> {
     }
 
     #[derive(Debug, Error)]
-    #[error("something went wrong\n\nHere's a more detailed explanation of everything that actually went wrong because it's actually important.\n")]
+    #[error(
+        "something went wrong\n\nHere's a more detailed explanation of everything that actually went wrong because it's actually important.\n"
+    )]
     struct Inner(#[source] InnerInner);
 
     #[derive(Debug, Error)]

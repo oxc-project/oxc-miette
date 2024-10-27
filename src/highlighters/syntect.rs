@@ -12,12 +12,11 @@ mod syntect {
 
 use owo_colors::{Rgb, Style, Styled};
 
+use super::BlankHighlighterState;
 use crate::{
     highlighters::{Highlighter, HighlighterState},
     SpanContents,
 };
-
-use super::BlankHighlighterState;
 
 /// Highlights miette [SourceCode] with the [syntect](https://docs.rs/syntect/latest/syntect/) highlighting crate.
 ///

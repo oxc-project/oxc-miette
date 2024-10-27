@@ -9,11 +9,9 @@ use syn::{
 
 use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
-    utils::{display_pat_members, gen_all_variants_with},
-};
-use crate::{
     fmt::{self, Display},
     forward::WhichFn,
+    utils::{display_pat_members, gen_all_variants_with},
 };
 
 pub enum Help {
@@ -77,6 +75,7 @@ impl Help {
         }
         Ok(None)
     }
+
     pub(crate) fn gen_enum(variants: &[DiagnosticDef]) -> Option<TokenStream> {
         gen_all_variants_with(
             variants,

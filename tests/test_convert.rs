@@ -1,7 +1,8 @@
 mod drop;
 
-use self::drop::{DetectDrop, Flag};
 use miette::{Diagnostic, Report, Result};
+
+use self::drop::{DetectDrop, Flag};
 
 #[test]
 fn test_convert() {

@@ -2,16 +2,18 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{punctuated::Punctuated, DeriveInput, Token};
 
-use crate::code::Code;
-use crate::diagnostic_arg::DiagnosticArg;
-use crate::diagnostic_source::DiagnosticSource;
-use crate::forward::{Forward, WhichFn};
-use crate::help::Help;
-use crate::label::Labels;
-use crate::related::Related;
-use crate::severity::Severity;
-use crate::source_code::SourceCode;
-use crate::url::Url;
+use crate::{
+    code::Code,
+    diagnostic_arg::DiagnosticArg,
+    diagnostic_source::DiagnosticSource,
+    forward::{Forward, WhichFn},
+    help::Help,
+    label::Labels,
+    related::Related,
+    severity::Severity,
+    source_code::SourceCode,
+    url::Url,
+};
 
 pub enum Diagnostic {
     Struct {
@@ -248,7 +250,7 @@ impl Diagnostic {
                 return Err(syn::Error::new(
                     input.ident.span(),
                     "Can't derive Diagnostic for Unions",
-                ))
+                ));
             }
         })
     }
