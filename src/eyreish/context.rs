@@ -10,7 +10,7 @@ mod ext {
     use super::*;
 
     pub trait Diag {
-        #[cfg_attr(track_caller, track_caller)]
+        #[track_caller]
         fn ext_report<D>(self, msg: D) -> Report
         where
             D: Display + Send + Sync + 'static;
