@@ -19,9 +19,9 @@ init:
 ready:
   git diff --exit-code --quiet
   typos
-  just fmt
-  just check
-  just test
-  just lint
-  just doc
+  cargo fmt
+  cargo check
+  cargo test
+  cargo clippy
+  cargo doc
   git status
