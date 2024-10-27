@@ -671,10 +671,10 @@
 //!
 //! To use the built-in highlighting functionality, you must enable the
 //! `syntect-highlighter` crate feature. When this feature is enabled, `miette` will
-//! automatically use the [`syntect`] crate to highlight the `#[source_code]`
+//! automatically use the `syntect` crate to highlight the `#[source_code]`
 //! field of your [`Diagnostic`].
 //!
-//! Syntax detection with [`syntect`] is handled by checking 2 methods on the [`SpanContents`] trait, in order:
+//! Syntax detection with `syntect` is handled by checking 2 methods on the [`SpanContents`] trait, in order:
 //! * [language()](SpanContents::language) - Provides the name of the language
 //!   as a string. For example `"Rust"` will indicate Rust syntax highlighting.
 //!   You can set the language of the [`SpanContents`] produced by a
@@ -686,10 +686,9 @@
 //!   try to guess the syntax from that.
 //!
 //! If you want to use a custom highlighter, you can provide a custom
-//! implementation of the [`Highlighter`](highlighters::Highlighter)
-//! trait to [`MietteHandlerOpts`] by calling the
-//! [`with_syntax_highlighting`](MietteHandlerOpts::with_syntax_highlighting)
-//! method. See the [`highlighters`] module docs for more details.
+//! implementation of the `Highlighter`
+//! trait to [`MietteHandlerOpts`] by calling the `with_syntax_highlighting`
+//! method. See the `highlighters` module docs for more details.
 //!
 //! ### ... collection of labels
 //!
@@ -773,6 +772,20 @@
 //! and some from [`thiserror`](https://github.com/dtolnay/thiserror), also
 //! under the Apache License. Some code is taken from
 //! [`ariadne`](https://github.com/zesterer/ariadne), which is MIT licensed.
+//!
+//! [`miette!`]: https://docs.rs/miette/latest/miette/macro.miette.html
+//! [`diagnostic!`]: https://docs.rs/miette/latest/miette/macro.diagnostic.html
+//! [`std::error::Error`]: https://doc.rust-lang.org/nightly/std/error/trait.Error.html
+//! [`Diagnostic`]: https://docs.rs/miette/latest/miette/trait.Diagnostic.html
+//! [`IntoDiagnostic`]: https://docs.rs/miette/latest/miette/trait.IntoDiagnostic.html
+//! [`MietteHandlerOpts`]: https://docs.rs/miette/latest/miette/struct.MietteHandlerOpts.html
+//! [`MietteHandler`]: https://docs.rs/miette/latest/miette/struct.MietteHandler.html
+//! [`MietteDiagnostic`]: https://docs.rs/miette/latest/miette/struct.MietteDiagnostic.html
+//! [`Report`]: https://docs.rs/miette/latest/miette/struct.Report.html
+//! [`ReportHandler`]: https://docs.rs/miette/latest/miette/trait.ReportHandler.html
+//! [`Result`]: https://docs.rs/miette/latest/miette/type.Result.html
+//! [`SourceCode`]: https://docs.rs/miette/latest/miette/trait.SourceCode.html
+//! [`SourceSpan`]: https://docs.rs/miette/latest/miette/struct.SourceSpan.html
 #[cfg(feature = "derive")]
 pub use miette_derive::*;
 
