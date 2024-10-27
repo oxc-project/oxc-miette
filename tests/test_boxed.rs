@@ -195,7 +195,9 @@ fn test_boxed_custom_diagnostic() {
             Some(CustomDiagnostic::SOURCE_CODE.to_owned().into_bytes())
         );
         assert_eq!(
-            report.diagnostic_source().map(std::string::ToString::to_string),
+            report
+                .diagnostic_source()
+                .map(std::string::ToString::to_string),
             Some("oh no!".to_owned()),
         );
     }
