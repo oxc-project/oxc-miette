@@ -1,6 +1,6 @@
 [package]
 name = "oxc-miette"
-version = "1.0.1"
+version = "1.0.2"
 authors = ["Boshen", "Kat Marchán <kzm@zkat.tech>"]
 description = "Fancy diagnostic reporting library and protocol for us mere mortals who aren't compiler hackers."
 categories = ["rust-patterns"]
@@ -22,7 +22,7 @@ unit-bindings = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }
 
 [dependencies]
-oxc-miette-derive = { path = "miette-derive", version = "=1.0.1", optional = true }
+oxc-miette-derive = { path = "miette-derive", version = "=1.0.2", optional = true }
 
 # Relaxed version so the user can decide which version to use.
 thiserror = "1"
