@@ -11,6 +11,7 @@ repository = "https://github.com/zkat/miette"
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1.0.89"
-quote = "1.0.37"
-syn = "2.0.85"
+# Relaxed version so the user can decide which version to use.
+proc-macro2 = "1"
+quote = "1"
+syn = "2"
