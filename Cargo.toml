@@ -25,7 +25,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_
 oxc-miette-derive = { path = "miette-derive", version = "=1.0.2", optional = true }
 
 # Relaxed version so the user can decide which version to use.
-thiserror = "1"
+thiserror = "2"
 serde = { version = "1", features = ["derive"], optional = true }
 
 unicode-width = "0.2.0"
