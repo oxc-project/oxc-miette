@@ -14,8 +14,8 @@ use owo_colors::{Rgb, Style, Styled};
 
 use super::BlankHighlighterState;
 use crate::{
-    highlighters::{Highlighter, HighlighterState},
     SpanContents,
+    highlighters::{Highlighter, HighlighterState},
 };
 
 /// Highlights miette [SourceCode] with the [syntect](https://docs.rs/syntect/latest/syntect/) highlighting crate.
@@ -102,18 +102,21 @@ pub(crate) struct SyntectHighlighterState<'h> {
 
 impl<'h> HighlighterState for SyntectHighlighterState<'h> {
     fn highlight_line<'s>(&mut self, line: &'s str) -> Vec<Styled<&'s str>> {
-        if let Ok(ops) = self.parse_state.parse_line(line, &self.syntax_set) {
-            let use_bg_color = self.use_bg_color;
-            syntect::HighlightIterator::new(
-                &mut self.highlight_state,
-                &ops,
-                line,
-                &mut self.highlighter,
-            )
-            .map(|(style, str)| (convert_style(style, use_bg_color).style(str)))
-            .collect()
-        } else {
-            vec![Style::default().style(line)]
+        match self.parse_state.parse_line(line, &self.syntax_set) {
+            Ok(ops) => {
+                let use_bg_color = self.use_bg_color;
+                syntect::HighlightIterator::new(
+                    &mut self.highlight_state,
+                    &ops,
+                    line,
+                    &mut self.highlighter,
+                )
+                .map(|(style, str)| (convert_style(style, use_bg_color).style(str)))
+                .collect()
+            }
+            _ => {
+                vec![Style::default().style(line)]
+            }
         }
     }
 }

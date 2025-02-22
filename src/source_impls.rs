@@ -69,13 +69,10 @@ fn context_info<'a>(
     }
 
     if offset >= (span.offset() + span.len()).saturating_sub(1) {
-        let starting_offset = before_lines_starts.front().copied().unwrap_or_else(|| {
-            if context_lines_before == 0 {
-                span.offset()
-            } else {
-                0
-            }
-        });
+        let starting_offset = before_lines_starts
+            .front()
+            .copied()
+            .unwrap_or_else(|| if context_lines_before == 0 { span.offset() } else { 0 });
         Ok(MietteSpanContents::new(
             &input[starting_offset..offset],
             (starting_offset, offset - starting_offset).into(),

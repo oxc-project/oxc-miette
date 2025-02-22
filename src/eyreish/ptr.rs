@@ -36,7 +36,7 @@ where
     }
 
     pub(crate) unsafe fn boxed(self) -> Box<T> {
-        Box::from_raw(self.ptr.as_ptr())
+        unsafe { Box::from_raw(self.ptr.as_ptr()) }
     }
 
     pub(crate) const fn by_ref<'a>(&self) -> Ref<'a, T> {
@@ -95,7 +95,7 @@ where
     }
 
     pub(crate) unsafe fn deref(self) -> &'a T {
-        &*self.ptr.as_ptr()
+        unsafe { &*self.ptr.as_ptr() }
     }
 }
 
@@ -138,13 +138,13 @@ where
     }
 
     pub(crate) unsafe fn deref_mut(self) -> &'a mut T {
-        &mut *self.ptr.as_ptr()
+        unsafe { &mut *self.ptr.as_ptr() }
     }
 }
 
 impl<T> Mut<'_, T> {
     pub(crate) unsafe fn read(self) -> T {
-        self.ptr.as_ptr().read()
+        unsafe { self.ptr.as_ptr().read() }
     }
 }
 

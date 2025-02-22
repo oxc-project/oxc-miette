@@ -2,13 +2,12 @@
 use std::{collections::HashSet as Set, iter::FromIterator};
 
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
-use quote::{format_ident, quote, quote_spanned, ToTokens};
+use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
-    braced, bracketed,
+    Ident, Index, LitStr, Member, Result, Token, braced, bracketed,
     ext::IdentExt,
     parenthesized,
     parse::{ParseStream, Parser},
-    Ident, Index, LitStr, Member, Result, Token,
 };
 
 #[derive(Clone)]

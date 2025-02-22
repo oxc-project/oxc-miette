@@ -3,9 +3,9 @@ use std::fmt;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
+    LabeledSpan, MietteError, ReportHandler, SourceCode, SourceSpan, SpanContents,
     diagnostic_chain::DiagnosticChain,
     protocol::{Diagnostic, Severity},
-    LabeledSpan, MietteError, ReportHandler, SourceCode, SourceSpan, SpanContents,
 };
 
 /**
@@ -380,7 +380,7 @@ fn safe_get_column(text: &str, offset: usize, start: bool) -> usize {
         // Offset are zero-based, so plus one
         column += 1;
     } // On the other hand for end span, offset refers for the next column
-      // So we should do -1. column+1-1 == column
+    // So we should do -1. column+1-1 == column
     column
 }
 

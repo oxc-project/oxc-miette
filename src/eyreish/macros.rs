@@ -78,12 +78,12 @@
 /// ```
 #[macro_export]
 macro_rules! bail {
-    ($($key:ident = $value:expr,)* $fmt:literal $($arg:tt)*) => {
+    ($($key:ident = $value:expr_2021,)* $fmt:literal $($arg:tt)*) => {
         return $crate::private::Err(
             $crate::miette!($($key = $value,)* $fmt $($arg)*)
         );
     };
-    ($err:expr $(,)?) => {
+    ($err:expr_2021 $(,)?) => {
         return $crate::private::Err($crate::miette!($err));
     };
 }
@@ -154,14 +154,14 @@ macro_rules! bail {
 /// ```
 #[macro_export]
 macro_rules! ensure {
-    ($cond:expr, $($key:ident = $value:expr,)* $fmt:literal $($arg:tt)*) => {
+    ($cond:expr_2021, $($key:ident = $value:expr_2021,)* $fmt:literal $($arg:tt)*) => {
         if !$cond {
             return $crate::private::Err(
                 $crate::miette!($($key = $value,)* $fmt $($arg)*)
             );
         }
     };
-    ($cond:expr, $err:expr $(,)?) => {
+    ($cond:expr_2021, $err:expr_2021 $(,)?) => {
         if !$cond {
             return $crate::private::Err($crate::miette!($err));
         }
@@ -227,12 +227,12 @@ macro_rules! ensure {
 /// [`Report`]: crate::Report
 #[macro_export]
 macro_rules! miette {
-    ($($key:ident = $value:expr,)* $fmt:literal $($arg:tt)*) => {
+    ($($key:ident = $value:expr_2021,)* $fmt:literal $($arg:tt)*) => {
         $crate::Report::from(
             $crate::diagnostic!($($key = $value,)* $fmt $($arg)*)
         )
     };
-    ($err:expr $(,)?) => ({
+    ($err:expr_2021 $(,)?) => ({
         use $crate::private::kind::*;
         let error = $err;
         (&error).miette_kind().new(error)
@@ -292,7 +292,7 @@ macro_rules! diagnostic {
     ($fmt:literal $($arg:tt)*) => {{
         $crate::MietteDiagnostic::new(format!($fmt $($arg)*))
     }};
-    ($($key:ident = $value:expr,)+ $fmt:literal $($arg:tt)*) => {{
+    ($($key:ident = $value:expr_2021,)+ $fmt:literal $($arg:tt)*) => {{
         let mut diag = $crate::MietteDiagnostic::new(format!($fmt $($arg)*));
         $(diag.$key = Some($value.into());)*
         diag

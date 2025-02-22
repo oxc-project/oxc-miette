@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{punctuated::Punctuated, DeriveInput, Token};
+use syn::{DeriveInput, Token, punctuated::Punctuated};
 
 use crate::{
     code::Code,

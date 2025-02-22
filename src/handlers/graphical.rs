@@ -260,10 +260,11 @@ impl GraphicalReportHandler {
         let mut header = String::new();
         if self.links == LinkStyle::Link && diagnostic.url().is_some() {
             let url = diagnostic.url().unwrap(); // safe
-            let code = if let Some(code) = diagnostic.code() {
-                format!("{} ", code)
-            } else {
-                "".to_string()
+            let code = match diagnostic.code() {
+                Some(code) => {
+                    format!("{} ", code)
+                }
+                _ => "".to_string(),
             };
             let display_text = self.link_display_text.as_deref().unwrap_or("(link)");
             let link = format!(
@@ -275,14 +276,19 @@ impl GraphicalReportHandler {
             write!(header, "{}", link)?;
             writeln!(f, "{}", header)?;
             writeln!(f)?;
-        } else if let Some(code) = diagnostic.code() {
-            write!(header, "{}", code.style(severity_style),)?;
-            if self.links == LinkStyle::Text && diagnostic.url().is_some() {
-                let url = diagnostic.url().unwrap(); // safe
-                write!(header, " ({})", url.style(self.theme.styles.link))?;
+        } else {
+            match diagnostic.code() {
+                Some(code) => {
+                    write!(header, "{}", code.style(severity_style),)?;
+                    if self.links == LinkStyle::Text && diagnostic.url().is_some() {
+                        let url = diagnostic.url().unwrap(); // safe
+                        write!(header, " ({})", url.style(self.theme.styles.link))?;
+                    }
+                    writeln!(f, "{}", header)?;
+                    writeln!(f)?;
+                }
+                _ => {}
             }
-            writeln!(f, "{}", header)?;
-            writeln!(f)?;
         }
         Ok(())
     }
@@ -566,19 +572,29 @@ impl GraphicalReportHandler {
             None => contents,
         };
 
-        if let Some(source_name) = primary_contents.name() {
-            let source_name = source_name.style(self.theme.styles.link);
-            writeln!(
-                f,
-                "[{}:{}:{}]",
-                source_name,
-                primary_contents.line() + 1,
-                primary_contents.column() + 1
-            )?;
-        } else if lines.len() <= 1 {
-            writeln!(f, "{}", self.theme.characters.hbar.to_string().repeat(3))?;
-        } else {
-            writeln!(f, "[{}:{}]", primary_contents.line() + 1, primary_contents.column() + 1)?;
+        match primary_contents.name() {
+            Some(source_name) => {
+                let source_name = source_name.style(self.theme.styles.link);
+                writeln!(
+                    f,
+                    "[{}:{}:{}]",
+                    source_name,
+                    primary_contents.line() + 1,
+                    primary_contents.column() + 1
+                )?;
+            }
+            _ => {
+                if lines.len() <= 1 {
+                    writeln!(f, "{}", self.theme.characters.hbar.to_string().repeat(3))?;
+                } else {
+                    writeln!(
+                        f,
+                        "[{}:{}]",
+                        primary_contents.line() + 1,
+                        primary_contents.column() + 1
+                    )?;
+                }
+            }
         }
 
         // Now it's time for the fun part--actually rendering everything!
@@ -917,7 +933,10 @@ impl GraphicalReportHandler {
     }
 
     /// Returns an iterator over the visual width of each character in a line.
-    fn line_visual_char_width<'a>(&self, text: &'a str) -> impl Iterator<Item = usize> + 'a {
+    fn line_visual_char_width<'a>(
+        &self,
+        text: &'a str,
+    ) -> impl Iterator<Item = usize> + 'a + use<'a> {
         let mut column = 0;
         let mut escaped = false;
         let tab_width = self.tab_width;

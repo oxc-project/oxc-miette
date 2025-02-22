@@ -2,8 +2,8 @@ use std::{
     error::Error as StdError,
     fmt::{self, Display},
     sync::{
-        atomic::{AtomicBool, Ordering::SeqCst},
         Arc,
+        atomic::{AtomicBool, Ordering::SeqCst},
     },
 };
 

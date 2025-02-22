@@ -1,7 +1,7 @@
 use std::fmt::{self, Write};
 
 use crate::{
-    diagnostic_chain::DiagnosticChain, protocol::Diagnostic, ReportHandler, Severity, SourceCode,
+    ReportHandler, Severity, SourceCode, diagnostic_chain::DiagnosticChain, protocol::Diagnostic,
 };
 
 /**
@@ -110,43 +110,49 @@ impl JSONReportHandler {
         if let Some(src) = src {
             self.render_snippets(f, diagnostic, src)?;
         }
-        if let Some(labels) = diagnostic.labels() {
-            write!(f, r#""labels": ["#)?;
-            let mut add_comma = false;
-            for label in labels {
-                if add_comma {
-                    write!(f, ",")?;
-                } else {
-                    add_comma = true;
-                }
-                write!(f, "{{")?;
-                if let Some(label_name) = label.label() {
-                    write!(f, r#""label": "{}","#, escape(label_name))?;
-                }
-                write!(f, r#""span": {{"#)?;
-                write!(f, r#""offset": {},"#, label.offset())?;
-                write!(f, r#""length": {}"#, label.len())?;
+        match diagnostic.labels() {
+            Some(labels) => {
+                write!(f, r#""labels": ["#)?;
+                let mut add_comma = false;
+                for label in labels {
+                    if add_comma {
+                        write!(f, ",")?;
+                    } else {
+                        add_comma = true;
+                    }
+                    write!(f, "{{")?;
+                    if let Some(label_name) = label.label() {
+                        write!(f, r#""label": "{}","#, escape(label_name))?;
+                    }
+                    write!(f, r#""span": {{"#)?;
+                    write!(f, r#""offset": {},"#, label.offset())?;
+                    write!(f, r#""length": {}"#, label.len())?;
 
-                write!(f, "}}}}")?;
-            }
-            write!(f, "],")?;
-        } else {
-            write!(f, r#""labels": [],"#)?;
-        }
-        if let Some(relates) = diagnostic.related() {
-            write!(f, r#""related": ["#)?;
-            let mut add_comma = false;
-            for related in relates {
-                if add_comma {
-                    write!(f, ",")?;
-                } else {
-                    add_comma = true;
+                    write!(f, "}}}}")?;
                 }
-                self._render_report(f, related, src)?;
+                write!(f, "],")?;
             }
-            write!(f, "]")?;
-        } else {
-            write!(f, r#""related": []"#)?;
+            _ => {
+                write!(f, r#""labels": [],"#)?;
+            }
+        }
+        match diagnostic.related() {
+            Some(relates) => {
+                write!(f, r#""related": ["#)?;
+                let mut add_comma = false;
+                for related in relates {
+                    if add_comma {
+                        write!(f, ",")?;
+                    } else {
+                        add_comma = true;
+                    }
+                    self._render_report(f, related, src)?;
+                }
+                write!(f, "]")?;
+            }
+            _ => {
+                write!(f, r#""related": []"#)?;
+            }
         }
         write!(f, "}}")
     }

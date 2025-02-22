@@ -1,10 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    parenthesized,
+    Token, parenthesized,
     parse::{Parse, ParseStream},
     spanned::Spanned,
-    Token,
 };
 
 use crate::{
@@ -145,11 +144,7 @@ impl Labels {
                 }
             }
         }
-        if labels.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(Labels(labels)))
-        }
+        if labels.is_empty() { Ok(None) } else { Ok(Some(Labels(labels))) }
     }
 
     pub(crate) fn gen_struct(&self, fields: &syn::Fields) -> Option<TokenStream> {
