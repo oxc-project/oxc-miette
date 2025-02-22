@@ -1,10 +1,10 @@
 use std::fmt;
 
 use crate::{
-    highlighters::{Highlighter, MietteHighlighter},
-    protocol::Diagnostic,
     GraphicalReportHandler, GraphicalTheme, NarratableReportHandler, ReportHandler,
     ThemeCharacters, ThemeStyles,
+    highlighters::{Highlighter, MietteHighlighter},
+    protocol::Diagnostic,
 };
 
 /// Settings to control the color format used for graphical rendering.
@@ -353,11 +353,7 @@ impl MietteHandlerOpts {
     // Detects known terminal apps based on env variables and returns true if
     // they support rendering links.
     pub(crate) fn use_links(&self) -> bool {
-        if let Some(linkify) = self.linkify {
-            linkify
-        } else {
-            syscall::supports_hyperlinks()
-        }
+        if let Some(linkify) = self.linkify { linkify } else { syscall::supports_hyperlinks() }
     }
 
     pub(crate) fn get_width(&self) -> usize {

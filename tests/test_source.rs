@@ -4,7 +4,7 @@ use std::{
     io,
 };
 
-use miette::{miette, Report};
+use miette::{Report, miette};
 
 #[derive(Debug)]
 enum TestError {

@@ -2,9 +2,6 @@
 use core::fmt::Display;
 use std::{error::Error as StdError, sync::OnceLock};
 
-use error::ErrorImpl;
-#[allow(unreachable_pub)]
-pub use into_diagnostic::*;
 #[doc(hidden)]
 #[allow(unreachable_pub)]
 pub use Report as ErrReport;
@@ -17,6 +14,9 @@ pub use ReportHandler as EyreContext;
 /// Compatibility re-export of `WrapErr` for interop with `anyhow`
 #[allow(unreachable_pub)]
 pub use WrapErr as Context;
+use error::ErrorImpl;
+#[allow(unreachable_pub)]
+pub use into_diagnostic::*;
 
 use self::ptr::Own;
 #[cfg(not(feature = "fancy-base"))]

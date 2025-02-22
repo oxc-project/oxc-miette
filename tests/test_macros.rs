@@ -1,7 +1,7 @@
 #![allow(clippy::eq_op)]
 mod common;
 
-use miette::{ensure, Result};
+use miette::{Result, ensure};
 
 use self::common::*;
 

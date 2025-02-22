@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{protocol::Diagnostic, ReportHandler};
+use crate::{ReportHandler, protocol::Diagnostic};
 
 /**
 [`ReportHandler`] that renders plain text and avoids extraneous graphics.

@@ -8,10 +8,10 @@ use core::{
 use std::error::Error as StdError;
 
 use super::{
-    ptr::{Mut, Own, Ref},
     Report, ReportHandler,
+    ptr::{Mut, Own, Ref},
 };
-use crate::{chain::Chain, eyreish::wrapper::WithSourceCode, Diagnostic, SourceCode};
+use crate::{Diagnostic, SourceCode, chain::Chain, eyreish::wrapper::WithSourceCode};
 
 impl Report {
     /// Create a new error object from any error type.
@@ -458,20 +458,24 @@ struct ErrorVTable {
 
 // Safety: requires layout of *e to match ErrorImpl<E>.
 unsafe fn object_drop<E>(e: Own<ErasedErrorImpl>) {
-    // Cast back to ErrorImpl<E> so that the allocator receives the correct
-    // Layout to deallocate the Box's memory.
-    let unerased = e.cast::<ErrorImpl<E>>().boxed();
-    drop(unerased);
+    unsafe {
+        // Cast back to ErrorImpl<E> so that the allocator receives the correct
+        // Layout to deallocate the Box's memory.
+        let unerased = e.cast::<ErrorImpl<E>>().boxed();
+        drop(unerased);
+    }
 }
 
 // Safety: requires layout of *e to match ErrorImpl<E>.
 unsafe fn object_drop_front<E>(e: Own<ErasedErrorImpl>, target: TypeId) {
-    // Drop the fields of ErrorImpl other than E as well as the Box allocation,
-    // without dropping E itself. This is used by downcast after doing a
-    // ptr::read to take ownership of the E.
-    let _ = target;
-    let unerased = e.cast::<ErrorImpl<ManuallyDrop<E>>>().boxed();
-    drop(unerased);
+    unsafe {
+        // Drop the fields of ErrorImpl other than E as well as the Box allocation,
+        // without dropping E itself. This is used by downcast after doing a
+        // ptr::read to take ownership of the E.
+        let _ = target;
+        let unerased = e.cast::<ErrorImpl<ManuallyDrop<E>>>().boxed();
+        drop(unerased);
+    }
 }
 
 // Safety: requires layout of *e to match ErrorImpl<E>.
@@ -481,10 +485,12 @@ unsafe fn object_ref<E>(
 where
     E: Diagnostic + Send + Sync + 'static,
 {
-    // Attach E's native StdError vtable onto a pointer to self._object.
-    let unerased = e.cast::<ErrorImpl<E>>();
+    unsafe {
+        // Attach E's native StdError vtable onto a pointer to self._object.
+        let unerased = e.cast::<ErrorImpl<E>>();
 
-    Ref::from_raw(NonNull::new_unchecked(ptr::addr_of!((*unerased.as_ptr())._object) as *mut E))
+        Ref::from_raw(NonNull::new_unchecked(ptr::addr_of!((*unerased.as_ptr())._object) as *mut E))
+    }
 }
 
 // Safety: requires layout of *e to match ErrorImpl<E>.
@@ -494,10 +500,12 @@ unsafe fn object_ref_stderr<E>(
 where
     E: StdError + Send + Sync + 'static,
 {
-    // Attach E's native StdError vtable onto a pointer to self._object.
-    let unerased = e.cast::<ErrorImpl<E>>();
+    unsafe {
+        // Attach E's native StdError vtable onto a pointer to self._object.
+        let unerased = e.cast::<ErrorImpl<E>>();
 
-    Ref::from_raw(NonNull::new_unchecked(ptr::addr_of!((*unerased.as_ptr())._object) as *mut E))
+        Ref::from_raw(NonNull::new_unchecked(ptr::addr_of!((*unerased.as_ptr())._object) as *mut E))
+    }
 }
 
 // Safety: requires layout of *e to match ErrorImpl<E>.
@@ -505,8 +513,10 @@ unsafe fn object_boxed<E>(e: Own<ErasedErrorImpl>) -> Box<dyn Diagnostic + Send 
 where
     E: Diagnostic + Send + Sync + 'static,
 {
-    // Attach ErrorImpl<E>'s native StdError vtable. The StdError impl is below.
-    e.cast::<ErrorImpl<E>>().boxed()
+    unsafe {
+        // Attach ErrorImpl<E>'s native StdError vtable. The StdError impl is below.
+        e.cast::<ErrorImpl<E>>().boxed()
+    }
 }
 
 // Safety: requires layout of *e to match ErrorImpl<E>.
@@ -516,8 +526,10 @@ unsafe fn object_boxed_stderr<E>(
 where
     E: StdError + Send + Sync + 'static,
 {
-    // Attach ErrorImpl<E>'s native StdError vtable. The StdError impl is below.
-    e.cast::<ErrorImpl<E>>().boxed()
+    unsafe {
+        // Attach ErrorImpl<E>'s native StdError vtable. The StdError impl is below.
+        e.cast::<ErrorImpl<E>>().boxed()
+    }
 }
 
 // Safety: requires layout of *e to match ErrorImpl<E>.
@@ -525,19 +537,21 @@ unsafe fn object_downcast<E>(e: Ref<'_, ErasedErrorImpl>, target: TypeId) -> Opt
 where
     E: 'static,
 {
-    if TypeId::of::<E>() == target {
-        // Caller is looking for an E pointer and e is ErrorImpl<E>, take a
-        // pointer to its E field.
-        let unerased = e.cast::<ErrorImpl<E>>();
+    unsafe {
+        if TypeId::of::<E>() == target {
+            // Caller is looking for an E pointer and e is ErrorImpl<E>, take a
+            // pointer to its E field.
+            let unerased = e.cast::<ErrorImpl<E>>();
 
-        Some(
-            Ref::from_raw(NonNull::new_unchecked(
-                ptr::addr_of!((*unerased.as_ptr())._object) as *mut E
-            ))
-            .cast::<()>(),
-        )
-    } else {
-        None
+            Some(
+                Ref::from_raw(NonNull::new_unchecked(
+                    ptr::addr_of!((*unerased.as_ptr())._object) as *mut E
+                ))
+                .cast::<()>(),
+            )
+        } else {
+            None
+        }
     }
 }
 
@@ -547,14 +561,16 @@ where
     D: 'static,
     E: 'static,
 {
-    if TypeId::of::<D>() == target {
-        let unerased = e.cast::<ErrorImpl<ContextError<D, E>>>().deref();
-        Some(Ref::new(&unerased._object.msg).cast::<()>())
-    } else if TypeId::of::<E>() == target {
-        let unerased = e.cast::<ErrorImpl<ContextError<D, E>>>().deref();
-        Some(Ref::new(&unerased._object.error).cast::<()>())
-    } else {
-        None
+    unsafe {
+        if TypeId::of::<D>() == target {
+            let unerased = e.cast::<ErrorImpl<ContextError<D, E>>>().deref();
+            Some(Ref::new(&unerased._object.msg).cast::<()>())
+        } else if TypeId::of::<E>() == target {
+            let unerased = e.cast::<ErrorImpl<ContextError<D, E>>>().deref();
+            Some(Ref::new(&unerased._object.error).cast::<()>())
+        } else {
+            None
+        }
     }
 }
 
@@ -564,14 +580,16 @@ where
     D: 'static,
     E: 'static,
 {
-    // Called after downcasting by value to either the D or the E and doing a
-    // ptr::read to take ownership of that value.
-    if TypeId::of::<D>() == target {
-        let unerased = e.cast::<ErrorImpl<ContextError<ManuallyDrop<D>, E>>>().boxed();
-        drop(unerased);
-    } else {
-        let unerased = e.cast::<ErrorImpl<ContextError<D, ManuallyDrop<E>>>>().boxed();
-        drop(unerased);
+    unsafe {
+        // Called after downcasting by value to either the D or the E and doing a
+        // ptr::read to take ownership of that value.
+        if TypeId::of::<D>() == target {
+            let unerased = e.cast::<ErrorImpl<ContextError<ManuallyDrop<D>, E>>>().boxed();
+            drop(unerased);
+        } else {
+            let unerased = e.cast::<ErrorImpl<ContextError<D, ManuallyDrop<E>>>>().boxed();
+            drop(unerased);
+        }
     }
 }
 
@@ -583,13 +601,15 @@ unsafe fn context_chain_downcast<D>(
 where
     D: 'static,
 {
-    let unerased = e.cast::<ErrorImpl<ContextError<D, Report>>>().deref();
-    if TypeId::of::<D>() == target {
-        Some(Ref::new(&unerased._object.msg).cast::<()>())
-    } else {
-        // Recurse down the context chain per the inner error's vtable.
-        let source = &unerased._object.error;
-        (vtable(source.inner.ptr).object_downcast)(source.inner.by_ref(), target)
+    unsafe {
+        let unerased = e.cast::<ErrorImpl<ContextError<D, Report>>>().deref();
+        if TypeId::of::<D>() == target {
+            Some(Ref::new(&unerased._object.msg).cast::<()>())
+        } else {
+            // Recurse down the context chain per the inner error's vtable.
+            let source = &unerased._object.error;
+            (vtable(source.inner.ptr).object_downcast)(source.inner.by_ref(), target)
+        }
     }
 }
 
@@ -598,20 +618,22 @@ unsafe fn context_chain_drop_rest<D>(e: Own<ErasedErrorImpl>, target: TypeId)
 where
     D: 'static,
 {
-    // Called after downcasting by value to either the D or one of the causes
-    // and doing a ptr::read to take ownership of that value.
-    if TypeId::of::<D>() == target {
-        let unerased = e.cast::<ErrorImpl<ContextError<ManuallyDrop<D>, Report>>>().boxed();
-        // Drop the entire rest of the data structure rooted in the next Report.
-        drop(unerased);
-    } else {
-        let unerased = e.cast::<ErrorImpl<ContextError<D, ManuallyDrop<Report>>>>().boxed();
-        // Read out a ManuallyDrop<Box<ErasedErrorImpl>> from the next error.
-        let inner = unerased._object.error.inner;
-        drop(unerased);
-        let vtable = vtable(inner.ptr);
-        // Recursively drop the next error using the same target typeid.
-        (vtable.object_drop_rest)(inner, target);
+    unsafe {
+        // Called after downcasting by value to either the D or one of the causes
+        // and doing a ptr::read to take ownership of that value.
+        if TypeId::of::<D>() == target {
+            let unerased = e.cast::<ErrorImpl<ContextError<ManuallyDrop<D>, Report>>>().boxed();
+            // Drop the entire rest of the data structure rooted in the next Report.
+            drop(unerased);
+        } else {
+            let unerased = e.cast::<ErrorImpl<ContextError<D, ManuallyDrop<Report>>>>().boxed();
+            // Read out a ManuallyDrop<Box<ErasedErrorImpl>> from the next error.
+            let inner = unerased._object.error.inner;
+            drop(unerased);
+            let vtable = vtable(inner.ptr);
+            // Recursively drop the next error using the same target typeid.
+            (vtable.object_drop_rest)(inner, target);
+        }
     }
 }
 
@@ -637,7 +659,7 @@ type ErasedErrorImpl = ErrorImpl<()>;
 
 // Safety: `ErrorVTable` must be the first field of `ErrorImpl`
 unsafe fn vtable(p: NonNull<ErasedErrorImpl>) -> &'static ErrorVTable {
-    (p.as_ptr() as *const &'static ErrorVTable).read()
+    unsafe { (p.as_ptr() as *const &'static ErrorVTable).read() }
 }
 
 impl<E> ErrorImpl<E> {
@@ -653,29 +675,35 @@ impl ErasedErrorImpl {
     pub(crate) unsafe fn error<'a>(
         this: Ref<'a, Self>,
     ) -> &'a (dyn StdError + Send + Sync + 'static) {
-        // Use vtable to attach E's native StdError vtable for the right
-        // original type E.
-        (vtable(this.ptr).object_ref_stderr)(this).deref()
+        unsafe {
+            // Use vtable to attach E's native StdError vtable for the right
+            // original type E.
+            (vtable(this.ptr).object_ref_stderr)(this).deref()
+        }
     }
 
     pub(crate) unsafe fn diagnostic<'a>(
         this: Ref<'a, Self>,
     ) -> &'a (dyn Diagnostic + Send + Sync + 'static) {
-        // Use vtable to attach E's native StdError vtable for the right
-        // original type E.
-        (vtable(this.ptr).object_ref)(this).deref()
+        unsafe {
+            // Use vtable to attach E's native StdError vtable for the right
+            // original type E.
+            (vtable(this.ptr).object_ref)(this).deref()
+        }
     }
 
     pub(crate) unsafe fn diagnostic_mut<'a>(
         this: Mut<'a, Self>,
     ) -> &'a mut (dyn Diagnostic + Send + Sync + 'static) {
-        // Use vtable to attach E's native StdError vtable for the right
-        // original type E.
-        (vtable(this.ptr).object_ref)(this.by_ref()).by_mut().deref_mut()
+        unsafe {
+            // Use vtable to attach E's native StdError vtable for the right
+            // original type E.
+            (vtable(this.ptr).object_ref)(this.by_ref()).by_mut().deref_mut()
+        }
     }
 
     pub(crate) unsafe fn chain(this: Ref<'_, Self>) -> Chain<'_> {
-        Chain::new(Self::error(this))
+        unsafe { Chain::new(Self::error(this)) }
     }
 }
 

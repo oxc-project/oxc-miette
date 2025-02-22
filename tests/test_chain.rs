@@ -1,4 +1,4 @@
-use miette::{miette, Report};
+use miette::{Report, miette};
 
 fn error() -> Report {
     miette!("0").wrap_err(1).wrap_err(2).wrap_err(3)

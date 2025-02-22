@@ -62,9 +62,11 @@ impl EnvVarGuard<'_> {
 impl Drop for EnvVarGuard<'_> {
     fn drop(&mut self) {
         if let Some(old_value) = &self.old_value {
-            std::env::set_var(self.var, old_value);
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe { std::env::set_var(self.var, old_value) };
         } else {
-            std::env::remove_var(self.var);
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe { std::env::remove_var(self.var) };
         }
     }
 }
@@ -90,23 +92,31 @@ fn check_colors<F: Fn(MietteHandlerOpts) -> MietteHandlerOpts>(
 
     let guards = (EnvVarGuard::new("NO_COLOR"), EnvVarGuard::new("FORCE_COLOR"));
     // Clear color environment variables that may be set outside of 'cargo test'
-    std::env::remove_var("NO_COLOR");
-    std::env::remove_var("FORCE_COLOR");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("NO_COLOR") };
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("FORCE_COLOR") };
 
-    std::env::set_var("NO_COLOR", "1");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("NO_COLOR", "1") };
     let handler = make_handler(MietteHandlerOpts::new()).build();
     assert_eq!(color_format(handler), no_support);
-    std::env::remove_var("NO_COLOR");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("NO_COLOR") };
 
-    std::env::set_var("FORCE_COLOR", "1");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("FORCE_COLOR", "1") };
     let handler = make_handler(MietteHandlerOpts::new()).build();
     assert_eq!(color_format(handler), ansi_support);
-    std::env::remove_var("FORCE_COLOR");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("FORCE_COLOR") };
 
-    std::env::set_var("FORCE_COLOR", "3");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("FORCE_COLOR", "3") };
     let handler = make_handler(MietteHandlerOpts::new()).build();
     assert_eq!(color_format(handler), rgb_support);
-    std::env::remove_var("FORCE_COLOR");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("FORCE_COLOR") };
 
     drop(guards);
     drop(lock);

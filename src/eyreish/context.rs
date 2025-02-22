@@ -2,8 +2,8 @@ use core::fmt::{self, Debug, Display, Write};
 use std::error::Error as StdError;
 
 use super::{
-    error::{ContextError, ErrorImpl},
     Report, WrapErr,
+    error::{ContextError, ErrorImpl},
 };
 use crate::{Diagnostic, LabeledSpan};
 

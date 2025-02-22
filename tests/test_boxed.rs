@@ -1,6 +1,6 @@
 use std::{error::Error as StdError, io};
 
-use miette::{miette, Diagnostic, LabeledSpan, Report, SourceSpan};
+use miette::{Diagnostic, LabeledSpan, Report, SourceSpan, miette};
 use thiserror::Error;
 
 #[derive(Error, Debug)]

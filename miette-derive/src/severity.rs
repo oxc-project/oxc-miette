@@ -1,9 +1,8 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parenthesized,
+    Token, parenthesized,
     parse::{Parse, ParseStream},
-    Token,
 };
 
 use crate::{
