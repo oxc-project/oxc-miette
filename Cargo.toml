@@ -1,6 +1,6 @@
 [package]
 name = "oxc-miette"
-version = "1.0.2"
+version = "2.0.0"
 authors = ["Boshen", "Kat Marchán <kzm@zkat.tech>"]
 description = "Fancy diagnostic reporting library and protocol for us mere mortals who aren't compiler hackers."
 categories = ["rust-patterns"]
