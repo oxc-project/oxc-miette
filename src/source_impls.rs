@@ -3,24 +3,24 @@ Default trait implementations for [`SourceCode`].
 */
 use std::{borrow::Cow, collections::VecDeque, fmt::Debug, sync::Arc};
 
+use ropey::Rope;
+
 use crate::{MietteError, MietteSpanContents, SourceCode, SourceSpan, SpanContents};
 
 fn context_info<'a>(
-    input: &'a [u8],
+    input: &'a str,
     span: &SourceSpan,
     context_lines_before: usize,
     context_lines_after: usize,
 ) -> Result<MietteSpanContents<'a>, MietteError> {
     let mut offset = 0usize;
     let mut line_count = 0usize;
-    let mut start_line = 0usize;
-    let mut start_column = 0usize;
     let mut before_lines_starts = VecDeque::new();
     let mut current_line_start = 0usize;
     let mut end_lines = 0usize;
     let mut post_span = false;
     let mut post_span_got_newline = false;
-    let mut iter = input.iter().copied().peekable();
+    let mut iter = input.bytes().peekable();
     while let Some(char) = iter.next() {
         if matches!(char, b'\r' | b'\n') {
             line_count += 1;
@@ -29,10 +29,8 @@ fn context_info<'a>(
             }
             if offset < span.offset() {
                 // We're before the start of the span.
-                start_column = 0;
                 before_lines_starts.push_back(current_line_start);
                 if before_lines_starts.len() > context_lines_before {
-                    start_line += 1;
                     before_lines_starts.pop_front();
                 }
             } else if offset >= span.offset() + span.len().saturating_sub(1) {
@@ -40,7 +38,6 @@ fn context_info<'a>(
                 // started collecting end lines yet (we might still be
                 // collecting context lines).
                 if post_span {
-                    start_column = 0;
                     if post_span_got_newline {
                         end_lines += 1;
                     } else {
@@ -53,8 +50,6 @@ fn context_info<'a>(
                 }
             }
             current_line_start = offset + 1;
-        } else if offset < span.offset() {
-            start_column += 1;
         }
 
         if offset >= (span.offset() + span.len()).saturating_sub(1) {
@@ -73,8 +68,12 @@ fn context_info<'a>(
             .front()
             .copied()
             .unwrap_or_else(|| if context_lines_before == 0 { span.offset() } else { 0 });
+
+        let rope = Rope::from_str(input);
+        let (start_line, start_column) = get_line_column(&rope, starting_offset, input);
+
         Ok(MietteSpanContents::new(
-            &input[starting_offset..offset],
+            &input.as_bytes()[starting_offset..offset],
             (starting_offset, offset - starting_offset).into(),
             start_line,
             if context_lines_before == 0 { start_column } else { 0 },
@@ -85,38 +84,14 @@ fn context_info<'a>(
     }
 }
 
-impl SourceCode for [u8] {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
-        let contents = context_info(self, span, context_lines_before, context_lines_after)?;
-        Ok(Box::new(contents))
-    }
-}
-
-impl SourceCode for &[u8] {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
-        <[u8] as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
-    }
-}
-
-impl SourceCode for Vec<u8> {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
-        <[u8] as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
-    }
+/// Get UTF16 line and column from UTF8 offset and source text.
+pub fn get_line_column(rope: &Rope, offset: usize, source_text: &str) -> (usize, usize) {
+    // Get line number and byte offset of start of line
+    let line_index = rope.byte_to_line(offset);
+    let line_offset = rope.line_to_byte(line_index);
+    // Get column number
+    let column_index = source_text[line_offset..offset].encode_utf16().count();
+    (line_index, column_index)
 }
 
 impl SourceCode for str {
@@ -126,12 +101,8 @@ impl SourceCode for str {
         context_lines_before: usize,
         context_lines_after: usize,
     ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
-        <[u8] as SourceCode>::read_span(
-            self.as_bytes(),
-            span,
-            context_lines_before,
-            context_lines_after,
-        )
+        let contents = context_info(self, span, context_lines_before, context_lines_after)?;
+        Ok(Box::new(contents))
     }
 }
 
@@ -273,6 +244,16 @@ mod tests {
         assert_eq!(0, contents.column());
         let span: SourceSpan = (0, 9).into();
         assert_eq!(&span, contents.span());
+        Ok(())
+    }
+
+    #[test]
+    fn utf_16() -> Result<(), MietteError> {
+        let src = String::from("🤨 debugger");
+        let contents = src.read_span(&(5, 8).into(), 0, 0)?;
+        assert_eq!("debugger", std::str::from_utf8(contents.data()).unwrap());
+        assert_eq!(0, contents.line());
+        assert_eq!(3, contents.column());
         Ok(())
     }
 }
