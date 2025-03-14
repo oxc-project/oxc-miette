@@ -1,12 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>Boshen/renovate", "helpers:pinGitHubActionDigestsToSemver"],
-  "packageRules": [
-    {
-      "groupName": "ignored crates",
-      "matchManagers": ["cargo"],
-      "matchPackageNames": ["thiserror"],
-      "enabled": false
-    }
-  ]
+  "extends": ["github>Boshen/renovate", "helpers:pinGitHubActionDigestsToSemver"]
 }
