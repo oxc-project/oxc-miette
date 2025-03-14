@@ -1,0 +1,3 @@
+[workspace]
+semver_check = true
+allow_dirty = true
