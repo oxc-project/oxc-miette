@@ -13,7 +13,7 @@ alias r := ready
 # or install via `cargo install cargo-binstall`
 # Initialize the project by installing all the necessary tools.
 init:
-  cargo binstall bacon cargo-insta typos-cli cargo-shear -y
+  cargo binstall watchexec-cli cargo-insta typos-cli cargo-shear -y
 
 # When ready, run the same CI commands
 ready:
@@ -26,3 +26,9 @@ ready:
   cargo test --features fancy
   cargo doc
   git status
+
+watch *args='':
+  watchexec {{args}}
+
+watch-check:
+  just watch "'cargo check; cargo clippy'"
