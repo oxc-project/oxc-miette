@@ -22,7 +22,7 @@ unit-bindings = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }
 
 [dependencies]
-oxc-miette-derive = { path = "miette-derive", version = "=1.0.2", optional = true }
+oxc-miette-derive = { path = "miette-derive", version = "=1.0.3", optional = true }
 
 # Relaxed version so the user can decide which version to use.
 thiserror = "2"

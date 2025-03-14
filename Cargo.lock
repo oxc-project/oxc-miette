@@ -268,7 +268,7 @@ dependencies = [
 
 [[package]]
 name = "oxc-miette-derive"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "proc-macro2",
  "quote",
