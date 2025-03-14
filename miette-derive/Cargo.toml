@@ -1,11 +1,13 @@
 [package]
 name = "oxc-miette-derive"
-version = "1.0.2"
-authors = ["Boshen", "Kat Marchán <kzm@zkat.tech>"]
-edition = "2018"
-license = "Apache-2.0"
+version = "2.1.0"
 description = "Derive macros for miette. Like `thiserror` for Diagnostics."
-repository = "https://github.com/zkat/miette"
+authors.workspace = true
+categories.workspace = true
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 
 [lib]
 proc-macro = true

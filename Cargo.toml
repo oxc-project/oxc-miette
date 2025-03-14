@@ -1,11 +1,11 @@
 [package]
 name = "oxc-miette"
-version = "2.0.0"
+version = "2.1.0"
 authors = ["Boshen", "Kat Marchán <kzm@zkat.tech>"]
 description = "Fancy diagnostic reporting library and protocol for us mere mortals who aren't compiler hackers."
 categories = ["rust-patterns"]
-repository = "https://github.com/zkat/miette"
-documentation = "https://docs.rs/miette"
+repository = "https://github.com/oxc-project/oxc-miette"
+documentation = "https://docs.rs/oxc-miette"
 license = "Apache-2.0"
 readme = "README.md"
 edition = "2024"
@@ -22,7 +22,7 @@ unit-bindings = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }
 
 [dependencies]
-oxc-miette-derive = { path = "miette-derive", version = "=1.0.2", optional = true }
+oxc-miette-derive = { path = "miette-derive", version = "=2.1.0", optional = true }
 
 # Relaxed version so the user can decide which version to use.
 thiserror = "2"
