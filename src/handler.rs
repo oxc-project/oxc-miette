@@ -2,9 +2,7 @@ use std::fmt;
 
 use crate::{
     GraphicalReportHandler, GraphicalTheme, NarratableReportHandler, ReportHandler,
-    ThemeCharacters, ThemeStyles,
-    highlighters::{Highlighter, MietteHighlighter},
-    protocol::Diagnostic,
+    ThemeCharacters, ThemeStyles, protocol::Diagnostic,
 };
 
 /// Settings to control the color format used for graphical rendering.
@@ -58,7 +56,6 @@ pub struct MietteHandlerOpts {
     pub(crate) wrap_lines: Option<bool>,
     pub(crate) word_separator: Option<textwrap::WordSeparator>,
     pub(crate) word_splitter: Option<textwrap::WordSplitter>,
-    pub(crate) highlighter: Option<MietteHighlighter>,
 }
 
 impl MietteHandlerOpts {
@@ -81,43 +78,6 @@ impl MietteHandlerOpts {
     /// [`color()`](`MietteHandlerOpts::color).
     pub fn graphical_theme(mut self, theme: GraphicalTheme) -> Self {
         self.theme = Some(theme);
-        self
-    }
-
-    /// Set a syntax highlighter when rendering in graphical mode.
-    /// Use [`force_graphical()`](MietteHandlerOpts::force_graphical()) to
-    /// force graphical mode.
-    ///
-    /// Syntax highlighting is disabled by default unless the
-    /// `syntect-highlighter` feature is enabled. Call this method
-    /// to override the default and use a custom highlighter
-    /// implementation instead.
-    ///
-    /// Use
-    /// [`without_syntax_highlighting()`](MietteHandlerOpts::without_syntax_highlighting())
-    /// To disable highlighting completely.
-    ///
-    /// Setting this option will not force color output. In all cases, the
-    /// current color configuration via
-    /// [`color()`](MietteHandlerOpts::color()) takes precedence over
-    /// highlighter configuration.
-    pub fn with_syntax_highlighting(
-        mut self,
-        highlighter: impl Highlighter + Send + Sync + 'static,
-    ) -> Self {
-        self.highlighter = Some(MietteHighlighter::from(highlighter));
-        self
-    }
-
-    /// Disables syntax highlighting when rendering in graphical mode.
-    /// Use [`force_graphical()`](MietteHandlerOpts::force_graphical()) to
-    /// force graphical mode.
-    ///
-    /// Syntax highlighting is disabled by default unless the
-    /// `syntect-highlighter` feature is enabled. Call this method if you want
-    /// to disable highlighting when building with this feature.
-    pub fn without_syntax_highlighting(mut self) -> Self {
-        self.highlighter = Some(MietteHighlighter::nocolor());
         self
     }
 
@@ -281,30 +241,9 @@ impl MietteHandlerOpts {
             } else {
                 ThemeStyles::none()
             };
-            // #[cfg(not(feature = "syntect-highlighter"))]
-            // let highlighter = self.highlighter.unwrap_or_else(MietteHighlighter::nocolor);
-            // #[cfg(feature = "syntect-highlighter")]
-            // let highlighter = if self.color == Some(false) {
-            // MietteHighlighter::nocolor()
-            // } else if self.color == Some(true) || syscall::supports_color() {
-            // match self.highlighter {
-            // Some(highlighter) => highlighter,
-            // None => match self.rgb_colors {
-            // // Because the syntect highlighter currently only supports 24-bit truecolor,
-            // // respect RgbColor::Never by disabling the highlighter.
-            // // TODO: In the future, find a way to convert the RGB syntect theme
-            // // into an ANSI color theme.
-            // RgbColors::Never => MietteHighlighter::nocolor(),
-            // _ => MietteHighlighter::syntect_truecolor(),
-            // },
-            // }
-            // } else {
-            // MietteHighlighter::nocolor()
-            // };
             let theme = self.theme.unwrap_or(GraphicalTheme { characters, styles });
             let mut handler =
                 GraphicalReportHandler::new_themed(theme).with_width(width).with_links(linkify);
-            // handler.highlighter = highlighter;
             if let Some(with_cause_chain) = self.with_cause_chain {
                 if with_cause_chain {
                     handler = handler.with_cause_chain();
@@ -424,18 +363,6 @@ mod syscall {
                 false
             } else {
                 supports_hyperlinks::on(supports_hyperlinks::Stream::Stderr)
-            }
-        }
-    }
-
-    #[cfg(feature = "syntect-highlighter")]
-    #[inline]
-    pub(super) fn supports_color() -> bool {
-        cfg_if! {
-            if #[cfg(feature = "fancy-no-syscall")] {
-                false
-            } else {
-                supports_color::on(supports_color::Stream::Stderr).is_some()
             }
         }
     }
