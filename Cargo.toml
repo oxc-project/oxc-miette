@@ -1,15 +1,27 @@
-[package]
-name = "oxc-miette"
-version = "2.1.0"
+[workspace]
+resolver = "3"
+members = ["miette-derive"]
+
+[workspace.package]
 authors = ["Boshen", "Kat Marchán <kzm@zkat.tech>"]
-description = "Fancy diagnostic reporting library and protocol for us mere mortals who aren't compiler hackers."
 categories = ["rust-patterns"]
 repository = "https://github.com/oxc-project/oxc-miette"
-documentation = "https://docs.rs/oxc-miette"
 license = "Apache-2.0"
-readme = "README.md"
 edition = "2024"
 rust-version = "1.85.0"
+
+[package]
+name = "oxc-miette"
+description = "Fancy diagnostic reporting library and protocol for us mere mortals who aren't compiler hackers."
+documentation = "https://docs.rs/oxc-miette"
+readme = "README.md"
+version = "2.1.0"
+authors.workspace = true
+categories.workspace = true
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 exclude = ["images/", "tests/", "miette-derive/"]
 
 [lib]
@@ -72,9 +84,6 @@ fancy-no-backtrace = [
     "supports-unicode",
 ]
 fancy = ["fancy-no-backtrace", "backtrace", "backtrace-ext"]
-
-[workspace]
-members = ["miette-derive"]
 
 [package.metadata.docs.rs]
 all-features = true

@@ -23,7 +23,7 @@ mod utils;
 pub fn derive_diagnostic(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let cmd = match Diagnostic::from_derive_input(input) {
-        Ok(cmd) => cmd.gen(),
+        Ok(cmd) => cmd.r#gen(),
         Err(err) => return err.to_compile_error().into(),
     };
     // panic!("{:#}", cmd.to_token_stream());

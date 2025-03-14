@@ -255,7 +255,7 @@ impl Diagnostic {
         })
     }
 
-    pub fn gen(&self) -> TokenStream {
+    pub fn r#gen(&self) -> TokenStream {
         match self {
             Self::Struct { ident, fields, generics, args } => {
                 let (impl_generics, ty_generics, where_clause) = &generics.split_for_impl();
