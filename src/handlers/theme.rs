@@ -23,6 +23,10 @@ pub struct GraphicalTheme {
 
 impl Default for GraphicalTheme {
     fn default() -> Self {
+        if std::env::var("CI").is_ok() || std::env::var("FORCE_COLOR").is_ok_and(|env| env != "0") {
+            return Self::unicode();
+        }
+
         match std::env::var("NO_COLOR") {
             _ if !std::io::stdout().is_terminal() || !std::io::stderr().is_terminal() => {
                 Self::none()
@@ -35,6 +39,10 @@ impl Default for GraphicalTheme {
 
 impl GraphicalTheme {
     pub fn new(is_terminal: bool) -> Self {
+        if std::env::var("CI").is_ok() || std::env::var("FORCE_COLOR").is_ok_and(|env| env != "0") {
+            return Self::unicode();
+        }
+
         match std::env::var("NO_COLOR") {
             _ if !is_terminal => Self::none(),
             Ok(string) if string != "0" => Self::unicode_nocolor(),
