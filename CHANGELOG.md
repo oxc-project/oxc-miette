@@ -1,3 +1,21 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [2.2.0](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.1.2...oxc-miette-v2.2.0) - 2025-03-17
+
+### Added
+
+- report in color with env var `CI` and `FORCE_COLOR` ([#16](https://github.com/oxc-project/oxc-miette/pull/16))
+
+### Other
+
+- *(deps)* update marcoieni/release-plz-action digest to 4cd77ee ([#17](https://github.com/oxc-project/oxc-miette/pull/17))
 # `miette` Release Changelog
 
 <a name="7.2.0"></a>
