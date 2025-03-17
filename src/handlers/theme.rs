@@ -1,4 +1,4 @@
-use std::io::IsTerminal;
+use std::{env, io::IsTerminal};
 
 use owo_colors::Style;
 
@@ -21,8 +21,16 @@ pub struct GraphicalTheme {
     pub styles: ThemeStyles,
 }
 
+fn force_color() -> bool {
+    // Assume CI can always print colors.
+    env::var("CI").is_ok() || env::var("FORCE_COLOR").is_ok_and(|env| env != "0")
+}
+
 impl Default for GraphicalTheme {
     fn default() -> Self {
+        if force_color() {
+            return Self::unicode();
+        }
         match std::env::var("NO_COLOR") {
             _ if !std::io::stdout().is_terminal() || !std::io::stderr().is_terminal() => {
                 Self::none()
@@ -35,6 +43,9 @@ impl Default for GraphicalTheme {
 
 impl GraphicalTheme {
     pub fn new(is_terminal: bool) -> Self {
+        if force_color() {
+            return Self::unicode();
+        }
         match std::env::var("NO_COLOR") {
             _ if !is_terminal => Self::none(),
             Ok(string) if string != "0" => Self::unicode_nocolor(),
