@@ -1041,6 +1041,8 @@ impl GraphicalReportHandler {
                 let vbar_offset = (start + end) / 2;
                 let num_left = vbar_offset - start;
                 let num_right = end - vbar_offset - 1;
+                // Throws `Formatting argument out of range` when width is above u16::MAX.
+                let width = start.saturating_sub(highest).min(u16::MAX as usize);
                 underlines.push_str(
                     &format!(
                         "{:width$}{}{}{}",
@@ -1054,7 +1056,6 @@ impl GraphicalReportHandler {
                             chars.underline
                         },
                         chars.underline.to_string().repeat(num_right),
-                        width = start.saturating_sub(highest),
                     )
                     .style(hl.style)
                     .to_string(),
