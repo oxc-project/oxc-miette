@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.2.0...oxc-miette-v2.2.1) - 2025-03-19
+
+### Fixed
+
+- "Formatting argument out of range" in rustc nightly ([#20](https://github.com/oxc-project/oxc-miette/pull/20))
+
 ## [2.2.0](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.1.2...oxc-miette-v2.2.0) - 2025-03-17
 
 ### Added
