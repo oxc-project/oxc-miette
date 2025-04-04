@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.2](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.2.1...oxc-miette-v2.2.2) - 2025-04-04
+
+### Other
+
+- *(deps)* update dependency rust to v1.86.0 ([#27](https://github.com/oxc-project/oxc-miette/pull/27))
+- *(deps)* update github-actions ([#26](https://github.com/oxc-project/oxc-miette/pull/26))
+- *(deps)* update github-actions ([#24](https://github.com/oxc-project/oxc-miette/pull/24))
+- *(deps)* lock file maintenance ([#25](https://github.com/oxc-project/oxc-miette/pull/25))
+- *(deps)* update dependency rust to v1.85.1 ([#22](https://github.com/oxc-project/oxc-miette/pull/22))
+- fix permissions
+- add zizmor
+
 ## [2.2.1](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.2.0...oxc-miette-v2.2.1) - 2025-03-19
 
 ### Fixed
