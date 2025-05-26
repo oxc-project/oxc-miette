@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.2.1...oxc-miette-v2.3.0) - 2025-05-26
+
+### <!-- 0 -->Features
+
+- *(formatter)* output lint/col in json formatter ([#42](https://github.com/oxc-project/oxc-miette/pull/42))
+
+### <!-- 7 -->Chore
+
+- *(release-plz)* group version
+- *(deps)* update taiki-e/install-action action to v2.52.1 ([#40](https://github.com/oxc-project/oxc-miette/pull/40))
+- *(deps)* lock file maintenance rust crates ([#41](https://github.com/oxc-project/oxc-miette/pull/41))
+- *(deps)* update github-actions ([#38](https://github.com/oxc-project/oxc-miette/pull/38))
+- *(deps)* lock file maintenance rust crates ([#39](https://github.com/oxc-project/oxc-miette/pull/39))
+- *(deps)* update dependency rust to v1.87.0 ([#37](https://github.com/oxc-project/oxc-miette/pull/37))
+- *(deps)* lock file maintenance rust crates ([#36](https://github.com/oxc-project/oxc-miette/pull/36))
+- *(deps)* update github-actions ([#34](https://github.com/oxc-project/oxc-miette/pull/34))
+- *(deps)* lock file maintenance rust crates ([#35](https://github.com/oxc-project/oxc-miette/pull/35))
+- *(deps)* update github-actions ([#33](https://github.com/oxc-project/oxc-miette/pull/33))
+- *(deps)* lock file maintenance rust crates ([#32](https://github.com/oxc-project/oxc-miette/pull/32))
+- *(deps)* update github-actions ([#31](https://github.com/oxc-project/oxc-miette/pull/31))
+- *(deps)* update github-actions ([#30](https://github.com/oxc-project/oxc-miette/pull/30))
+- *(deps)* update github-actions ([#28](https://github.com/oxc-project/oxc-miette/pull/28))
+- *(deps)* lock file maintenance ([#29](https://github.com/oxc-project/oxc-miette/pull/29))
+- *(deps)* update dependency rust to v1.86.0 ([#27](https://github.com/oxc-project/oxc-miette/pull/27))
+- *(deps)* update github-actions ([#26](https://github.com/oxc-project/oxc-miette/pull/26))
+- *(deps)* update github-actions ([#24](https://github.com/oxc-project/oxc-miette/pull/24))
+- *(deps)* lock file maintenance ([#25](https://github.com/oxc-project/oxc-miette/pull/25))
+- *(deps)* update dependency rust to v1.85.1 ([#22](https://github.com/oxc-project/oxc-miette/pull/22))
+
+### <!-- 8 -->CI
+
+- fix permissions
+- add zizmor
+
 ## [2.2.1](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.2.0...oxc-miette-v2.2.1) - 2025-03-19
 
 ### Fixed
