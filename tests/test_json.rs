@@ -39,7 +39,9 @@ mod json_report_handler {
                     "label": "this bit here",
                     "span": {
                         "offset": 9,
-                        "length": 6
+                        "length": 6,
+                        "line": 2,
+                        "column": 3
                     }
                 }
             ],
@@ -81,7 +83,9 @@ mod json_report_handler {
                     "label": "this bit here",
                     "span": {
                         "offset": 9,
-                        "length": 4
+                        "length": 4,
+                        "line": 2,
+                        "column": 3
                     }
                 }
             ],
@@ -123,7 +127,9 @@ mod json_report_handler {
                     "label": "this bit here",
                     "span": {
                         "offset": 0,
-                        "length": 0
+                        "length": 0,
+                        "line": 1,
+                        "column": 1
                     }
                 }
             ],
@@ -165,7 +171,9 @@ mod json_report_handler {
                     "label": "this bit here",
                     "span": {
                         "offset": 9,
-                        "length": 0
+                        "length": 0,
+                        "line": 2,
+                        "column": 3
                     }
                 }
             ],
@@ -206,7 +214,9 @@ mod json_report_handler {
                 {
                     "span": {
                         "offset": 9,
-                        "length": 4
+                        "length": 4,
+                        "line": 2,
+                        "column": 3
                     }
                 }
             ],
@@ -248,7 +258,9 @@ mod json_report_handler {
                     "label": "this bit here",
                     "span": {
                         "offset": 7,
-                        "length": 4
+                        "length": 4,
+                        "line": 2,
+                        "column": 1
                     }
                 }
             ],
@@ -299,21 +311,27 @@ mod json_report_handler {
                     "label": "x",
                     "span": {
                         "offset": 9,
-                        "length": 4
+                        "length": 4,
+                        "line": 2,
+                        "column": 3
                     }
                 },
                 {
                     "label": "y",
                     "span": {
                         "offset": 14,
-                        "length": 4
+                        "length": 4,
+                        "line": 2,
+                        "column": 8
                     }
                 },
                 {
                     "label": "z",
                     "span": {
                         "offset": 24,
-                        "length": 4
+                        "length": 4,
+                        "line": 2,
+                        "column": 18
                     }
                 }
             ],
@@ -355,7 +373,9 @@ mod json_report_handler {
                     "label": "these two lines",
                     "span": {
                         "offset": 9,
-                        "length": 11
+                        "length": 11,
+                        "line": 2,
+                        "column": 3
                     }
                 }
             ],
@@ -410,14 +430,18 @@ mod json_report_handler {
                     "label": "block 1",
                     "span": {
                         "offset": 0,
-                        "length": 50
+                        "length": 50,
+                        "line": 1,
+                        "column": 1
                     }
                 },
                 {
                     "label": "block 2",
                     "span": {
                         "offset": 10,
-                        "length": 9
+                        "length": 9,
+                        "line": 2,
+                        "column": 5
                     }
                 }
             ],
@@ -488,13 +512,17 @@ mod json_report_handler {
                     "label": "block 1",
                     "span": {
                         "offset": 0,
-                        "length": 50
+                        "length": 50,
+                        "line": 1,
+                        "column": 1
                     }
                 },
                 {
                     "span": {
                         "offset": 10,
-                        "length": 9
+                        "length": 9,
+                        "line": 2,
+                        "column": 5
                     }
                 }
             ],
@@ -542,14 +570,18 @@ mod json_report_handler {
                     "label": "this bit here",
                     "span": {
                         "offset": 0,
-                        "length": 10
+                        "length": 10,
+                        "line": 1,
+                        "column": 1
                     }
                 },
                 {
                     "label": "also this bit",
                     "span": {
                         "offset": 20,
-                        "length": 6
+                        "length": 6,
+                        "line": 3,
+                        "column": 7
                     }
                 }
             ],
@@ -597,14 +629,18 @@ mod json_report_handler {
                     "label": "this bit here",
                     "span": {
                         "offset": 0,
-                        "length": 8
+                        "length": 8,
+                        "line": 1,
+                        "column": 1
                     }
                 },
                 {
                     "label": "also this bit",
                     "span": {
                         "offset": 9,
-                        "length": 10
+                        "length": 10,
+                        "line": 2,
+                        "column": 3
                     }
                 }
             ],
@@ -652,14 +688,18 @@ mod json_report_handler {
                     "label": "this bit here",
                     "span": {
                         "offset": 0,
-                        "length": 8
+                        "length": 8,
+                        "line": 1,
+                        "column": 1
                     }
                 },
                 {
                     "label": "also this bit",
                     "span": {
                         "offset": 10,
-                        "length": 10
+                        "length": 10,
+                        "line": 2,
+                        "column": 4
                     }
                 }
             ],
@@ -745,7 +785,9 @@ mod json_report_handler {
                     "label": "this bit here",
                     "span": {
                         "offset": 9,
-                        "length": 4
+                        "length": 4,
+                        "line": 2,
+                        "column": 3
                     }
                 }
             ],
@@ -761,7 +803,9 @@ mod json_report_handler {
                         "label": "this bit here",
                         "span": {
                             "offset": 0,
-                            "length": 6
+                            "length": 6,
+                            "line": 1,
+                            "column": 1
                         }
                     }
                 ],
@@ -778,7 +822,9 @@ mod json_report_handler {
                         "label": "this bit here",
                         "span": {
                             "offset": 0,
-                            "length": 6
+                            "length": 6,
+                            "line": 1,
+                            "column": 1
                         }
                     }
                 ],
@@ -838,7 +884,9 @@ mod json_report_handler {
                     "label": "this bit here",
                     "span": {
                         "offset": 9,
-                        "length": 4
+                        "length": 4,
+                        "line": 2,
+                        "column": 3
                     }
                 }
             ],
@@ -854,7 +902,9 @@ mod json_report_handler {
                         "label": "this bit here",
                         "span": {
                             "offset": 0,
-                            "length": 6
+                            "length": 6,
+                            "line": 1,
+                            "column": 1
                         }
                     }
                 ],
@@ -871,7 +921,9 @@ mod json_report_handler {
                         "label": "this bit here",
                         "span": {
                             "offset": 0,
-                            "length": 6
+                            "length": 6,
+                            "line": 1,
+                            "column": 1
                         }
                     }
                 ],

@@ -126,7 +126,18 @@ impl JSONReportHandler {
                     }
                     write!(f, r#""span": {{"#)?;
                     write!(f, r#""offset": {},"#, label.offset())?;
-                    write!(f, r#""length": {}"#, label.len())?;
+                    write!(f, r#""length": {},"#, label.len())?;
+
+                    if let Some(Ok(location)) = diagnostic
+                        .source_code()
+                        .or(parent_src)
+                        .map(|src| src.read_span(label.inner(), 0, 0))
+                    {
+                        write!(f, r#""line": {},"#, location.line() + 1)?;
+                        write!(f, r#""column": {}"#, location.column() + 1)?;
+                    } else {
+                        write!(f, r#""line": null,"column": null"#)?;
+                    }
 
                     write!(f, "}}}}")?;
                 }
