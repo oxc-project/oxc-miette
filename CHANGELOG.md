@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.3.0...oxc-miette-v2.3.1) - 2025-06-08
+
+### <!-- 7 -->Chore
+
+- *(deps)* lock file maintenance rust crates ([#45](https://github.com/oxc-project/oxc-miette/pull/45))
+- *(deps)* update taiki-e/install-action action to v2.52.4 ([#43](https://github.com/oxc-project/oxc-miette/pull/43))
+
 ## [2.3.0](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.2.1...oxc-miette-v2.3.0) - 2025-05-26
 
 ### <!-- 0 -->Features
