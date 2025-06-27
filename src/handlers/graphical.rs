@@ -262,7 +262,7 @@ impl GraphicalReportHandler {
             let url = diagnostic.url().unwrap(); // safe
             let code = match diagnostic.code() {
                 Some(code) => {
-                    format!("{} ", code)
+                    format!("{code} ")
                 }
                 _ => "".to_string(),
             };
@@ -273,22 +273,17 @@ impl GraphicalReportHandler {
                 code.style(severity_style),
                 display_text.style(self.theme.styles.link)
             );
-            write!(header, "{}", link)?;
-            writeln!(f, "{}", header)?;
+            write!(header, "{link}")?;
+            writeln!(f, "{header}")?;
             writeln!(f)?;
-        } else {
-            match diagnostic.code() {
-                Some(code) => {
-                    write!(header, "{}", code.style(severity_style),)?;
-                    if self.links == LinkStyle::Text && diagnostic.url().is_some() {
-                        let url = diagnostic.url().unwrap(); // safe
-                        write!(header, " ({})", url.style(self.theme.styles.link))?;
-                    }
-                    writeln!(f, "{}", header)?;
-                    writeln!(f)?;
-                }
-                _ => {}
+        } else if let Some(code) = diagnostic.code() {
+            write!(header, "{}", code.style(severity_style),)?;
+            if self.links == LinkStyle::Text && diagnostic.url().is_some() {
+                let url = diagnostic.url().unwrap(); // safe
+                write!(header, " ({})", url.style(self.theme.styles.link))?;
             }
+            writeln!(f, "{header}")?;
+            writeln!(f)?;
         }
         Ok(())
     }
@@ -325,7 +320,7 @@ impl GraphicalReportHandler {
                 format!("{CTL}{url}\u{1b}\\{code}{END}: {title}",)
             }
             (_, _, Some(code)) => {
-                let title = format!("{code}: {}", diagnostic);
+                let title = format!("{code}: {diagnostic}");
                 format!("{}", title.style(severity_style))
             }
             _ => {
@@ -333,7 +328,7 @@ impl GraphicalReportHandler {
             }
         };
         let title = textwrap::fill(&title, opts);
-        writeln!(f, "{}", title)?;
+        writeln!(f, "{title}")?;
 
         // if !self.with_cause_chain {
         // return Ok(());
@@ -899,12 +894,10 @@ impl GraphicalReportHandler {
                     } else {
                         result.push_str(opts.initial_indent);
                     }
+                } else if line.trim().is_empty() {
+                    result.push_str(trimmed_indent);
                 } else {
-                    if line.trim().is_empty() {
-                        result.push_str(trimmed_indent);
-                    } else {
-                        result.push_str(opts.subsequent_indent);
-                    }
+                    result.push_str(opts.subsequent_indent);
                 }
                 result.push_str(line);
             }
@@ -1065,7 +1058,7 @@ impl GraphicalReportHandler {
                 (hl, vbar_offset)
             })
             .collect();
-        writeln!(f, "{}", underlines)?;
+        writeln!(f, "{underlines}")?;
 
         for hl in single_liners.iter().rev() {
             if let Some(label) = hl.label_parts() {

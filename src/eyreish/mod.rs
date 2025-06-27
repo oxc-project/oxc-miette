@@ -164,11 +164,11 @@ pub trait ReportHandler: core::any::Any + Send + Sync {
         error: &(dyn StdError + 'static),
         f: &mut core::fmt::Formatter<'_>,
     ) -> core::fmt::Result {
-        write!(f, "{}", error)?;
+        write!(f, "{error}")?;
 
         if f.alternate() {
             for cause in crate::chain::Chain::new(error).skip(1) {
-                write!(f, ": {}", cause)?;
+                write!(f, ": {cause}")?;
             }
         }
 

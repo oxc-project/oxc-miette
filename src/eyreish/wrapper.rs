@@ -256,7 +256,7 @@ mod tests {
         })
         .with_source_code(outer_source.to_string());
 
-        let message = format!("{:?}", report);
+        let message = format!("{report:?}");
         assert!(message.contains(inner_source));
         assert!(message.contains(outer_source));
     }

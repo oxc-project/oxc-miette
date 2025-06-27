@@ -6,20 +6,15 @@ use crate::{
 };
 
 /// Settings to control the color format used for graphical rendering.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 pub enum RgbColors {
     /// Use RGB colors even if the terminal does not support them
     Always,
     /// Use RGB colors instead of ANSI if the terminal supports RGB
     Preferred,
     /// Always use ANSI, regardless of terminal support for RGB
+    #[default]
     Never,
-}
-
-impl Default for RgbColors {
-    fn default() -> RgbColors {
-        RgbColors::Never
-    }
 }
 
 /**
