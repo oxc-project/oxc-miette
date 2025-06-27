@@ -80,7 +80,7 @@ impl Url {
                         let fmt =
                             "https://docs.rs/{crate_name}/{crate_version}/{mod_name}/{item_path}"
                                 .into();
-                        let item_path = format!("enum.{}.html#variant.{}", enum_name, ident);
+                        let item_path = format!("enum.{enum_name}.html#variant.{ident}");
                         let args = quote! {
                             ,
                             crate_name=env!("CARGO_PKG_NAME"),
@@ -113,7 +113,7 @@ impl Url {
                 let pat = gen_unused_pat(fields);
                 let fmt =
                     "https://docs.rs/{crate_name}/{crate_version}/{mod_name}/{item_path}".into();
-                let item_path = format!("struct.{}.html", struct_name);
+                let item_path = format!("struct.{struct_name}.html");
                 let args = quote! {
                     ,
                     crate_name=env!("CARGO_PKG_NAME"),

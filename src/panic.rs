@@ -20,7 +20,7 @@ pub fn set_panic_hook() {
                 .with_context(|| format!("at {}:{}:{}", loc.file(), loc.line(), loc.column()));
         }
         if let Err(err) = report.with_context(|| "Main thread panicked.".to_string()) {
-            eprintln!("Error: {:?}", err);
+            eprintln!("Error: {err:?}");
         }
     }));
 }
@@ -43,7 +43,7 @@ impl Panic {
                 let frames = backtrace_ext::short_frames_strict(&trace).enumerate();
                 for (idx, (frame, sub_frames)) in frames {
                     let ip = frame.ip();
-                    let _ = write!(backtrace, "\n{:4}: {:2$?}", idx, ip, HEX_WIDTH);
+                    let _ = write!(backtrace, "\n{idx:4}: {ip:HEX_WIDTH$?}");
 
                     let symbols = frame.symbols();
                     if symbols.is_empty() {
@@ -60,7 +60,7 @@ impl Panic {
                         }
 
                         if let Some(name) = symbol.name() {
-                            let _ = write!(backtrace, " - {}", name);
+                            let _ = write!(backtrace, " - {name}");
                         } else {
                             let _ = write!(backtrace, " - <unknown>");
                         }

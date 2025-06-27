@@ -95,7 +95,7 @@ impl NarratableReportHandler {
             Some(Severity::Warning) => "warning",
             Some(Severity::Advice) => "advice",
         };
-        writeln!(f, "    Diagnostic severity: {}", severity)?;
+        writeln!(f, "    Diagnostic severity: {severity}")?;
         Ok(())
     }
 

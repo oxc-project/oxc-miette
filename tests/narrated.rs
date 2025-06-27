@@ -35,7 +35,7 @@ fn single_line_with_wide_char() -> Result<(), MietteError> {
     let src = "source\n  👼🏼text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 6).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -68,7 +68,7 @@ fn single_line_highlight() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -101,7 +101,7 @@ fn single_line_highlight_offset_zero() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (0, 0).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -133,7 +133,7 @@ fn single_line_highlight_with_empty_span() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 0).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -166,7 +166,7 @@ fn single_line_highlight_no_label() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -199,7 +199,7 @@ fn single_line_highlight_at_line_start() -> Result<(), MietteError> {
     let src = "source\ntext\n  here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (7, 4).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -241,7 +241,7 @@ fn multiple_same_line_highlights() -> Result<(), MietteError> {
         highlight3: (24, 4).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -276,7 +276,7 @@ fn multiline_highlight_adjacent() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 11).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -323,7 +323,7 @@ line5
         highlight2: (10, 9).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -387,7 +387,7 @@ line5
         highlight2: (10, 9).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = "wtf?!
 it broke :(
     Diagnostic severity: error
@@ -437,7 +437,7 @@ fn multiple_multiline_highlights_adjacent() -> Result<(), MietteError> {
         highlight2: (20, 6).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = "oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -485,7 +485,7 @@ fn multiple_multiline_highlights_overlapping_lines() -> Result<(), MietteError> 
         highlight2: (9, 10).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     assert_eq!("Error [oops::my::bad]: oops!\n\n[bad_file.rs] This is the part that broke:\n\n 1 │ source\n 2 │   text\n   ·   ──┬─\n   ·     ╰── this bit here\n 3 │     here\n\n﹦ try doing it better next time?\n".to_string(), out);
     Ok(())
 }
@@ -513,7 +513,7 @@ fn multiple_multiline_highlights_overlapping_offsets() -> Result<(), MietteError
         highlight2: (10, 10).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     assert_eq!("Error [oops::my::bad]: oops!\n\n[bad_file.rs] This is the part that broke:\n\n 1 │ source\n 2 │   text\n   ·   ──┬─\n   ·     ╰── this bit here\n 3 │     here\n\n﹦ try doing it better next time?\n".to_string(), out);
     Ok(())
 }
@@ -526,7 +526,7 @@ fn url() -> Result<(), MietteError> {
     struct MyBad;
     let err = MyBad;
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     assert!(out.contains("https://example.com"));
     Ok(())
 }
@@ -556,7 +556,7 @@ fn related() -> Result<(), MietteError> {
         }],
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
@@ -615,7 +615,7 @@ fn related_source_code_propagation() -> Result<(), MietteError> {
         related: vec![InnerError { highlight: (0, 6).into() }],
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     let expected = r#"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1

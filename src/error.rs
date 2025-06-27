@@ -44,8 +44,7 @@ impl Diagnostic for MietteError {
             MietteError::OutOfBounds => "#variant.OutOfBounds",
         };
         Some(Box::new(format!(
-            "https://docs.rs/miette/{}/miette/enum.MietteError.html{}",
-            crate_version, variant,
+            "https://docs.rs/miette/{crate_version}/miette/enum.MietteError.html{variant}",
         )))
     }
 }
