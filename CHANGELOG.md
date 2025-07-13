@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.2](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.3.1...oxc-miette-v2.3.2) - 2025-07-13
+
+### <!-- 7 -->Chore
+
+- *(deps)* lock file maintenance rust crates ([#56](https://github.com/oxc-project/oxc-miette/pull/56))
+- *(deps)* update github-actions ([#54](https://github.com/oxc-project/oxc-miette/pull/54))
+- *(deps)* update github-actions ([#52](https://github.com/oxc-project/oxc-miette/pull/52))
+
 ## [2.3.1](https://github.com/oxc-project/oxc-miette/compare/oxc-miette-v2.3.0...oxc-miette-v2.3.1) - 2025-06-27
 
 ### <!-- 7 -->Chore
