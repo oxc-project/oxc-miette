@@ -241,7 +241,7 @@ checksum = "48dd4f4a2c8405440fd0462561f0e5806bd0f77e86f51c761481bdd4018b545e"
 
 [[package]]
 name = "oxc-miette"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "backtrace",
  "backtrace-ext",
@@ -268,7 +268,7 @@ dependencies = [
 
 [[package]]
 name = "oxc-miette-derive"
-version = "2.3.1"
+version = "2.3.2"
 dependencies = [
  "proc-macro2",
  "quote",
