@@ -289,6 +289,11 @@ impl LabeledSpan {
         self.label = label;
     }
 
+    /// Change the offset of the span
+    pub fn set_span_offset(&mut self, offset: usize) {
+        self.span.offset = SourceOffset(offset);
+    }
+
     /// Makes a new label at specified span
     ///
     /// # Examples
@@ -368,6 +373,15 @@ impl LabeledSpan {
     pub const fn primary(&self) -> bool {
         self.primary
     }
+}
+
+#[test]
+fn test_set_span_offset() {
+    let mut span = LabeledSpan::new(None, 10, 10);
+    assert_eq!(span.offset(), 10);
+
+    span.set_span_offset(20);
+    assert_eq!(span.offset(), 20);
 }
 
 #[cfg(feature = "serde")]
