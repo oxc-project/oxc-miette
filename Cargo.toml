@@ -54,6 +54,7 @@ backtrace-ext = { version = "0.2.1", optional = true }
 
 [dev-dependencies]
 semver = "1.0.26"
+criterion = "0.5"
 
 # Eyre devdeps
 futures = { version = "0.3", default-features = false }
@@ -90,3 +91,7 @@ all-features = true
 
 [package.metadata.cargo-shear]
 ignored = ["futures", "indenter", "semver"]
+
+[[bench]]
+name = "performance"
+harness = false
