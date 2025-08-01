@@ -257,32 +257,25 @@ impl GraphicalReportHandler {
             Some(Severity::Warning) => self.theme.styles.warning,
             Some(Severity::Advice) => self.theme.styles.advice,
         };
-        let mut header = String::new();
+        
         if self.links == LinkStyle::Link && diagnostic.url().is_some() {
             let url = diagnostic.url().unwrap(); // safe
-            let code = match diagnostic.code() {
-                Some(code) => {
-                    format!("{code} ")
-                }
-                _ => "".to_string(),
-            };
             let display_text = self.link_display_text.as_deref().unwrap_or("(link)");
-            let link = format!(
-                "\u{1b}]8;;{}\u{1b}\\{}{}\u{1b}]8;;\u{1b}\\",
-                url,
-                code.style(severity_style),
-                display_text.style(self.theme.styles.link)
-            );
-            write!(header, "{link}")?;
-            writeln!(f, "{header}")?;
+            
+            write!(f, "\u{1b}]8;;{}\u{1b}\\", url)?;
+            if let Some(code) = diagnostic.code() {
+                write!(f, "{} ", code.style(severity_style))?;
+            }
+            write!(f, "{}\u{1b}]8;;\u{1b}\\", display_text.style(self.theme.styles.link))?;
+            writeln!(f)?;
             writeln!(f)?;
         } else if let Some(code) = diagnostic.code() {
-            write!(header, "{}", code.style(severity_style),)?;
+            write!(f, "{}", code.style(severity_style))?;
             if self.links == LinkStyle::Text && diagnostic.url().is_some() {
                 let url = diagnostic.url().unwrap(); // safe
-                write!(header, " ({})", url.style(self.theme.styles.link))?;
+                write!(f, " ({})", url.style(self.theme.styles.link))?;
             }
-            writeln!(f, "{header}")?;
+            writeln!(f)?;
             writeln!(f)?;
         }
         Ok(())
@@ -295,8 +288,12 @@ impl GraphicalReportHandler {
             Some(Severity::Advice) => (self.theme.styles.advice, &self.theme.characters.advice),
         };
 
-        let initial_indent = format!("  {} ", severity_icon.style(severity_style));
-        let rest_indent = format!("  {} ", self.theme.characters.vbar.style(severity_style));
+        // Pre-allocate indent strings to avoid repeated allocations
+        let mut initial_indent = String::with_capacity(16);
+        write!(initial_indent, "  {} ", severity_icon.style(severity_style))?;
+        
+        let mut rest_indent = String::with_capacity(16);
+        write!(rest_indent, "  {} ", self.theme.characters.vbar.style(severity_style))?;
         let width = self.termwidth.saturating_sub(2);
         let mut opts = textwrap::Options::new(width)
             .initial_indent(&initial_indent)
@@ -309,22 +306,23 @@ impl GraphicalReportHandler {
             opts = opts.word_splitter(word_splitter);
         }
 
-        let title = match (self.links, diagnostic.url(), diagnostic.code()) {
+        // Construct title directly using write! to minimize allocations
+        let mut title = String::with_capacity(128); // Pre-allocate reasonable capacity
+        match (self.links, diagnostic.url(), diagnostic.code()) {
             (LinkStyle::Link, Some(url), Some(code)) => {
                 // magic unicode escape sequences to make the terminal print a hyperlink
-                const CTL: &str = "\u{1b}]8;;";
-                const END: &str = "\u{1b}]8;;\u{1b}\\";
-                let code = code.style(severity_style);
-                let message = diagnostic.to_string();
-                let title = message.style(severity_style);
-                format!("{CTL}{url}\u{1b}\\{code}{END}: {title}",)
+                write!(title, "\u{1b}]8;;{}\u{1b}\\{}\u{1b}]8;;\u{1b}\\: {}", 
+                       url, 
+                       code.style(severity_style),
+                       diagnostic.to_string().style(severity_style))?;
             }
             (_, _, Some(code)) => {
-                let title = format!("{code}: {diagnostic}");
-                format!("{}", title.style(severity_style))
+                write!(title, "{}: {}", 
+                       code.style(severity_style),
+                       diagnostic.to_string().style(severity_style))?;
             }
             _ => {
-                format!("{}", diagnostic.to_string().style(severity_style))
+                write!(title, "{}", diagnostic.to_string().style(severity_style))?;
             }
         };
         let title = textwrap::fill(&title, opts);
@@ -551,14 +549,11 @@ impl GraphicalReportHandler {
             .to_string()
             .len();
 
-        // Header
-        write!(
-            f,
-            "{}{}{}",
-            " ".repeat(linum_width + 2),
-            self.theme.characters.ltop,
-            self.theme.characters.hbar,
-        )?;
+        // Header - optimize space generation
+        for _ in 0..(linum_width + 2) {
+            write!(f, " ")?;
+        }
+        write!(f, "{}{}", self.theme.characters.ltop, self.theme.characters.hbar)?;
 
         // If there is a primary label, then use its span
         // as the reference point for line/column information.
@@ -580,7 +575,9 @@ impl GraphicalReportHandler {
             }
             _ => {
                 if lines.len() <= 1 {
-                    writeln!(f, "{}", self.theme.characters.hbar.to_string().repeat(3))?;
+                    write!(f, "{}", self.theme.characters.hbar)?;
+                    write!(f, "{}", self.theme.characters.hbar)?;
+                    writeln!(f, "{}", self.theme.characters.hbar)?;
                 } else {
                     writeln!(
                         f,
@@ -639,13 +636,15 @@ impl GraphicalReportHandler {
                 }
             }
         }
-        writeln!(
-            f,
-            "{}{}{}",
-            " ".repeat(linum_width + 2),
-            self.theme.characters.lbot,
-            self.theme.characters.hbar.to_string().repeat(4),
-        )?;
+        // Footer - optimize repeated character generation
+        for _ in 0..(linum_width + 2) {
+            write!(f, " ")?;
+        }
+        write!(f, "{}", self.theme.characters.lbot)?;
+        for _ in 0..4 {
+            write!(f, "{}", self.theme.characters.hbar)?;
+        }
+        writeln!(f)?;
         Ok(())
     }
 
@@ -1015,7 +1014,7 @@ impl GraphicalReportHandler {
         single_liners: &[&FancySpan],
         all_highlights: &[FancySpan],
     ) -> fmt::Result {
-        let mut underlines = String::new();
+        let mut underlines = String::with_capacity(256); // Pre-allocate capacity
         let mut highest = 0;
 
         let chars = &self.theme.characters;
@@ -1036,23 +1035,31 @@ impl GraphicalReportHandler {
                 let num_right = end - vbar_offset - 1;
                 // Throws `Formatting argument out of range` when width is above u16::MAX.
                 let width = start.saturating_sub(highest).min(u16::MAX as usize);
-                underlines.push_str(
-                    &format!(
-                        "{:width$}{}{}{}",
-                        "",
-                        chars.underline.to_string().repeat(num_left),
-                        if hl.len() == 0 {
-                            chars.uarrow
-                        } else if hl.label().is_some() {
-                            chars.underbar
-                        } else {
-                            chars.underline
-                        },
-                        chars.underline.to_string().repeat(num_right),
-                    )
-                    .style(hl.style)
-                    .to_string(),
-                );
+                
+                // Optimize string building - use format! but cache underline strings
+                let underline_char = chars.underline;
+                let middle_char = if hl.len() == 0 {
+                    chars.uarrow
+                } else if hl.label().is_some() {
+                    chars.underbar
+                } else {
+                    chars.underline
+                };
+                
+                let spaces = " ".repeat(width);
+                let left_underlines = underline_char.to_string().repeat(num_left);
+                let right_underlines = underline_char.to_string().repeat(num_right);
+                
+                let segment = format!(
+                    "{}{}{}{}",
+                    spaces,
+                    left_underlines,
+                    middle_char,
+                    right_underlines
+                ).style(hl.style).to_string();
+                
+                underlines.push_str(&segment);
+                
                 highest = std::cmp::max(highest, end);
 
                 (hl, vbar_offset)
@@ -1136,18 +1143,24 @@ impl GraphicalReportHandler {
                 write!(f, "{}", chars.vbar.to_string().style(offset_hl.style))?;
                 curr_offset += 1;
             } else {
-                let lines = match render_mode {
+                match render_mode {
                     LabelRenderMode::SingleLine => {
-                        format!("{}{} {}", chars.lbot, chars.hbar.to_string().repeat(2), label,)
+                        write!(f, "{}", chars.lbot.style(hl.style))?;
+                        write!(f, "{}", chars.hbar.style(hl.style))?;
+                        write!(f, "{}", chars.hbar.style(hl.style))?;
+                        writeln!(f, " {}", label.style(hl.style))?;
                     }
                     LabelRenderMode::BlockFirst => {
-                        format!("{}{}{} {}", chars.lbot, chars.hbar, chars.rcross, label,)
+                        write!(f, "{}", chars.lbot.style(hl.style))?;
+                        write!(f, "{}", chars.hbar.style(hl.style))?;
+                        write!(f, "{}", chars.rcross.style(hl.style))?;
+                        writeln!(f, " {}", label.style(hl.style))?;
                     }
                     LabelRenderMode::BlockRest => {
-                        format!("  {} {}", chars.vbar, label,)
+                        write!(f, "  {} {}", chars.vbar.style(hl.style), label.style(hl.style))?;
+                        writeln!(f)?;
                     }
                 };
-                writeln!(f, "{}", lines.style(hl.style))?;
                 break;
             }
         }

@@ -11,34 +11,40 @@ fn context_info<'a>(
     context_lines_before: usize,
     context_lines_after: usize,
 ) -> Result<MietteSpanContents<'a>, MietteError> {
+    let span_start = span.offset();
+    let span_end = span_start + span.len();
+    
+    // Optimized version with pre-allocated collections
     let mut offset = 0usize;
     let mut line_count = 0usize;
     let mut start_line = 0usize;
     let mut start_column = 0usize;
-    let mut before_lines_starts = VecDeque::new();
+    let mut before_lines_starts = VecDeque::with_capacity(context_lines_before + 1);
     let mut current_line_start = 0usize;
     let mut end_lines = 0usize;
     let mut post_span = false;
     let mut post_span_got_newline = false;
-    let mut iter = input.iter().copied().peekable();
-    while let Some(char) = iter.next() {
-        if matches!(char, b'\r' | b'\n') {
+    
+    // Process input more efficiently by avoiding peekable iterator
+    let mut i = 0;
+    while i < input.len() {
+        let byte = input[i];
+        if matches!(byte, b'\r' | b'\n') {
             line_count += 1;
-            if char == b'\r' && iter.next_if_eq(&b'\n').is_some() {
+            let is_crlf = byte == b'\r' && input.get(i + 1) == Some(&b'\n');
+            if is_crlf {
+                i += 1; // Skip the \n part
                 offset += 1;
             }
-            if offset < span.offset() {
-                // We're before the start of the span.
+            
+            if offset < span_start {
                 start_column = 0;
                 before_lines_starts.push_back(current_line_start);
                 if before_lines_starts.len() > context_lines_before {
                     start_line += 1;
                     before_lines_starts.pop_front();
                 }
-            } else if offset >= span.offset() + span.len().saturating_sub(1) {
-                // We're after the end of the span, but haven't necessarily
-                // started collecting end lines yet (we might still be
-                // collecting context lines).
+            } else if offset >= span_end.saturating_sub(1) {
                 if post_span {
                     start_column = 0;
                     if post_span_got_newline {
@@ -53,11 +59,11 @@ fn context_info<'a>(
                 }
             }
             current_line_start = offset + 1;
-        } else if offset < span.offset() {
+        } else if offset < span_start {
             start_column += 1;
         }
 
-        if offset >= (span.offset() + span.len()).saturating_sub(1) {
+        if offset >= span_end.saturating_sub(1) {
             post_span = true;
             if end_lines >= context_lines_after {
                 offset += 1;
@@ -66,13 +72,14 @@ fn context_info<'a>(
         }
 
         offset += 1;
+        i += 1;
     }
 
-    if offset >= (span.offset() + span.len()).saturating_sub(1) {
+    if offset >= span_end.saturating_sub(1) {
         let starting_offset = before_lines_starts
             .front()
             .copied()
-            .unwrap_or_else(|| if context_lines_before == 0 { span.offset() } else { 0 });
+            .unwrap_or_else(|| if context_lines_before == 0 { span_start } else { 0 });
         Ok(MietteSpanContents::new(
             &input[starting_offset..offset],
             (starting_offset, offset - starting_offset).into(),
