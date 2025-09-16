@@ -4,7 +4,8 @@ use std::{
 };
 
 use owo_colors::{OwoColorize, Style};
-use unicode_width::UnicodeWidthChar;
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
     Diagnostic, GraphicalTheme, LabeledSpan, ReportHandler, Severity, SourceCode, SourceSpan,
@@ -930,31 +931,77 @@ impl GraphicalReportHandler {
         &self,
         text: &'a str,
     ) -> impl Iterator<Item = usize> + 'a + use<'a> {
-        let mut column = 0;
-        let mut escaped = false;
-        let tab_width = self.tab_width;
-        text.chars().map(move |c| {
-            let width = match (escaped, c) {
-                // Round up to the next multiple of tab_width
-                (false, '\t') => tab_width - column % tab_width,
-                // start of ANSI escape
-                (false, '\x1b') => {
-                    escaped = true;
-                    0
-                }
-                // use Unicode width for all other characters
-                (false, c) => c.width().unwrap_or(0),
-                // end of ANSI escape
-                (true, 'm') => {
-                    escaped = false;
-                    0
-                }
-                // characters are zero width within escape sequence
-                (true, _) => 0,
-            };
-            column += width;
-            width
-        })
+        // Custom iterator that handles both ASCII and Unicode efficiently
+        struct CharWidthIterator<'a> {
+            chars: std::str::CharIndices<'a>,
+            grapheme_boundaries: Option<Vec<(usize, usize)>>, // (byte_pos, width) - None for ASCII
+            current_grapheme_idx: usize,
+            column: usize,
+            escaped: bool,
+            tab_width: usize,
+        }
+
+        impl<'a> Iterator for CharWidthIterator<'a> {
+            type Item = usize;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                let (byte_pos, c) = self.chars.next()?;
+
+                let width = match (self.escaped, c) {
+                    (false, '\t') => self.tab_width - self.column % self.tab_width,
+                    (false, '\x1b') => {
+                        self.escaped = true;
+                        0
+                    }
+                    (false, _) => {
+                        if let Some(ref boundaries) = self.grapheme_boundaries {
+                            // Unicode path: check if we're at a grapheme boundary
+                            if self.current_grapheme_idx < boundaries.len()
+                                && boundaries[self.current_grapheme_idx].0 == byte_pos
+                            {
+                                let width = boundaries[self.current_grapheme_idx].1;
+                                self.current_grapheme_idx += 1;
+                                width
+                            } else {
+                                0 // Not at a grapheme boundary
+                            }
+                        } else {
+                            // ASCII path: all non-control chars are width 1
+                            1
+                        }
+                    }
+                    (true, 'm') => {
+                        self.escaped = false;
+                        0
+                    }
+                    (true, _) => 0,
+                };
+
+                self.column += width;
+                Some(width)
+            }
+        }
+
+        // Only compute grapheme boundaries for non-ASCII text
+        let grapheme_boundaries = if text.is_ascii() {
+            None
+        } else {
+            // Collect grapheme boundaries with their widths
+            Some(
+                text.grapheme_indices(true)
+                    .map(|(pos, grapheme)| (pos, grapheme.width()))
+                    .collect(),
+            )
+        };
+
+        CharWidthIterator {
+            chars: text.char_indices(),
+            grapheme_boundaries,
+            current_grapheme_idx: 0,
+            column: 0,
+            escaped: false,
+            tab_width: self.tab_width,
+        }
     }
 
     /// Returns the visual column position of a byte offset on a specific line.
