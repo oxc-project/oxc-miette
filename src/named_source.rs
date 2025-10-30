@@ -71,4 +71,8 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
         }
         Ok(Box::new(contents))
     }
+
+    fn name(&self) -> Option<&str> {
+        Some(&self.name)
+    }
 }
