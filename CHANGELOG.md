@@ -61,6 +61,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [2.6.0] - 2025-10-30
+
+### Features
+
+- Expose `name` method on `SourceCode` for getting the file name ([#103](https://github.com/oxc-project/oxc-miette/pull/103))
+
+### Chore
+
+- *(deps)* Update github-actions ([#93](https://github.com/oxc-project/oxc-miette/pull/93))
+- *(deps)* Update github/codeql-action action to v4 ([#96](https://github.com/oxc-project/oxc-miette/pull/96))
+- *(deps)* Lock file maintenance rust crates ([#97](https://github.com/oxc-project/oxc-miette/pull/97))
+- *(deps)* Update taiki-e/install-action action to v2.62.28 ([#95](https://github.com/oxc-project/oxc-miette/pull/95))
+- *(deps)* Update github-actions ([#99](https://github.com/oxc-project/oxc-miette/pull/99))
+- *(deps)* Lock file maintenance rust crates ([#100](https://github.com/oxc-project/oxc-miette/pull/100))
+- *(deps)* Update github-actions ([#101](https://github.com/oxc-project/oxc-miette/pull/101))
+- *(deps)* Lock file maintenance rust crates ([#102](https://github.com/oxc-project/oxc-miette/pull/102))
 ## [2.5.1] - 2025-09-28
 
 ### Chore
