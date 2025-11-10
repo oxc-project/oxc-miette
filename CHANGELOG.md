@@ -61,6 +61,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [2.6.1] - 2025-11-10
+
+### Chore
+
+- *(deps)* Update dependency rust to v1.91.0 ([#104](https://github.com/oxc-project/oxc-miette/pull/104))
+- *(deps)* Update github-actions ([#106](https://github.com/oxc-project/oxc-miette/pull/106))
+- *(deps)* Lock file maintenance rust crates ([#107](https://github.com/oxc-project/oxc-miette/pull/107))
+- *(deps)* Update taiki-e/install-action action to v2.62.49 ([#109](https://github.com/oxc-project/oxc-miette/pull/109))
+- *(deps)* Lock file maintenance ([#110](https://github.com/oxc-project/oxc-miette/pull/110))
+- *(deps)* Update dependency rust to v1.91.1 ([#111](https://github.com/oxc-project/oxc-miette/pull/111))
 ## [2.6.0] - 2025-10-30
 
 ### Features
