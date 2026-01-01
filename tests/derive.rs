@@ -585,7 +585,10 @@ fn note_field() {
     #[diagnostic()]
     enum Bar<'a> {
         A(#[note] Option<&'a str>),
-        B { #[note] reason: Option<&'a str> },
+        B {
+            #[note]
+            reason: Option<&'a str>,
+        },
     }
 
     assert_eq!("x".to_string(), Bar::A(Some("x")).note().unwrap().to_string());
@@ -597,11 +600,7 @@ fn note_field() {
 fn note_with_help() {
     #[derive(Debug, Diagnostic, Error)]
     #[error("welp")]
-    #[diagnostic(
-        code(foo::bar::baz),
-        help("try this"),
-        note("and note that")
-    )]
+    #[diagnostic(code(foo::bar::baz), help("try this"), note("and note that"))]
     struct Foo;
 
     assert_eq!("try this".to_string(), Foo.help().unwrap().to_string());

@@ -52,7 +52,9 @@ impl Note {
     pub(crate) fn from_fields(fields: &syn::Fields) -> syn::Result<Option<Self>> {
         match fields {
             syn::Fields::Named(named) => Self::from_fields_vec(named.named.iter().collect()),
-            syn::Fields::Unnamed(unnamed) => Self::from_fields_vec(unnamed.unnamed.iter().collect()),
+            syn::Fields::Unnamed(unnamed) => {
+                Self::from_fields_vec(unnamed.unnamed.iter().collect())
+            }
             syn::Fields::Unit => Ok(None),
         }
     }
