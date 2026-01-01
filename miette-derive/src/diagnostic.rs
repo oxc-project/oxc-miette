@@ -8,6 +8,7 @@ use crate::{
     diagnostic_source::DiagnosticSource,
     forward::{Forward, WhichFn},
     help::Help,
+    note::Note,
     label::Labels,
     related::Related,
     severity::Severity,
@@ -64,6 +65,7 @@ pub struct DiagnosticConcreteArgs {
     pub code: Option<Code>,
     pub severity: Option<Severity>,
     pub help: Option<Help>,
+    pub note: Option<Note>,
     pub labels: Option<Labels>,
     pub source_code: Option<SourceCode>,
     pub url: Option<Url>,
@@ -78,10 +80,12 @@ impl DiagnosticConcreteArgs {
         let source_code = SourceCode::from_fields(fields)?;
         let related = Related::from_fields(fields)?;
         let help = Help::from_fields(fields)?;
+        let note = Note::from_fields(fields)?;
         let diagnostic_source = DiagnosticSource::from_fields(fields)?;
         Ok(DiagnosticConcreteArgs {
             code: None,
             help,
+            note,
             related,
             severity: None,
             labels,
@@ -134,6 +138,13 @@ impl DiagnosticConcreteArgs {
                             .push(syn::Error::new_spanned(attr, "help has already been specified"));
                     }
                     self.help = Some(hl);
+                }
+                DiagnosticArg::Note(note) => {
+                    if self.note.is_some() {
+                        errors
+                            .push(syn::Error::new_spanned(attr, "note has already been specified"));
+                    }
+                    self.note = Some(note);
                 }
                 DiagnosticArg::Url(u) => {
                     if self.url.is_some() {
@@ -263,6 +274,7 @@ impl Diagnostic {
                     DiagnosticDefArgs::Transparent(forward) => {
                         let code_method = forward.gen_struct_method(WhichFn::Code);
                         let help_method = forward.gen_struct_method(WhichFn::Help);
+                        let note_method = forward.gen_struct_method(WhichFn::Note);
                         let url_method = forward.gen_struct_method(WhichFn::Url);
                         let labels_method = forward.gen_struct_method(WhichFn::Labels);
                         let source_code_method = forward.gen_struct_method(WhichFn::SourceCode);
@@ -275,6 +287,7 @@ impl Diagnostic {
                             impl #impl_generics miette::Diagnostic for #ident #ty_generics #where_clause {
                                 #code_method
                                 #help_method
+                                #note_method
                                 #url_method
                                 #labels_method
                                 #severity_method
@@ -298,6 +311,11 @@ impl Diagnostic {
                             .as_ref()
                             .and_then(|x| x.gen_struct(fields))
                             .or_else(|| forward(WhichFn::Help));
+                        let note_body = concrete
+                            .note
+                            .as_ref()
+                            .and_then(|x| x.gen_struct(fields))
+                            .or_else(|| forward(WhichFn::Note));
                         let sev_body = concrete
                             .severity
                             .as_ref()
@@ -332,6 +350,7 @@ impl Diagnostic {
                             impl #impl_generics miette::Diagnostic for #ident #ty_generics #where_clause {
                                 #code_body
                                 #help_body
+                                #note_body
                                 #sev_body
                                 #rel_body
                                 #url_body
@@ -347,6 +366,7 @@ impl Diagnostic {
                 let (impl_generics, ty_generics, where_clause) = &generics.split_for_impl();
                 let code_body = Code::gen_enum(variants);
                 let help_body = Help::gen_enum(variants);
+                let note_body = Note::gen_enum(variants);
                 let sev_body = Severity::gen_enum(variants);
                 let labels_body = Labels::gen_enum(variants);
                 let src_body = SourceCode::gen_enum(variants);
@@ -357,6 +377,7 @@ impl Diagnostic {
                     impl #impl_generics miette::Diagnostic for #ident #ty_generics #where_clause {
                         #code_body
                         #help_body
+                        #note_body
                         #sev_body
                         #labels_body
                         #src_body
