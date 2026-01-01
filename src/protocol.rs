@@ -42,6 +42,13 @@ pub trait Diagnostic: std::error::Error {
         None
     }
 
+    /// Supplementary context for this `Diagnostic`, separate from help text.
+    /// Notes mirror rustc-style `= note:` lines and offer additional
+    /// information when guidance (help) is insufficient.
+    fn note<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+        None
+    }
+
     /// URL to visit for a more detailed explanation/help about this
     /// `Diagnostic`.
     fn url<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
