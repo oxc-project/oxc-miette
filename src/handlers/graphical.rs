@@ -411,7 +411,7 @@ impl GraphicalReportHandler {
         }
         if let Some(note) = diagnostic.note() {
             // Renders as:
-            //   = note: This is a note about the error
+            //   note: This is a note about the error
             let width = self.termwidth.saturating_sub(4);
             let initial_indent = "  note: ".style(self.theme.styles.help).to_string();
             let mut opts = textwrap::Options::new(width)
