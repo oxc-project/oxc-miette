@@ -29,6 +29,9 @@ pub struct MietteDiagnostic {
     /// Additional help text related to this Diagnostic
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub help: Option<String>,
+    /// Additional note text related to this Diagnostic
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub note: Option<String>,
     /// URL to visit for a more detailed explanation/help about this
     /// [`Diagnostic`].
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
@@ -57,6 +60,10 @@ impl Diagnostic for MietteDiagnostic {
 
     fn help<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
         self.help.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
+    }
+
+    fn note<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+        self.note.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
     }
 
     fn url<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
@@ -91,6 +98,7 @@ impl MietteDiagnostic {
             severity: None,
             code: None,
             help: None,
+            note: None,
             url: None,
         }
     }
@@ -140,6 +148,23 @@ impl MietteDiagnostic {
     #[must_use]
     pub fn with_help(mut self, help: impl Into<String>) -> Self {
         self.help = Some(help.into());
+        self
+    }
+
+    /// Return new diagnostic with the given note.
+    ///
+    /// # Examples
+    /// ```
+    /// use miette::{Diagnostic, MietteDiagnostic};
+    ///
+    /// let diag = MietteDiagnostic::new("Something went wrong")
+    ///     .with_note("This is additional context");
+    /// assert_eq!(diag.note, Some("This is additional context".to_string()));
+    /// assert_eq!(diag.message, "Something went wrong");
+    /// ```
+    #[must_use]
+    pub fn with_note(mut self, note: impl Into<String>) -> Self {
+        self.note = Some(note.into());
         self
     }
 
