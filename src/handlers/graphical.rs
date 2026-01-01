@@ -413,7 +413,7 @@ impl GraphicalReportHandler {
             // Renders as:
             //   note: This is a note about the error
             let width = self.termwidth.saturating_sub(4);
-            let initial_indent = "  note: ".style(self.theme.styles.help).to_string();
+            let initial_indent = "  note: ".style(self.theme.styles.note).to_string();
             let mut opts = textwrap::Options::new(width)
                 .initial_indent(&initial_indent)
                 .subsequent_indent("           ")
