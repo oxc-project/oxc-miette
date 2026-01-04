@@ -44,6 +44,10 @@ impl Diagnostic for BoxedError {
         self.0.help()
     }
 
+    fn note<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+        self.0.note()
+    }
+
     fn url<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
         self.0.url()
     }
@@ -111,6 +115,10 @@ impl<E: Diagnostic, C: SourceCode> Diagnostic for WithSourceCode<E, C> {
         self.error.help()
     }
 
+    fn note<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+        self.error.note()
+    }
+
     fn url<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
         self.error.url()
     }
@@ -143,6 +151,10 @@ impl<C: SourceCode> Diagnostic for WithSourceCode<Report, C> {
 
     fn help<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
         self.error.help()
+    }
+
+    fn note<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+        self.error.note()
     }
 
     fn url<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
