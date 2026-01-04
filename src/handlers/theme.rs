@@ -100,6 +100,8 @@ pub struct ThemeStyles {
     pub advice: Style,
     /// Style to apply to the help text.
     pub help: Style,
+    /// Style to apply to the note text.
+    pub note: Style,
     /// Style to apply to filenames/links/URLs.
     pub link: Style,
     /// Style to apply to line numbers.
@@ -122,6 +124,7 @@ impl ThemeStyles {
             warning: style().fg_rgb::<244, 191, 117>().bold(),
             advice: style().fg_rgb::<106, 159, 181>(),
             help: style().fg_rgb::<106, 159, 181>(),
+            note: style().fg_rgb::<106, 159, 181>(),
             link: style().fg_rgb::<92, 157, 255>().bold(),
             linum: style().dimmed(),
             highlights: vec![
@@ -139,6 +142,7 @@ impl ThemeStyles {
             warning: style().yellow(),
             advice: style().cyan(),
             help: style().cyan(),
+            note: style().cyan(),
             link: style().cyan().underline().bold(),
             linum: style().dimmed(),
             highlights: vec![
@@ -156,6 +160,7 @@ impl ThemeStyles {
             warning: style(),
             advice: style(),
             help: style(),
+            note: style(),
             link: style(),
             linum: style(),
             highlights: vec![style()],
