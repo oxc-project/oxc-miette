@@ -61,6 +61,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [2.7.0] - 2026-01-04
+
+### Features
+
+- Support `note`s for diagnostics ([#124](https://github.com/oxc-project/oxc-miette/pull/124))
+
+### Chore
+
+- *(deps)* Update dependency rust to v1.91.0 ([#104](https://github.com/oxc-project/oxc-miette/pull/104))
+- *(deps)* Update github-actions ([#106](https://github.com/oxc-project/oxc-miette/pull/106))
+- *(deps)* Lock file maintenance rust crates ([#107](https://github.com/oxc-project/oxc-miette/pull/107))
+- *(deps)* Update taiki-e/install-action action to v2.62.49 ([#109](https://github.com/oxc-project/oxc-miette/pull/109))
+- *(deps)* Lock file maintenance ([#110](https://github.com/oxc-project/oxc-miette/pull/110))
+- *(deps)* Update dependency rust to v1.91.1 ([#111](https://github.com/oxc-project/oxc-miette/pull/111))
+- *(deps)* Update github-actions ([#112](https://github.com/oxc-project/oxc-miette/pull/112))
+- *(deps)* Update rust crate syn to v2.0.110 ([#108](https://github.com/oxc-project/oxc-miette/pull/108))
+- *(deps)* Update github-actions ([#113](https://github.com/oxc-project/oxc-miette/pull/113))
+- *(deps)* Update rust crate syn to v2.0.111 ([#114](https://github.com/oxc-project/oxc-miette/pull/114))
+- *(deps)* Update actions/checkout action to v6 ([#115](https://github.com/oxc-project/oxc-miette/pull/115))
+- *(deps)* Update github-actions ([#116](https://github.com/oxc-project/oxc-miette/pull/116))
+- *(deps)* Update github-actions ([#117](https://github.com/oxc-project/oxc-miette/pull/117))
+- *(deps)* Update dependency rust to v1.92.0 ([#118](https://github.com/oxc-project/oxc-miette/pull/118))
+- *(deps)* Update github-actions ([#119](https://github.com/oxc-project/oxc-miette/pull/119))
+- *(deps)* Update github-actions ([#120](https://github.com/oxc-project/oxc-miette/pull/120))
+- *(deps)* Update rust crate supports-hyperlinks to v3.2.0 ([#121](https://github.com/oxc-project/oxc-miette/pull/121))
+- *(deps)* Update github-actions ([#122](https://github.com/oxc-project/oxc-miette/pull/122))
+- *(deps)* Update rust crates ([#123](https://github.com/oxc-project/oxc-miette/pull/123))
+- *(deps)* Update rust crate syn to v2.0.113 ([#126](https://github.com/oxc-project/oxc-miette/pull/126))
+- *(deps)* Update taiki-e/install-action action to v2.65.12 ([#127](https://github.com/oxc-project/oxc-miette/pull/127))
 ## [2.6.0] - 2025-10-30
 
 ### Features
