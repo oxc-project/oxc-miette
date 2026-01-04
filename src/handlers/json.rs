@@ -106,6 +106,9 @@ impl JSONReportHandler {
         if let Some(help) = diagnostic.help() {
             write!(f, r#""help": "{}","#, escape(&help.to_string()))?;
         }
+        if let Some(note) = diagnostic.note() {
+            write!(f, r#""note": "{}","#, escape(&note.to_string()))?;
+        }
         let src = diagnostic.source_code().or(parent_src);
         if let Some(src) = src {
             self.render_snippets(f, diagnostic, src)?;

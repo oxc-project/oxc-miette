@@ -409,6 +409,24 @@ impl GraphicalReportHandler {
 
             writeln!(f, "{}", self.wrap(&help.to_string(), opts))?;
         }
+        if let Some(note) = diagnostic.note() {
+            // Renders as:
+            //   note: This is a note about the error
+            let width = self.termwidth.saturating_sub(4);
+            let initial_indent = "  note: ".style(self.theme.styles.note).to_string();
+            let mut opts = textwrap::Options::new(width)
+                .initial_indent(&initial_indent)
+                .subsequent_indent("           ")
+                .break_words(self.break_words);
+            if let Some(word_separator) = self.word_separator {
+                opts = opts.word_separator(word_separator);
+            }
+            if let Some(word_splitter) = self.word_splitter.clone() {
+                opts = opts.word_splitter(word_splitter);
+            }
+
+            writeln!(f, "{}", self.wrap(&note.to_string(), opts))?;
+        }
         Ok(())
     }
 

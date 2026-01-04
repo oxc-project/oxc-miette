@@ -47,6 +47,9 @@ impl DebugReportHandler {
         if let Some(help) = diagnostic.help() {
             diag.field("help", &help.to_string());
         }
+        if let Some(note) = diagnostic.note() {
+            diag.field("note", &note.to_string());
+        }
         if let Some(labels) = diagnostic.labels() {
             let labels: Vec<_> = labels.collect();
             diag.field("labels", &format!("{labels:?}"));
