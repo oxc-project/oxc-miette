@@ -35,6 +35,7 @@ impl Parse for Forward {
 pub enum WhichFn {
     Code,
     Help,
+    Note,
     Url,
     Severity,
     Labels,
@@ -48,6 +49,7 @@ impl WhichFn {
         match self {
             Self::Code => quote! { code() },
             Self::Help => quote! { help() },
+            Self::Note => quote! { note() },
             Self::Url => quote! { url() },
             Self::Severity => quote! { severity() },
             Self::Labels => quote! { labels() },
@@ -64,6 +66,9 @@ impl WhichFn {
             },
             Self::Help => quote! {
                 fn help(& self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
+            },
+            Self::Note => quote! {
+                fn note(& self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
             },
             Self::Url => quote! {
                 fn url(& self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
