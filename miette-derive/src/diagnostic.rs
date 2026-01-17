@@ -6,6 +6,7 @@ use crate::{
     code::Code,
     diagnostic_arg::DiagnosticArg,
     diagnostic_source::DiagnosticSource,
+    fix_diff::FixDiff,
     forward::{Forward, WhichFn},
     help::Help,
     label::Labels,
@@ -70,6 +71,7 @@ pub struct DiagnosticConcreteArgs {
     pub forward: Option<Forward>,
     pub related: Option<Related>,
     pub diagnostic_source: Option<DiagnosticSource>,
+    pub fix_diff: Option<FixDiff>,
 }
 
 impl DiagnosticConcreteArgs {
@@ -79,6 +81,7 @@ impl DiagnosticConcreteArgs {
         let related = Related::from_fields(fields)?;
         let help = Help::from_fields(fields)?;
         let diagnostic_source = DiagnosticSource::from_fields(fields)?;
+        let fix_diff = FixDiff::from_fields(fields)?;
         Ok(DiagnosticConcreteArgs {
             code: None,
             help,
@@ -89,6 +92,7 @@ impl DiagnosticConcreteArgs {
             forward: None,
             source_code,
             diagnostic_source,
+            fix_diff,
         })
     }
 
@@ -141,6 +145,13 @@ impl DiagnosticConcreteArgs {
                             .push(syn::Error::new_spanned(attr, "url has already been specified"));
                     }
                     self.url = Some(u);
+                }
+                DiagnosticArg::FixDiff(fd) => {
+                    if self.fix_diff.is_some() {
+                        errors
+                            .push(syn::Error::new_spanned(attr, "fix_diff has already been specified"));
+                    }
+                    self.fix_diff = Some(fd);
                 }
             }
         }
@@ -270,6 +281,7 @@ impl Diagnostic {
                         let related_method = forward.gen_struct_method(WhichFn::Related);
                         let diagnostic_source_method =
                             forward.gen_struct_method(WhichFn::DiagnosticSource);
+                        let fix_diff_method = forward.gen_struct_method(WhichFn::FixDiff);
 
                         quote! {
                             impl #impl_generics miette::Diagnostic for #ident #ty_generics #where_clause {
@@ -281,6 +293,7 @@ impl Diagnostic {
                                 #source_code_method
                                 #related_method
                                 #diagnostic_source_method
+                                #fix_diff_method
                             }
                         }
                     }
@@ -328,6 +341,11 @@ impl Diagnostic {
                             .as_ref()
                             .and_then(|x| x.gen_struct())
                             .or_else(|| forward(WhichFn::DiagnosticSource));
+                        let fix_diff_body = concrete
+                            .fix_diff
+                            .as_ref()
+                            .and_then(|x| x.gen_struct(fields))
+                            .or_else(|| forward(WhichFn::FixDiff));
                         quote! {
                             impl #impl_generics miette::Diagnostic for #ident #ty_generics #where_clause {
                                 #code_body
@@ -338,6 +356,7 @@ impl Diagnostic {
                                 #labels_body
                                 #src_body
                                 #diagnostic_source
+                                #fix_diff_body
                             }
                         }
                     }
@@ -353,6 +372,7 @@ impl Diagnostic {
                 let rel_body = Related::gen_enum(variants);
                 let url_body = Url::gen_enum(ident, variants);
                 let diagnostic_source_body = DiagnosticSource::gen_enum(variants);
+                let fix_diff_body = FixDiff::gen_enum(variants);
                 quote! {
                     impl #impl_generics miette::Diagnostic for #ident #ty_generics #where_clause {
                         #code_body
@@ -363,6 +383,7 @@ impl Diagnostic {
                         #rel_body
                         #url_body
                         #diagnostic_source_body
+                        #fix_diff_body
                     }
                 }
             }

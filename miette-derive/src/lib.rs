@@ -6,6 +6,7 @@ mod code;
 mod diagnostic;
 mod diagnostic_arg;
 mod diagnostic_source;
+mod fix_diff;
 mod fmt;
 mod forward;
 mod help;
@@ -18,7 +19,7 @@ mod utils;
 
 #[proc_macro_derive(
     Diagnostic,
-    attributes(diagnostic, source_code, label, related, help, diagnostic_source)
+    attributes(diagnostic, source_code, label, related, help, diagnostic_source, fix_diff)
 )]
 pub fn derive_diagnostic(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

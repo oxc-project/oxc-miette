@@ -1,6 +1,6 @@
 use syn::parse::{Parse, ParseStream};
 
-use crate::{code::Code, forward::Forward, help::Help, severity::Severity, url::Url};
+use crate::{code::Code, fix_diff::FixDiff, forward::Forward, help::Help, severity::Severity, url::Url};
 
 pub enum DiagnosticArg {
     Transparent,
@@ -9,6 +9,7 @@ pub enum DiagnosticArg {
     Help(Help),
     Url(Url),
     Forward(Forward),
+    FixDiff(FixDiff),
 }
 
 impl Parse for DiagnosticArg {
@@ -28,6 +29,8 @@ impl Parse for DiagnosticArg {
             Ok(DiagnosticArg::Help(input.parse()?))
         } else if ident == "url" {
             Ok(DiagnosticArg::Url(input.parse()?))
+        } else if ident == "fix_diff" {
+            Ok(DiagnosticArg::FixDiff(input.parse()?))
         } else {
             Err(syn::Error::new(ident.span(), "Unrecognized diagnostic option"))
         }
