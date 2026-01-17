@@ -74,6 +74,12 @@ pub trait Diagnostic: std::error::Error {
     fn diagnostic_source(&self) -> Option<&dyn Diagnostic> {
         None
     }
+
+    /// Optional fix diff to display how the code should be corrected.
+    /// This will render a diff-style output showing removed and added lines.
+    fn fix_diff<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+        None
+    }
 }
 
 macro_rules! box_error_impls {

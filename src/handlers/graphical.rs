@@ -231,6 +231,7 @@ impl GraphicalReportHandler {
         self.render_causes(f, diagnostic)?;
         let src = diagnostic.source_code();
         self.render_snippets(f, diagnostic, src)?;
+        self.render_fix_diff(f, diagnostic)?;
         self.render_footer(f, diagnostic)?;
         self.render_related(f, diagnostic, src)?;
         if let Some(footer) = &self.footer {
@@ -426,6 +427,28 @@ impl GraphicalReportHandler {
             }
 
             writeln!(f, "{}", self.wrap(&note.to_string(), opts))?;
+        }
+        Ok(())
+    }
+
+    fn render_fix_diff(&self, f: &mut impl fmt::Write, diagnostic: &dyn Diagnostic) -> fmt::Result {
+        if let Some(fix_diff) = diagnostic.fix_diff() {
+            writeln!(f)?;
+            let diff_text = fix_diff.to_string();
+            
+            // Render the fix diff with color-coded lines
+            for line in diff_text.lines() {
+                if line.starts_with('-') {
+                    // Removed line
+                    writeln!(f, "  {}", line.style(self.theme.styles.error))?;
+                } else if line.starts_with('+') {
+                    // Added line
+                    writeln!(f, "  {}", line.style(self.theme.styles.help))?;
+                } else {
+                    // Context line
+                    writeln!(f, "  {}", line)?;
+                }
+            }
         }
         Ok(())
     }
