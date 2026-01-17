@@ -433,20 +433,22 @@ impl GraphicalReportHandler {
 
     fn render_fix_diff(&self, f: &mut impl fmt::Write, diagnostic: &dyn Diagnostic) -> fmt::Result {
         if let Some(fix_diff) = diagnostic.fix_diff() {
-            writeln!(f)?;
             let diff_text = fix_diff.to_string();
             
-            // Render the fix diff with color-coded lines
-            for line in diff_text.lines() {
-                if line.starts_with('-') {
-                    // Removed line
-                    writeln!(f, "  {}", line.style(self.theme.styles.error))?;
-                } else if line.starts_with('+') {
-                    // Added line
-                    writeln!(f, "  {}", line.style(self.theme.styles.help))?;
-                } else {
-                    // Context line
-                    writeln!(f, "  {}", line)?;
+            if !diff_text.is_empty() {
+                writeln!(f)?;
+                // Render the fix diff with color-coded lines
+                for line in diff_text.lines() {
+                    if line.starts_with('-') {
+                        // Removed line
+                        writeln!(f, "  {}", line.style(self.theme.styles.error))?;
+                    } else if line.starts_with('+') {
+                        // Added line
+                        writeln!(f, "  {}", line.style(self.theme.styles.help))?;
+                    } else {
+                        // Context line
+                        writeln!(f, "  {}", line)?;
+                    }
                 }
             }
         }

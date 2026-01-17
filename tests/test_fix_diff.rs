@@ -86,4 +86,3 @@ fn test_no_fix_diff() {
     assert!(!out.contains("- let"));
     assert!(!out.contains("+ let"));
 }
-

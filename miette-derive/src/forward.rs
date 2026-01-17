@@ -62,13 +62,13 @@ impl WhichFn {
     pub fn signature(&self) -> TokenStream {
         match self {
             Self::Code => quote! {
-                fn code(& self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
+                fn code(&self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
             },
             Self::Help => quote! {
-                fn help(& self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
+                fn help(&self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
             },
             Self::Url => quote! {
-                fn url(& self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
+                fn url(&self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
             },
             Self::Severity => quote! {
                 fn severity(&self) -> std::option::Option<miette::Severity>
@@ -86,7 +86,7 @@ impl WhichFn {
                 fn diagnostic_source(&self) -> std::option::Option<&dyn miette::Diagnostic>
             },
             Self::FixDiff => quote! {
-                fn fix_diff(& self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
+                fn fix_diff(&self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
             },
         }
     }
