@@ -479,28 +479,42 @@ impl GraphicalReportHandler {
                 for (idx, (kind, text)) in diff_lines.iter().enumerate() {
                     let line_num = idx + 1;
                     
-                    // Write line number
-                    write!(
-                        f,
-                        " {:width$} {} ",
-                        line_num.to_string().style(self.theme.styles.linum),
-                        self.theme.characters.vbar,
-                        width = linum_width
-                    )?;
-                    
-                    // Write diff marker and text with appropriate styling
+                    // Write line number and diff marker inline
                     match kind {
                         '-' => {
-                            // Removed line - use red/error styling
-                            write!(f, "{}", format!("- {}", text).style(self.theme.styles.error))?;
+                            // Removed line - use red/error styling for the marker
+                            write!(
+                                f,
+                                " {:width$} {} ",
+                                line_num.to_string().style(self.theme.styles.linum),
+                                "-".style(self.theme.styles.error),
+                                width = linum_width
+                            )?;
+                            // Write text with error styling
+                            write!(f, "{}", text.style(self.theme.styles.error))?;
                         }
                         '+' => {
-                            // Added line - use green/help styling  
-                            write!(f, "{}", format!("+ {}", text).style(self.theme.styles.help))?;
+                            // Added line - use green/help styling for the marker
+                            write!(
+                                f,
+                                " {:width$} {} ",
+                                line_num.to_string().style(self.theme.styles.linum),
+                                "+".style(self.theme.styles.help),
+                                width = linum_width
+                            )?;
+                            // Write text with help styling
+                            write!(f, "{}", text.style(self.theme.styles.help))?;
                         }
                         _ => {
-                            // Context line
-                            write!(f, "  {}", text)?;
+                            // Context line - use regular vbar
+                            write!(
+                                f,
+                                " {:width$} {} ",
+                                line_num.to_string().style(self.theme.styles.linum),
+                                self.theme.characters.vbar,
+                                width = linum_width
+                            )?;
+                            write!(f, "{}", text)?;
                         }
                     }
                     writeln!(f)?;
