@@ -439,21 +439,21 @@ impl GraphicalReportHandler {
                 writeln!(f)?;
                 
                 // Parse diff lines
-                let diff_lines: Vec<(char, &str)> = diff_text
+                let diff_lines: Vec<(char, String)> = diff_text
                     .lines()
                     .map(|line| {
                         if line.starts_with('-') {
                             let text = &line[1..];
-                            // Trim one leading space if present
+                            // Strip one leading space if present
                             let text = if text.starts_with(' ') { &text[1..] } else { text };
-                            ('-', text)
+                            ('-', text.to_string())
                         } else if line.starts_with('+') {
                             let text = &line[1..];
-                            // Trim one leading space if present
+                            // Strip one leading space if present
                             let text = if text.starts_with(' ') { &text[1..] } else { text };
-                            ('+', text)
+                            ('+', text.to_string())
                         } else {
-                            (' ', line)
+                            (' ', line.to_string())
                         }
                     })
                     .collect();
@@ -506,7 +506,7 @@ impl GraphicalReportHandler {
                     writeln!(f)?;
                 }
                 
-                // Render footer
+                // Render footer (matches source code snippet footer style)
                 writeln!(
                     f,
                     "{}{}{}",
