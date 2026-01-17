@@ -437,19 +437,83 @@ impl GraphicalReportHandler {
             
             if !diff_text.is_empty() {
                 writeln!(f)?;
-                // Render the fix diff with color-coded lines
-                for line in diff_text.lines() {
-                    if line.starts_with('-') {
-                        // Removed line
-                        writeln!(f, "  {}", line.style(self.theme.styles.error))?;
-                    } else if line.starts_with('+') {
-                        // Added line
-                        writeln!(f, "  {}", line.style(self.theme.styles.help))?;
-                    } else {
-                        // Context line
-                        writeln!(f, "  {}", line)?;
-                    }
+                
+                // Parse diff lines
+                let diff_lines: Vec<(char, &str)> = diff_text
+                    .lines()
+                    .map(|line| {
+                        if line.starts_with('-') {
+                            let text = &line[1..];
+                            // Trim one leading space if present
+                            let text = if text.starts_with(' ') { &text[1..] } else { text };
+                            ('-', text)
+                        } else if line.starts_with('+') {
+                            let text = &line[1..];
+                            // Trim one leading space if present
+                            let text = if text.starts_with(' ') { &text[1..] } else { text };
+                            ('+', text)
+                        } else {
+                            (' ', line)
+                        }
+                    })
+                    .collect();
+                
+                if diff_lines.is_empty() {
+                    return Ok(());
                 }
+                
+                // Calculate line number width (we use sequential line numbers for the diff)
+                let linum_width = diff_lines.len().to_string().len();
+                
+                // Render header
+                write!(
+                    f,
+                    "{}{}{}",
+                    " ".repeat(linum_width + 2),
+                    self.theme.characters.ltop,
+                    self.theme.characters.hbar,
+                )?;
+                writeln!(f, "{}", self.theme.characters.hbar.to_string().repeat(3))?;
+                
+                // Render each diff line
+                for (idx, (kind, text)) in diff_lines.iter().enumerate() {
+                    let line_num = idx + 1;
+                    
+                    // Write line number
+                    write!(
+                        f,
+                        " {:width$} {} ",
+                        line_num.to_string().style(self.theme.styles.linum),
+                        self.theme.characters.vbar,
+                        width = linum_width
+                    )?;
+                    
+                    // Write diff marker and text with appropriate styling
+                    match kind {
+                        '-' => {
+                            // Removed line - use red/error styling
+                            write!(f, "{}", format!("- {}", text).style(self.theme.styles.error))?;
+                        }
+                        '+' => {
+                            // Added line - use green/help styling  
+                            write!(f, "{}", format!("+ {}", text).style(self.theme.styles.help))?;
+                        }
+                        _ => {
+                            // Context line
+                            write!(f, "  {}", text)?;
+                        }
+                    }
+                    writeln!(f)?;
+                }
+                
+                // Render footer
+                writeln!(
+                    f,
+                    "{}{}{}",
+                    " ".repeat(linum_width + 2),
+                    self.theme.characters.lbot,
+                    self.theme.characters.hbar.to_string().repeat(4),
+                )?;
             }
         }
         Ok(())
