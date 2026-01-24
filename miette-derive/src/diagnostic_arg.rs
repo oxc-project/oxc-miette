@@ -1,12 +1,13 @@
 use syn::parse::{Parse, ParseStream};
 
-use crate::{code::Code, forward::Forward, help::Help, severity::Severity, url::Url};
+use crate::{code::Code, forward::Forward, help::Help, note::Note, severity::Severity, url::Url};
 
 pub enum DiagnosticArg {
     Transparent,
     Code(Code),
     Severity(Severity),
     Help(Help),
+    Note(Note),
     Url(Url),
     Forward(Forward),
 }
@@ -26,6 +27,8 @@ impl Parse for DiagnosticArg {
             Ok(DiagnosticArg::Severity(input.parse()?))
         } else if ident == "help" {
             Ok(DiagnosticArg::Help(input.parse()?))
+        } else if ident == "note" {
+            Ok(DiagnosticArg::Note(input.parse()?))
         } else if ident == "url" {
             Ok(DiagnosticArg::Url(input.parse()?))
         } else {

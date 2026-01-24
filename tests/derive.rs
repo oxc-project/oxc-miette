@@ -526,3 +526,83 @@ fn test_optional_source_code() {
     assert!(Enum::Variant2 { src: None }.source_code().is_none());
     assert!(Enum::Variant2 { src: Some(String::new()) }.source_code().is_some());
 }
+
+#[test]
+fn list_note() {
+    #[derive(Debug, Diagnostic, Error)]
+    #[error("welp")]
+    #[diagnostic(code(foo::bar::baz), note("try doing it better"))]
+    struct FooStruct;
+
+    assert_eq!("try doing it better".to_string(), FooStruct.note().unwrap().to_string());
+
+    #[derive(Debug, Diagnostic, Error)]
+    #[error("welp")]
+    enum FooEnum {
+        #[diagnostic(code(foo::x), note("try doing it better"))]
+        X,
+    }
+
+    assert_eq!("try doing it better".to_string(), FooEnum::X.note().unwrap().to_string());
+}
+
+#[test]
+fn fmt_note() {
+    #[derive(Debug, Diagnostic, Error)]
+    #[error("welp")]
+    #[diagnostic(code(foo::bar::baz), note("{} x {0} x {:?}", 1, "2"))]
+    struct FooStruct<'a>(&'a str);
+
+    assert_eq!("1 x hello x \"2\"".to_string(), FooStruct("hello").note().unwrap().to_string());
+
+    #[derive(Debug, Diagnostic, Error)]
+    #[error("welp")]
+    #[diagnostic(code(foo::bar::baz), note("{} x {my_field} x {:?}", 1, "2"))]
+    struct BarStruct<'a> {
+        my_field: &'a str,
+    }
+
+    assert_eq!(
+        "1 x hello x \"2\"".to_string(),
+        BarStruct { my_field: "hello" }.note().unwrap().to_string()
+    );
+}
+
+#[test]
+fn note_field() {
+    #[derive(Debug, Diagnostic, Error)]
+    #[error("welp")]
+    #[diagnostic()]
+    struct Foo<'a> {
+        #[note]
+        do_this: Option<&'a str>,
+    }
+
+    assert_eq!("x".to_string(), Foo { do_this: Some("x") }.note().unwrap().to_string());
+
+    #[derive(Debug, Diagnostic, Error)]
+    #[error("welp")]
+    #[diagnostic()]
+    enum Bar<'a> {
+        A(#[note] Option<&'a str>),
+        B {
+            #[note]
+            reason: Option<&'a str>,
+        },
+    }
+
+    assert_eq!("x".to_string(), Bar::A(Some("x")).note().unwrap().to_string());
+    assert_eq!("y".to_string(), Bar::B { reason: Some("y") }.note().unwrap().to_string());
+    assert!(Bar::A(None).note().is_none());
+}
+
+#[test]
+fn note_with_help() {
+    #[derive(Debug, Diagnostic, Error)]
+    #[error("welp")]
+    #[diagnostic(code(foo::bar::baz), help("try this"), note("and note that"))]
+    struct Foo;
+
+    assert_eq!("try this".to_string(), Foo.help().unwrap().to_string());
+    assert_eq!("and note that".to_string(), Foo.note().unwrap().to_string());
+}
