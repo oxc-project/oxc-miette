@@ -61,6 +61,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [2.7.1] - 2026-01-27
+
+### Testing
+
+- Implement `insta` for snapshot testing ([#138](https://github.com/oxc-project/oxc-miette/pull/138))
+
+### Chore
+
+- *(deps)* Update taiki-e/install-action action to v2.65.13 ([#128](https://github.com/oxc-project/oxc-miette/pull/128))
+- *(deps)* Update github-actions ([#130](https://github.com/oxc-project/oxc-miette/pull/130))
+- *(deps)* Update rust crates ([#131](https://github.com/oxc-project/oxc-miette/pull/131))
+- *(deps)* Update github-actions ([#133](https://github.com/oxc-project/oxc-miette/pull/133))
+- *(deps)* Update rust crate thiserror to v2.0.18 ([#134](https://github.com/oxc-project/oxc-miette/pull/134))
+- *(deps)* Update dependency rust to v1.93.0 ([#135](https://github.com/oxc-project/oxc-miette/pull/135))
+- *(deps)* Update github-actions ([#136](https://github.com/oxc-project/oxc-miette/pull/136))
+- *(deps)* Update rust crates to v1.0.106 ([#137](https://github.com/oxc-project/oxc-miette/pull/137))
 ## [2.7.0] - 2026-01-04
 
 ### Features
