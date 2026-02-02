@@ -58,9 +58,8 @@
 //! - Unique error codes on every [`Diagnostic`].
 //! - Custom links to get more details on error codes.
 //! - Super handy derive macro for defining diagnostic metadata.
-//! - Replacements for [`anyhow`](https://docs.rs/anyhow)/[`eyre`](https://docs.rs/eyre)
-//!   types [`Result`], [`Report`] and the [`miette!`] macro for the
-//!   `anyhow!`/`eyre!` macros.
+//! - [`Result`] and [`Report`] types compatible with
+//!   [`anyhow`](https://docs.rs/anyhow)/[`eyre`](https://docs.rs/eyre).
 //! - Generic support for arbitrary [`SourceCode`]s for snippet data, with
 //!   default support for `String`s included.
 //!
@@ -68,8 +67,6 @@
 //! the following features:
 //!
 //! - Fancy graphical [diagnostic output](#about), using ANSI/Unicode text
-//! - Screen reader/braille support, gated on [`NO_COLOR`](http://no-color.org/),
-//!   and other heuristics.
 //! - Fully customizable graphical theming (or overriding the printers
 //!   entirely).
 //! - Cause chain printing
@@ -225,56 +222,9 @@
 //! don't always need or care to define dedicated error wrappers for errors
 //! coming from external libraries and tools.
 //!
-//! For this situation, `miette` includes two tools: [`Report`] and
-//! [`IntoDiagnostic`]. They work in tandem to make it easy to convert regular
-//! `std::error::Error`s into [`Diagnostic`]s. Additionally, there's a
-//! [`Result`] type alias that you can use to be more terse.
-//!
-//! When dealing with non-`Diagnostic` types, you'll want to
-//! `.into_diagnostic()` them:
-//!
-//! ```rust
-//! // my_app/lib/my_internal_file.rs
-//! use miette::{IntoDiagnostic, Result};
-//! use semver::Version;
-//!
-//! pub fn some_tool() -> Result<Version> {
-//!     "1.2.x".parse().into_diagnostic()
-//! }
-//! ```
-//!
-//! `miette` also includes an `anyhow`/`eyre`-style `Context`/`WrapErr` traits
-//! that you can import to add ad-hoc context messages to your `Diagnostic`s, as
-//! well, though you'll still need to use `.into_diagnostic()` to make use of
-//! it:
-//!
-//! ```rust
-//! // my_app/lib/my_internal_file.rs
-//! use miette::{IntoDiagnostic, Result, WrapErr};
-//! use semver::Version;
-//!
-//! pub fn some_tool() -> Result<Version> {
-//!     "1.2.x"
-//!         .parse()
-//!         .into_diagnostic()
-//!         .wrap_err("Parsing this tool's semver version failed.")
-//! }
-//! ```
-//!
-//! To construct your own simple adhoc error use the [miette!] macro:
-//! ```rust
-//! // my_app/lib/my_internal_file.rs
-//! use miette::{miette, Result};
-//! use semver::Version;
-//!
-//! pub fn some_tool() -> Result<Version> {
-//!     let version = "1.2.x";
-//!     version
-//!         .parse()
-//!         .map_err(|_| miette!("Invalid version {}", version))
-//! }
-//! ```
-//! There are also similar [bail!] and [ensure!] macros.
+//! For this situation, `miette` includes [`Report`] which can wrap any
+//! [`Diagnostic`] type. Additionally, there's a [`Result`] type alias that
+//! you can use to be more terse.
 //!
 //! ### ... in `main()`
 //!
@@ -287,40 +237,12 @@
 //! > toplevel crate, as the fancy feature pulls in a number of dependencies that
 //! > libraries and such might not want.
 //!
-//! ```rust
-//! use miette::{IntoDiagnostic, Result};
-//! use semver::Version;
-//!
-//! fn pretend_this_is_main() -> Result<()> {
-//!     let version: Version = "1.2.x".parse().into_diagnostic()?;
-//!     println!("{}", version);
-//!     Ok(())
-//! }
-//! ```
-//!
 //! Please note: in order to get fancy diagnostic rendering with all the pretty
 //! colors and arrows, you should install `miette` with the `fancy` feature
 //! enabled:
 //!
 //! ```toml
 //! miette = { version = "X.Y.Z", features = ["fancy"] }
-//! ```
-//!
-//! Another way to display a diagnostic is by printing them using the debug formatter.
-//! This is, in fact, what returning diagnostics from main ends up doing.
-//! To do it yourself, you can write the following:
-//!
-//! ```rust
-//! use miette::{IntoDiagnostic, Result};
-//! use semver::Version;
-//!
-//! fn just_a_random_function() {
-//!     let version_result: Result<Version> = "1.2.x".parse().into_diagnostic();
-//!     match version_result {
-//!         Err(e) => println!("{:?}", e),
-//!         Ok(version) => println!("{}", version),
-//!     }
-//! }
 //! ```
 //!
 //! ### ... diagnostic code URLs
@@ -637,26 +559,9 @@
 //!
 //! ### ... dynamic diagnostics
 //!
-//! If you...
-//! - ...don't know all the possible errors upfront
-//! - ...need to serialize/deserialize errors
-//!
-//! then you may want to use [`miette!`], [`diagnostic!`] macros or
-//! [`MietteDiagnostic`] directly to create diagnostic on the fly.
-//!
-//! ```rust,ignore
-//! # use miette::{miette, LabeledSpan, Report};
-//!
-//! let source = "2 + 2 * 2 = 8".to_string();
-//! let report = miette!(
-//!   labels = vec![
-//!       LabeledSpan::at(12..13, "this should be 6"),
-//!   ],
-//!   help = "'*' has greater precedence than '+'",
-//!   "Wrong answer"
-//! ).with_source_code(source);
-//! println!("{:?}", report)
-//! ```
+//! If you don't know all the possible errors upfront, you can implement
+//! the [`Diagnostic`] trait directly on your error types to create
+//! diagnostics dynamically.
 //!
 //! ### ... collection of labels
 //!
@@ -741,14 +646,10 @@
 //! under the Apache License. Some code is taken from
 //! [`ariadne`](https://github.com/zesterer/ariadne), which is MIT licensed.
 //!
-//! [`miette!`]: https://docs.rs/miette/latest/miette/macro.miette.html
-//! [`diagnostic!`]: https://docs.rs/miette/latest/miette/macro.diagnostic.html
 //! [`std::error::Error`]: https://doc.rust-lang.org/nightly/std/error/trait.Error.html
 //! [`Diagnostic`]: https://docs.rs/miette/latest/miette/trait.Diagnostic.html
-//! [`IntoDiagnostic`]: https://docs.rs/miette/latest/miette/trait.IntoDiagnostic.html
 //! [`MietteHandlerOpts`]: https://docs.rs/miette/latest/miette/struct.MietteHandlerOpts.html
 //! [`MietteHandler`]: https://docs.rs/miette/latest/miette/struct.MietteHandler.html
-//! [`MietteDiagnostic`]: https://docs.rs/miette/latest/miette/struct.MietteDiagnostic.html
 //! [`Report`]: https://docs.rs/miette/latest/miette/struct.Report.html
 //! [`ReportHandler`]: https://docs.rs/miette/latest/miette/trait.ReportHandler.html
 //! [`Result`]: https://docs.rs/miette/latest/miette/type.Result.html
@@ -759,12 +660,9 @@ pub use eyreish::*;
 #[cfg(feature = "fancy-base")]
 pub use handler::*;
 pub use handlers::*;
-pub use miette_diagnostic::*;
 pub use named_source::*;
 #[cfg(feature = "derive")]
 pub use oxc_miette_derive::*;
-#[cfg(feature = "fancy")]
-pub use panic::*;
 pub use protocol::*;
 
 mod chain;
@@ -776,9 +674,6 @@ mod handler;
 mod handlers;
 #[doc(hidden)]
 pub mod macro_helpers;
-mod miette_diagnostic;
 mod named_source;
-#[cfg(feature = "fancy")]
-mod panic;
 mod protocol;
 mod source_impls;

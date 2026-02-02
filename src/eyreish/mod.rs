@@ -1,5 +1,4 @@
 #![allow(clippy::needless_doctest_main, clippy::new_ret_no_self, clippy::wrong_self_convention)]
-use core::fmt::Display;
 use std::{error::Error as StdError, sync::OnceLock};
 
 #[doc(hidden)]
@@ -11,26 +10,15 @@ pub use Report as Error;
 #[doc(hidden)]
 #[allow(unreachable_pub)]
 pub use ReportHandler as EyreContext;
-/// Compatibility re-export of `WrapErr` for interop with `anyhow`
-#[allow(unreachable_pub)]
-pub use WrapErr as Context;
 use error::ErrorImpl;
-#[allow(unreachable_pub)]
-pub use into_diagnostic::*;
 
 use self::ptr::Own;
-#[cfg(not(feature = "fancy-base"))]
-use crate::DebugReportHandler;
 use crate::Diagnostic;
 #[cfg(feature = "fancy-base")]
 use crate::MietteHandler;
 
-mod context;
 mod error;
 mod fmt;
-mod into_diagnostic;
-mod kind;
-mod macros;
 mod ptr;
 mod wrapper;
 
@@ -81,11 +69,28 @@ fn capture_handler(error: &(dyn Diagnostic + 'static)) -> Box<dyn ReportHandler>
     hook(error)
 }
 
+#[cfg(feature = "fancy-base")]
 fn get_default_printer(_err: &(dyn Diagnostic + 'static)) -> Box<dyn ReportHandler + 'static> {
-    #[cfg(feature = "fancy-base")]
-    return Box::new(MietteHandler::new());
-    #[cfg(not(feature = "fancy-base"))]
-    return Box::new(DebugReportHandler::new());
+    Box::new(MietteHandler::new())
+}
+
+#[cfg(not(feature = "fancy-base"))]
+fn get_default_printer(_err: &(dyn Diagnostic + 'static)) -> Box<dyn ReportHandler + 'static> {
+    Box::new(DefaultReportHandler)
+}
+
+/// Minimal report handler used when `fancy-base` feature is not enabled.
+#[cfg(not(feature = "fancy-base"))]
+struct DefaultReportHandler;
+
+#[cfg(not(feature = "fancy-base"))]
+impl ReportHandler for DefaultReportHandler {
+    fn debug(&self, diagnostic: &dyn Diagnostic, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if f.alternate() {
+            return core::fmt::Debug::fmt(diagnostic, f);
+        }
+        core::fmt::Display::fmt(diagnostic, f)
+    }
 }
 
 impl dyn ReportHandler {
@@ -196,263 +201,8 @@ pub trait ReportHandler: core::any::Any + Send + Sync {
 /// # };
 /// ```
 ///
-/// # Example
-///
-/// ```
-/// # pub trait Deserialize {}
-/// #
-/// # mod serde_json {
-/// #     use super::Deserialize;
-/// #     use std::io;
-/// #
-/// #     pub fn from_str<T: Deserialize>(json: &str) -> io::Result<T> {
-/// #         unimplemented!()
-/// #     }
-/// # }
-/// #
-/// # #[derive(Debug)]
-/// # struct ClusterMap;
-/// #
-/// # impl Deserialize for ClusterMap {}
-/// #
-/// use miette::{IntoDiagnostic, Result};
-///
-/// fn main() -> Result<()> {
-///     # return Ok(());
-///     let config = std::fs::read_to_string("cluster.json").into_diagnostic()?;
-///     let map: ClusterMap = serde_json::from_str(&config).into_diagnostic()?;
-///     println!("cluster info: {:#?}", map);
-///     Ok(())
-/// }
-/// ```
-///
 /// ## `anyhow`/`eyre` Users
 ///
 /// You can just replace `use`s of `anyhow::Result`/`eyre::Result` with
 /// `miette::Result`.
 pub type Result<T, E = Report> = core::result::Result<T, E>;
-
-/// Provides the [`wrap_err()`](WrapErr::wrap_err) method for [`Result`].
-///
-/// This trait is sealed and cannot be implemented for types outside of
-/// `miette`.
-///
-/// # Example
-///
-/// ```
-/// use miette::{WrapErr, IntoDiagnostic, Result};
-/// use std::{fs, path::PathBuf};
-///
-/// pub struct ImportantThing {
-///     path: PathBuf,
-/// }
-///
-/// impl ImportantThing {
-///     # const IGNORE: &'static str = stringify! {
-///     pub fn detach(&mut self) -> Result<()> {...}
-///     # };
-///     # fn detach(&mut self) -> Result<()> {
-///     #     unimplemented!()
-///     # }
-/// }
-///
-/// pub fn do_it(mut it: ImportantThing) -> Result<Vec<u8>> {
-///     it.detach().wrap_err("Failed to detach the important thing")?;
-///
-///     let path = &it.path;
-///     let content = fs::read(path)
-///         .into_diagnostic()
-///         .wrap_err_with(|| format!(
-///             "Failed to read instrs from {}",
-///             path.display())
-///         )?;
-///
-///     Ok(content)
-/// }
-/// ```
-///
-/// When printed, the outermost error would be printed first and the lower
-/// level underlying causes would be enumerated below.
-///
-/// ```console
-/// Error: Failed to read instrs from ./path/to/instrs.json
-///
-/// Caused by:
-///     No such file or directory (os error 2)
-/// ```
-///
-/// # Wrapping Types That Do Not Implement `Error`
-///
-/// For example `&str` and `Box<dyn Error>`.
-///
-/// Due to restrictions for coherence `Report` cannot implement `From` for types
-/// that don't implement `Error`. Attempts to do so will give `"this type might
-/// implement Error in the future"` as an error. As such, `wrap_err()`, which
-/// uses `From` under the hood, cannot be used to wrap these types. Instead we
-/// encourage you to use the combinators provided for `Result` in `std`/`core`.
-///
-/// For example, instead of this:
-///
-/// ```rust,compile_fail
-/// use std::error::Error;
-/// use miette::{WrapErr, Report};
-///
-/// fn wrap_example(err: Result<(), Box<dyn Error + Send + Sync + 'static>>)
-///     -> Result<(), Report>
-/// {
-///     err.wrap_err("saw a downstream error")
-/// }
-/// ```
-///
-/// We encourage you to write this:
-///
-/// ```rust
-/// use miette::{miette, Report, WrapErr};
-/// use std::error::Error;
-///
-/// fn wrap_example(err: Result<(), Box<dyn Error + Send + Sync + 'static>>) -> Result<(), Report> {
-///     err.map_err(|e| miette!(e))
-///         .wrap_err("saw a downstream error")
-/// }
-/// ```
-///
-/// # Effect on Downcasting
-///
-/// After attaching a message of type `D` onto an error of type `E`, the
-/// resulting `miette::Error` may be downcast to `D` **or** to `E`.
-///
-/// That is, in codebases that rely on downcasting, `miette`'s `wrap_err()`
-/// supports both of the following use cases:
-///
-///   - **Attaching messages whose type is insignificant onto errors whose type
-///     is used in downcasts.**
-///
-///     In other error libraries whose `wrap_err()` is not designed this way, it
-///     can be risky to introduce messages to existing code because new message
-///     might break existing working downcasts. In miette, any downcast that
-///     worked before adding the message will continue to work after you add a
-///     message, so you should freely wrap errors wherever it would be helpful.
-///
-///     ```
-///     # use miette::bail;
-///     # use thiserror::Error;
-///     #
-///     # #[derive(Error, Debug)]
-///     # #[error("???")]
-///     # struct SuspiciousError;
-///     #
-///     # fn helper() -> Result<()> {
-///     #     bail!(SuspiciousError);
-///     # }
-///     #
-///     use miette::{WrapErr, Result};
-///
-///     fn do_it() -> Result<()> {
-///         helper().wrap_err("Failed to complete the work")?;
-///         # const IGNORE: &str = stringify! {
-///         ...
-///         # };
-///         # unreachable!()
-///     }
-///
-///     fn main() {
-///         let err = do_it().unwrap_err();
-///         if let Some(e) = err.downcast_ref::<SuspiciousError>() {
-///             // If helper() returned SuspiciousError, this downcast will
-///             // correctly succeed even with the message in between.
-///             # return;
-///         }
-///         # panic!("expected downcast to succeed");
-///     }
-///     ```
-///
-///   - **Attaching message whose type is used in downcasts onto errors whose
-///     type is insignificant.**
-///
-///     Some codebases prefer to use machine-readable messages to categorize
-///     lower level errors in a way that will be actionable to higher levels of
-///     the application.
-///
-///     ```
-///     # use miette::bail;
-///     # use thiserror::Error;
-///     #
-///     # #[derive(Error, Debug)]
-///     # #[error("???")]
-///     # struct HelperFailed;
-///     #
-///     # fn helper() -> Result<()> {
-///     #     bail!("no such file or directory");
-///     # }
-///     #
-///     use miette::{WrapErr, Result};
-///
-///     fn do_it() -> Result<()> {
-///         helper().wrap_err(HelperFailed)?;
-///         # const IGNORE: &str = stringify! {
-///         ...
-///         # };
-///         # unreachable!()
-///     }
-///
-///     fn main() {
-///         let err = do_it().unwrap_err();
-///         if let Some(e) = err.downcast_ref::<HelperFailed>() {
-///             // If helper failed, this downcast will succeed because
-///             // HelperFailed is the message that has been attached to
-///             // that error.
-///             # return;
-///         }
-///         # panic!("expected downcast to succeed");
-///     }
-///     ```
-pub trait WrapErr<T, E>: context::private::Sealed {
-    /// Wrap the error value with a new adhoc error
-    #[track_caller]
-    fn wrap_err<D>(self, msg: D) -> Result<T, Report>
-    where
-        D: Display + Send + Sync + 'static;
-
-    /// Wrap the error value with a new adhoc error that is evaluated lazily
-    /// only once an error does occur.
-    #[track_caller]
-    fn wrap_err_with<D, F>(self, f: F) -> Result<T, Report>
-    where
-        D: Display + Send + Sync + 'static,
-        F: FnOnce() -> D;
-
-    /// Compatibility re-export of `wrap_err()` for interop with `anyhow`
-    #[track_caller]
-    fn context<D>(self, msg: D) -> Result<T, Report>
-    where
-        D: Display + Send + Sync + 'static;
-
-    /// Compatibility re-export of `wrap_err_with()` for interop with `anyhow`
-    #[track_caller]
-    fn with_context<D, F>(self, f: F) -> Result<T, Report>
-    where
-        D: Display + Send + Sync + 'static,
-        F: FnOnce() -> D;
-}
-
-// Private API. Referenced by macro-generated code.
-#[doc(hidden)]
-pub mod private {
-    use core::fmt::{Debug, Display};
-    pub use core::result::Result::Err;
-
-    use super::Report;
-
-    #[doc(hidden)]
-    pub mod kind {
-        pub use super::super::kind::{AdhocKind, BoxedKind, TraitKind};
-    }
-
-    #[track_caller]
-    pub fn new_adhoc<M>(message: M) -> Report
-    where
-        M: Display + Debug + Send + Sync + 'static,
-    {
-        Report::from_adhoc(message)
-    }
-}
