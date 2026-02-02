@@ -85,7 +85,11 @@ struct DefaultReportHandler;
 
 #[cfg(not(feature = "fancy-base"))]
 impl ReportHandler for DefaultReportHandler {
-    fn debug(&self, diagnostic: &dyn Diagnostic, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn debug(
+        &self,
+        diagnostic: &dyn Diagnostic,
+        f: &mut core::fmt::Formatter<'_>,
+    ) -> core::fmt::Result {
         if f.alternate() {
             return core::fmt::Debug::fmt(diagnostic, f);
         }
