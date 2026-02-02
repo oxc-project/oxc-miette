@@ -1,4 +1,4 @@
-#![cfg(feature = "fancy-no-backtrace")]
+#![cfg(all(feature = "fancy-no-backtrace", not(miri)))]
 #![expect(unused_assignments)]
 
 use miette::{
