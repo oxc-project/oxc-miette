@@ -15,7 +15,7 @@ name = "oxc-miette"
 description = "Fancy diagnostic reporting library and protocol for us mere mortals who aren't compiler hackers."
 documentation = "https://docs.rs/oxc-miette"
 readme = "README.md"
-version = "2.7.0"
+version = "2.7.1"
 authors.workspace = true
 categories.workspace = true
 repository.workspace = true
@@ -34,7 +34,7 @@ unit-bindings = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }
 
 [dependencies]
-oxc-miette-derive = { path = "miette-derive", version = "=2.7.0", optional = true }
+oxc-miette-derive = { path = "miette-derive", version = "=2.7.1", optional = true }
 
 # Relaxed version so the user can decide which version to use.
 thiserror = "2"
