@@ -1,8 +1,8 @@
 use std::fmt;
 
 use crate::{
-    GraphicalReportHandler, GraphicalTheme, NarratableReportHandler, ReportHandler,
-    ThemeCharacters, ThemeStyles, protocol::Diagnostic,
+    GraphicalReportHandler, GraphicalTheme, ReportHandler, ThemeCharacters, ThemeStyles,
+    protocol::Diagnostic,
 };
 
 /// Settings to control the color format used for graphical rendering.
@@ -196,80 +196,62 @@ impl MietteHandlerOpts {
     pub fn build(self) -> MietteHandler {
         let graphical = self.is_graphical();
         let width = self.get_width();
-        if !graphical {
-            let mut handler = NarratableReportHandler::new();
-            if let Some(footer) = self.footer {
-                handler = handler.with_footer(footer);
+        let linkify = if graphical { self.use_links() } else { false };
+        let characters = match self.unicode {
+            Some(true) => ThemeCharacters::unicode(),
+            Some(false) => ThemeCharacters::ascii(),
+            None if graphical && syscall::supports_unicode() => ThemeCharacters::unicode(),
+            None => ThemeCharacters::ascii(),
+        };
+        let styles = if !graphical || self.color == Some(false) {
+            ThemeStyles::none()
+        } else if let Some(color_has_16m) = syscall::supports_color_has_16m() {
+            match self.rgb_colors {
+                RgbColors::Always => ThemeStyles::rgb(),
+                RgbColors::Preferred if color_has_16m => ThemeStyles::rgb(),
+                _ => ThemeStyles::ansi(),
             }
-            if let Some(context_lines) = self.context_lines {
-                handler = handler.with_context_lines(context_lines);
+        } else if self.color == Some(true) {
+            match self.rgb_colors {
+                RgbColors::Always => ThemeStyles::rgb(),
+                _ => ThemeStyles::ansi(),
             }
-            if let Some(with_cause_chain) = self.with_cause_chain {
-                if with_cause_chain {
-                    handler = handler.with_cause_chain();
-                } else {
-                    handler = handler.without_cause_chain();
-                }
-            }
-            MietteHandler { inner: Box::new(handler) }
         } else {
-            let linkify = self.use_links();
-            let characters = match self.unicode {
-                Some(true) => ThemeCharacters::unicode(),
-                Some(false) => ThemeCharacters::ascii(),
-                None if syscall::supports_unicode() => ThemeCharacters::unicode(),
-                None => ThemeCharacters::ascii(),
-            };
-            let styles = if self.color == Some(false) {
-                ThemeStyles::none()
-            } else if let Some(color_has_16m) = syscall::supports_color_has_16m() {
-                match self.rgb_colors {
-                    RgbColors::Always => ThemeStyles::rgb(),
-                    RgbColors::Preferred if color_has_16m => ThemeStyles::rgb(),
-                    _ => ThemeStyles::ansi(),
-                }
-            } else if self.color == Some(true) {
-                match self.rgb_colors {
-                    RgbColors::Always => ThemeStyles::rgb(),
-                    _ => ThemeStyles::ansi(),
-                }
+            ThemeStyles::none()
+        };
+        let theme = self.theme.unwrap_or(GraphicalTheme { characters, styles });
+        let mut handler =
+            GraphicalReportHandler::new_themed(theme).with_width(width).with_links(linkify);
+        if let Some(with_cause_chain) = self.with_cause_chain {
+            if with_cause_chain {
+                handler = handler.with_cause_chain();
             } else {
-                ThemeStyles::none()
-            };
-            let theme = self.theme.unwrap_or(GraphicalTheme { characters, styles });
-            let mut handler =
-                GraphicalReportHandler::new_themed(theme).with_width(width).with_links(linkify);
-            if let Some(with_cause_chain) = self.with_cause_chain {
-                if with_cause_chain {
-                    handler = handler.with_cause_chain();
-                } else {
-                    handler = handler.without_cause_chain();
-                }
+                handler = handler.without_cause_chain();
             }
-            if let Some(footer) = self.footer {
-                handler = handler.with_footer(footer);
-            }
-            if let Some(context_lines) = self.context_lines {
-                handler = handler.with_context_lines(context_lines);
-            }
-            if let Some(w) = self.tab_width {
-                handler = handler.tab_width(w);
-            }
-            if let Some(b) = self.break_words {
-                handler = handler.with_break_words(b)
-            }
-            if let Some(b) = self.wrap_lines {
-                handler = handler.with_wrap_lines(b)
-            }
-            if let Some(s) = self.word_separator {
-                handler = handler.with_word_separator(s)
-            }
-            if let Some(s) = self.word_splitter {
-                handler = handler.with_word_splitter(s)
-            }
-
-            MietteHandler { inner: Box::new(handler) }
         }
+        if let Some(footer) = self.footer {
+            handler = handler.with_footer(footer);
+        }
+        if let Some(context_lines) = self.context_lines {
+            handler = handler.with_context_lines(context_lines);
+        }
+        if let Some(w) = self.tab_width {
+            handler = handler.tab_width(w);
+        }
+        if let Some(b) = self.break_words {
+            handler = handler.with_break_words(b)
+        }
+        if let Some(b) = self.wrap_lines {
+            handler = handler.with_wrap_lines(b)
+        }
+        if let Some(s) = self.word_separator {
+            handler = handler.with_word_separator(s)
+        }
+        if let Some(s) = self.word_splitter {
+            handler = handler.with_word_splitter(s)
+        }
+
+        MietteHandler { inner: Box::new(handler) }
     }
 
     pub(crate) fn is_graphical(&self) -> bool {
