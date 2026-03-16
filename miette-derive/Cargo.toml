@@ -11,6 +11,8 @@ rust-version.workspace = true
 
 [lib]
 proc-macro = true
+test = false
+doctest = false
 
 [dependencies]
 # Relaxed version so the user can decide which version to use.

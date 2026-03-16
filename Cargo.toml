@@ -90,9 +90,6 @@ fancy = ["fancy-no-backtrace", "backtrace", "backtrace-ext"]
 [package.metadata.docs.rs]
 all-features = true
 
-[package.metadata.cargo-shear]
-ignored = ["futures", "indenter", "semver"]
-
 [profile.dev.package]
 # Compile insta and its dependencies in release mode for faster snapshot tests
 # See: https://insta.rs/docs/quickstart/#optional-faster-runs
