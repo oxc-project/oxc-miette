@@ -167,6 +167,10 @@ impl<T: ?Sized + SourceCode> SourceCode for Arc<T> {
     ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
         self.as_ref().read_span(span, context_lines_before, context_lines_after)
     }
+
+    fn name(&self) -> Option<&str> {
+        self.as_ref().name()
+    }
 }
 
 impl<T: ?Sized + SourceCode + ToOwned> SourceCode for Cow<'_, T>
@@ -185,6 +189,10 @@ where
         context_lines_after: usize,
     ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
         self.as_ref().read_span(span, context_lines_before, context_lines_after)
+    }
+
+    fn name(&self) -> Option<&str> {
+        self.as_ref().name()
     }
 }
 

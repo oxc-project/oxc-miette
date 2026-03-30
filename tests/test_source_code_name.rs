@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use miette::{NamedSource, SourceCode};
 
 #[test]
@@ -23,4 +25,12 @@ fn test_named_source_with_string() {
     let named = NamedSource::new("main.rs", source);
     // Call the trait method explicitly through SourceCode trait
     assert_eq!(SourceCode::name(&named), Some("main.rs"));
+}
+
+#[test]
+fn test_arc_named_source_returns_name() {
+    let source = String::from("fn main() {}");
+    let named = Arc::new(NamedSource::new("main.rs", source));
+    assert_eq!(SourceCode::name(&named), Some("main.rs"));
+    assert_eq!(named.name(), Some("main.rs"));
 }
