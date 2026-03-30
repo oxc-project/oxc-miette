@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use miette::{NamedSource, SourceCode};
 
@@ -31,6 +31,15 @@ fn test_named_source_with_string() {
 fn test_arc_named_source_returns_name() {
     let source = String::from("fn main() {}");
     let named = Arc::new(NamedSource::new("main.rs", source));
+    assert_eq!(SourceCode::name(&named), Some("main.rs"));
+    assert_eq!(named.name(), Some("main.rs"));
+}
+
+#[test]
+fn test_cow_named_source_returns_name() {
+    let source = String::from("fn main() {}");
+    let named = NamedSource::new("main.rs", source);
+    let named = Cow::Borrowed(&named);
     assert_eq!(SourceCode::name(&named), Some("main.rs"));
     assert_eq!(named.name(), Some("main.rs"));
 }
