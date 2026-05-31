@@ -61,6 +61,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [2.7.2] - 2026-05-31
+
+### Chore
+
+- *(deps)* Update github-actions ([#164](https://github.com/oxc-project/oxc-miette/pull/164))
+- *(deps)* Update rust crates ([#165](https://github.com/oxc-project/oxc-miette/pull/165))
+- *(deps)* Update taiki-e/install-action action to v2.75.7 ([#166](https://github.com/oxc-project/oxc-miette/pull/166))
+- *(deps)* Update dependency rust to v1.95.0 ([#168](https://github.com/oxc-project/oxc-miette/pull/168))
+- *(deps)* Update github-actions ([#170](https://github.com/oxc-project/oxc-miette/pull/170))
+- *(deps)* Update oxc-project/security-action action to v1.0.2 ([#171](https://github.com/oxc-project/oxc-miette/pull/171))
+- *(deps)* Update oxc-project/security-action action to v1.0.3 ([#172](https://github.com/oxc-project/oxc-miette/pull/172))
+- *(deps)* Update oxc-project/security-action action to v1.0.5 ([#173](https://github.com/oxc-project/oxc-miette/pull/173))
+- Use ubuntu-latest for security workflow ([#175](https://github.com/oxc-project/oxc-miette/pull/175))
+- *(deps)* Update actions/create-github-app-token action to v3.2.0 ([#176](https://github.com/oxc-project/oxc-miette/pull/176))
+- *(deps)* Update rust crate serde_json to v1.0.150 ([#177](https://github.com/oxc-project/oxc-miette/pull/177))
+- *(deps)* Update dependency rust to v1.96.0 ([#178](https://github.com/oxc-project/oxc-miette/pull/178))
+- *(deps)* Update github actions ([#179](https://github.com/oxc-project/oxc-miette/pull/179))
+
+### CI
+
+- Replace OXC_BOT_PAT with GitHub App tokens ([#167](https://github.com/oxc-project/oxc-miette/pull/167))
+- Add security analysis workflow ([#169](https://github.com/oxc-project/oxc-miette/pull/169))
 ## [2.7.1] - 2026-03-30
 
 ### Bug Fixes
