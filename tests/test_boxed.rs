@@ -158,7 +158,7 @@ fn test_boxed_custom_diagnostic() {
             report.labels().map(std::iter::Iterator::collect),
             Some(vec![LabeledSpan::new(Some(CustomDiagnostic::LABEL.to_owned()), 0, 7)]),
         );
-        let span = SourceSpan::from(0..CustomDiagnostic::SOURCE_CODE.len());
+        let span = SourceSpan::from(0..CustomDiagnostic::SOURCE_CODE.len() as u32);
         assert_eq!(
             report.source_code().map(|source_code| source_code
                 .read_span(&span, 0, 0)

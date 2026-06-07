@@ -412,7 +412,7 @@
 //!     // You can add as many labels as you want.
 //!     // They'll be rendered sequentially.
 //!     #[label("This is bad")]
-//!     snip2: (usize, usize), // `(usize, usize)` is `Into<SourceSpan>`!
+//!     snip2: (u32, u32), // `(u32, u32)` is `Into<SourceSpan>`!
 //!
 //!     // Snippets can be optional, by using Option:
 //!     #[label("some text")]

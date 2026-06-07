@@ -19,7 +19,7 @@ fn test_emoji_sequence_underline() {
     let src = format!("before {} after", family_emoji);
     let err = TestError {
         src: NamedSource::new("test.txt", src.clone()),
-        span: (7, family_emoji.len()).into(),
+        span: (7, family_emoji.len() as u32).into(),
     };
 
     let mut output = String::new();
@@ -33,7 +33,7 @@ fn test_emoji_sequence_underline() {
     let src2 = format!("before {} after", flag_emoji);
     let err2 = TestError {
         src: NamedSource::new("test2.txt", src2.clone()),
-        span: (7, flag_emoji.len()).into(),
+        span: (7, flag_emoji.len() as u32).into(),
     };
 
     let mut output2 = String::new();
@@ -47,7 +47,7 @@ fn test_emoji_sequence_underline() {
     let src3 = format!("before {} after", skin_tone_emoji);
     let err3 = TestError {
         src: NamedSource::new("test3.txt", src3.clone()),
-        span: (7, skin_tone_emoji.len()).into(),
+        span: (7, skin_tone_emoji.len() as u32).into(),
     };
 
     let mut output3 = String::new();
@@ -61,7 +61,7 @@ fn test_emoji_sequence_underline() {
     let src4 = format!("before {} after", ascii_text);
     let err4 = TestError {
         src: NamedSource::new("test4.txt", src4.clone()),
-        span: (7, ascii_text.len()).into(),
+        span: (7, ascii_text.len() as u32).into(),
     };
 
     let mut output4 = String::new();

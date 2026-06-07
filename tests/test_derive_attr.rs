@@ -121,6 +121,6 @@ fn attr_not_required() {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad::Only { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let err_span = err.labels().unwrap().next().unwrap();
-    let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
+    let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
 }

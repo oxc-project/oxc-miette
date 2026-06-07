@@ -8,7 +8,7 @@ struct SourceError {
     #[help]
     help: String,
     #[label("here")]
-    label: (usize, usize),
+    label: (u32, u32),
 }
 
 #[derive(Debug, miette::Diagnostic, thiserror::Error)]
@@ -92,7 +92,7 @@ struct NestedError {
     #[source_code]
     code: String,
     #[label("here")]
-    label: (usize, usize),
+    label: (u32, u32),
     #[diagnostic_source]
     the_other_err: Box<dyn Diagnostic>,
 }

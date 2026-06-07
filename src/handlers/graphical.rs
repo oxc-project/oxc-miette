@@ -1252,7 +1252,7 @@ impl GraphicalReportHandler {
         let context = std::str::from_utf8(context_data.data()).expect("Bad utf8 detected");
         let mut line = context_data.line();
         let mut column = context_data.column();
-        let mut offset = context_data.span().offset();
+        let mut offset = context_data.span().offset() as usize;
         let mut line_offset = offset;
         let mut line_str = String::with_capacity(context.len());
         let mut lines = Vec::with_capacity(1);
@@ -1429,10 +1429,10 @@ impl FancySpan {
     }
 
     fn offset(&self) -> usize {
-        self.span.offset()
+        self.span.offset() as usize
     }
 
     fn len(&self) -> usize {
-        self.span.len()
+        self.span.len() as usize
     }
 }
