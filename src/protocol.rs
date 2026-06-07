@@ -619,7 +619,9 @@ impl From<(SourceOffset, u32)> for SourceSpan {
 
 impl From<std::ops::Range<ByteOffset>> for SourceSpan {
     fn from(range: std::ops::Range<ByteOffset>) -> Self {
-        Self { offset: range.start.into(), length: range.end - range.start }
+        // `Range::len` returns `0` for empty/reversed ranges, matching the
+        // previous behavior and avoiding underflow.
+        Self { offset: range.start.into(), length: range.len() as u32 }
     }
 }
 
