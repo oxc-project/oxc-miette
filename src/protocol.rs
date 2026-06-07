@@ -280,7 +280,7 @@ pub struct LabeledSpan {
 impl LabeledSpan {
     /// Makes a new labeled span.
     #[must_use]
-    pub const fn new(label: Option<String>, offset: ByteOffset, len: usize) -> Self {
+    pub const fn new(label: Option<String>, offset: ByteOffset, len: u32) -> Self {
         Self { label, span: SourceSpan::new(SourceOffset(offset), len), primary: false }
     }
 
@@ -302,7 +302,7 @@ impl LabeledSpan {
     }
 
     /// Change the offset of the span
-    pub fn set_span_offset(&mut self, offset: usize) {
+    pub fn set_span_offset(&mut self, offset: ByteOffset) {
         self.span.offset = SourceOffset(offset);
     }
 
@@ -367,12 +367,12 @@ impl LabeledSpan {
     }
 
     /// Returns the 0-based starting byte offset.
-    pub const fn offset(&self) -> usize {
+    pub const fn offset(&self) -> ByteOffset {
         self.span.offset()
     }
 
     /// Returns the number of bytes this `LabeledSpan` spans.
-    pub const fn len(&self) -> usize {
+    pub const fn len(&self) -> u32 {
         self.span.len()
     }
 
@@ -578,23 +578,23 @@ impl<'a> SpanContents<'a> for MietteSpanContents<'a> {
 pub struct SourceSpan {
     /// The start of the span.
     offset: SourceOffset,
-    /// The total length of the span
-    length: usize,
+    /// The total length of the span, in bytes.
+    length: u32,
 }
 
 impl SourceSpan {
     /// Create a new [`SourceSpan`].
-    pub const fn new(start: SourceOffset, length: usize) -> Self {
+    pub const fn new(start: SourceOffset, length: u32) -> Self {
         Self { offset: start, length }
     }
 
     /// The absolute offset, in bytes, from the beginning of a [`SourceCode`].
-    pub const fn offset(&self) -> usize {
+    pub const fn offset(&self) -> ByteOffset {
         self.offset.offset()
     }
 
     /// Total length of the [`SourceSpan`], in bytes.
-    pub const fn len(&self) -> usize {
+    pub const fn len(&self) -> u32 {
         self.length
     }
 
@@ -605,21 +605,21 @@ impl SourceSpan {
     }
 }
 
-impl From<(ByteOffset, usize)> for SourceSpan {
-    fn from((start, len): (ByteOffset, usize)) -> Self {
+impl From<(ByteOffset, u32)> for SourceSpan {
+    fn from((start, len): (ByteOffset, u32)) -> Self {
         Self { offset: start.into(), length: len }
     }
 }
 
-impl From<(SourceOffset, usize)> for SourceSpan {
-    fn from((start, len): (SourceOffset, usize)) -> Self {
+impl From<(SourceOffset, u32)> for SourceSpan {
+    fn from((start, len): (SourceOffset, u32)) -> Self {
         Self::new(start, len)
     }
 }
 
 impl From<std::ops::Range<ByteOffset>> for SourceSpan {
     fn from(range: std::ops::Range<ByteOffset>) -> Self {
-        Self { offset: range.start.into(), length: range.len() }
+        Self { offset: range.start.into(), length: range.end - range.start }
     }
 }
 
@@ -655,7 +655,7 @@ fn test_deserialize_source_span() {
 /**
 "Raw" type for the byte offset from the beginning of a [`SourceCode`].
 */
-pub type ByteOffset = usize;
+pub type ByteOffset = u32;
 
 /**
 Newtype that represents the [`ByteOffset`] from the beginning of a [`SourceCode`]
@@ -692,7 +692,7 @@ impl SourceOffset {
             offset += char.len_utf8();
         }
 
-        SourceOffset(offset)
+        SourceOffset(offset as u32)
     }
 
     /// Returns an offset for the _file_ location of wherever this function is
@@ -740,7 +740,7 @@ fn test_source_offset_from_location() {
     assert_eq!(SourceOffset::from_location(source, 4, 4).offset(), 10);
 
     // Out-of-range
-    assert_eq!(SourceOffset::from_location(source, 5, 1).offset(), source.len());
+    assert_eq!(SourceOffset::from_location(source, 5, 1).offset(), source.len() as u32);
 }
 
 #[cfg(feature = "serde")]

@@ -409,7 +409,7 @@ mod json_report_handler {
     line5
     "
         .to_string();
-        let len = src.len();
+        let len = src.len() as u32;
         let err = MyBad {
             src: NamedSource::new("bad_file.rs", src),
             highlight1: (0, len).into(),
@@ -487,7 +487,7 @@ mod json_report_handler {
     line5
     "
         .to_string();
-        let len = src.len();
+        let len = src.len() as u32;
         let err = MyBad {
             source: Inner(InnerInner),
             src: NamedSource::new("bad_file.rs", src),

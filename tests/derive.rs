@@ -255,13 +255,13 @@ fn test_snippet_named_struct() {
         var1: SourceSpan,
         #[label = "var 2"]
         // Anything that's Clone + Into<SourceSpan> can be used here.
-        var2: (usize, usize),
+        var2: (u32, u32),
         #[label]
-        var3: (usize, usize),
+        var3: (u32, u32),
         #[label("var 4")]
-        var4: Option<(usize, usize)>,
+        var4: Option<(u32, u32)>,
         #[label]
-        var5: Option<(usize, usize)>,
+        var5: Option<(u32, u32)>,
     }
 }
 
@@ -299,9 +299,9 @@ fn test_snippet_enum() {
             #[label]
             var2: SourceSpan,
             #[label("var 3")]
-            var3: Option<(usize, usize)>,
+            var3: Option<(u32, u32)>,
             #[label]
-            var4: Option<(usize, usize)>,
+            var4: Option<(u32, u32)>,
         },
         #[diagnostic(code(foo::b))]
         B(

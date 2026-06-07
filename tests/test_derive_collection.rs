@@ -30,13 +30,13 @@ fn attr_collection_in_enum() {
     };
     let mut label_iter = err.labels().unwrap();
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
+    let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 1usize, 2usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 1u32, 2u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 3usize, 4usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 3u32, 4u32);
     assert_eq!(err_span, expectation);
 }
 
@@ -61,13 +61,13 @@ fn attr_collection_in_struct() {
     };
     let mut label_iter = err.labels().unwrap();
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
+    let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 1usize, 2usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 1u32, 2u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 3usize, 4usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 3u32, 4u32);
     assert_eq!(err_span, expectation);
 }
 
@@ -92,13 +92,13 @@ fn attr_collection_as_deque() {
     };
     let mut label_iter = err.labels().unwrap();
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
+    let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 1usize, 2usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 1u32, 2u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 3usize, 4usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 3u32, 4u32);
     assert_eq!(err_span, expectation);
 }
 
@@ -123,13 +123,13 @@ fn attr_collection_as_linked_list() {
     };
     let mut label_iter = err.labels().unwrap();
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
+    let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 1usize, 2usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 1u32, 2u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 3usize, 4usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 3u32, 4u32);
     assert_eq!(err_span, expectation);
 }
 
@@ -143,7 +143,7 @@ fn attr_collection_of_tuple() {
         #[label("this bit here")]
         highlight: SourceSpan,
         #[label(collection, "and here")]
-        highlight2: Vec<(usize, usize)>,
+        highlight2: Vec<(u32, u32)>,
     }
 
     let src = "source\n  text\n    here".to_string();
@@ -154,13 +154,13 @@ fn attr_collection_of_tuple() {
     };
     let mut label_iter = err.labels().unwrap();
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
+    let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 1usize, 2usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 1u32, 2u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 3usize, 4usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 3u32, 4u32);
     assert_eq!(err_span, expectation);
 }
 
@@ -174,7 +174,7 @@ fn attr_collection_of_range() {
         #[label("this bit here")]
         highlight: SourceSpan,
         #[label(collection, "and here")]
-        highlight2: Vec<Range<usize>>,
+        highlight2: Vec<Range<u32>>,
     }
 
     let src = "source\n  text\n    here".to_string();
@@ -185,13 +185,13 @@ fn attr_collection_of_range() {
     };
     let mut label_iter = err.labels().unwrap();
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
+    let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 1usize, 2usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 1u32, 2u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 3usize, 4usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 3u32, 4u32);
     assert_eq!(err_span, expectation);
 }
 
@@ -219,13 +219,13 @@ fn attr_collection_of_labeled_span_in_struct() {
     };
     let mut label_iter = err.labels().unwrap();
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
+    let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("continuing here".into()), 1usize, 2usize);
+    let expectation = LabeledSpan::new(Some("continuing here".into()), 1u32, 2u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("then there".into()), 3usize, 4usize);
+    let expectation = LabeledSpan::new(Some("then there".into()), 3u32, 4u32);
     assert_eq!(err_span, expectation);
 }
 
@@ -255,13 +255,13 @@ fn attr_collection_of_labeled_span_in_enum() {
     };
     let mut label_iter = err.labels().unwrap();
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
+    let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("continuing here".into()), 1usize, 2usize);
+    let expectation = LabeledSpan::new(Some("continuing here".into()), 1u32, 2u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("then there".into()), 3usize, 4usize);
+    let expectation = LabeledSpan::new(Some("then there".into()), 3u32, 4u32);
     assert_eq!(err_span, expectation);
 }
 
@@ -289,18 +289,18 @@ fn attr_collection_multi() {
     };
     let mut label_iter = err.labels().unwrap();
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("this bit here".into()), 9usize, 4usize);
+    let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 1usize, 2usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 1u32, 2u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and here".into()), 3usize, 4usize);
+    let expectation = LabeledSpan::new(Some("and here".into()), 3u32, 4u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and there".into()), 5usize, 6usize);
+    let expectation = LabeledSpan::new(Some("and there".into()), 5u32, 6u32);
     assert_eq!(err_span, expectation);
     let err_span = label_iter.next().unwrap();
-    let expectation = LabeledSpan::new(Some("and there".into()), 7usize, 8usize);
+    let expectation = LabeledSpan::new(Some("and there".into()), 7u32, 8u32);
     assert_eq!(err_span, expectation);
 }

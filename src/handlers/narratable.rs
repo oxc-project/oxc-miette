@@ -286,7 +286,7 @@ impl NarratableReportHandler {
         let context = std::str::from_utf8(context_data.data()).expect("Bad utf8 detected");
         let mut line = context_data.line();
         let mut column = context_data.column();
-        let mut offset = context_data.span().offset();
+        let mut offset = context_data.span().offset() as usize;
         let mut line_offset = offset;
         let mut iter = context.chars().peekable();
         let mut line_str = String::new();
@@ -386,14 +386,15 @@ fn safe_get_column(text: &str, offset: usize, start: bool) -> usize {
 
 impl Line {
     fn span_attach(&self, span: &SourceSpan) -> Option<SpanAttach> {
-        let span_end = span.offset() + span.len();
+        let span_offset = span.offset() as usize;
+        let span_end = span_offset + span.len() as usize;
         let line_end = self.offset + self.text.len();
 
-        let start_after = span.offset() >= self.offset;
+        let start_after = span_offset >= self.offset;
         let end_before = self.at_end_of_file || span_end <= line_end;
 
         if start_after && end_before {
-            let col_start = safe_get_column(&self.text, span.offset() - self.offset, true);
+            let col_start = safe_get_column(&self.text, span_offset - self.offset, true);
             let col_end = if span.is_empty() {
                 col_start
             } else {
@@ -403,8 +404,8 @@ impl Line {
             };
             return Some(SpanAttach::Contained { col_start, col_end });
         }
-        if start_after && span.offset() <= line_end {
-            let col_start = safe_get_column(&self.text, span.offset() - self.offset, true);
+        if start_after && span_offset <= line_end {
+            let col_start = safe_get_column(&self.text, span_offset - self.offset, true);
             return Some(SpanAttach::Starts { col_start });
         }
         if end_before && span_end >= self.offset {
