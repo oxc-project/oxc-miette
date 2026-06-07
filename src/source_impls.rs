@@ -74,7 +74,7 @@ fn context_info<'a>(
         let starting_offset = before_lines_starts
             .front()
             .copied()
-            .unwrap_or_else(|| if context_lines_before == 0 { span_offset } else { 0 });
+            .unwrap_or(if context_lines_before == 0 { span_offset } else { 0 });
         Ok(MietteSpanContents::new(
             &input[starting_offset..offset],
             (starting_offset as u32, (offset - starting_offset) as u32).into(),
