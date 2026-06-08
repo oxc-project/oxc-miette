@@ -540,7 +540,7 @@ impl GraphicalReportHandler {
         let labels = labels
             .iter()
             .zip(self.theme.styles.highlights.iter().cloned().cycle())
-            .map(|(label, st)| FancySpan::new(label.label().map(String::from), *label.inner(), st))
+            .map(|(label, st)| FancySpan::new(label.label(), *label.inner(), st))
             .collect::<Vec<_>>();
 
         // let mut highlighter_state = self.highlighter.start_highlighter_state(&*contents);
@@ -1402,12 +1402,12 @@ impl PartialEq for FancySpan {
     }
 }
 
-fn split_label(v: String) -> Vec<String> {
+fn split_label(v: &str) -> Vec<String> {
     v.split('\n').map(|i| i.to_string()).collect()
 }
 
 impl FancySpan {
-    fn new(label: Option<String>, span: SourceSpan, style: Style) -> Self {
+    fn new(label: Option<&str>, span: SourceSpan, style: Style) -> Self {
         FancySpan { label: label.map(split_label), span, style }
     }
 
