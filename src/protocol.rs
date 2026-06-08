@@ -605,9 +605,9 @@ pub struct MietteSpanContents<'a> {
     // Number of line in this snippet.
     line_count: usize,
     // Optional filename
-    name: Option<String>,
+    name: Option<std::borrow::Cow<'a, str>>,
     // Optional language
-    language: Option<String>,
+    language: Option<std::borrow::Cow<'a, str>>,
 }
 
 impl<'a> MietteSpanContents<'a> {
@@ -624,7 +624,7 @@ impl<'a> MietteSpanContents<'a> {
 
     /// Make a new [`MietteSpanContents`] object, with a name for its 'file'.
     pub const fn new_named(
-        name: String,
+        name: std::borrow::Cow<'a, str>,
         data: &'a [u8],
         span: SourceSpan,
         line: usize,
@@ -644,7 +644,7 @@ impl<'a> MietteSpanContents<'a> {
 
     /// Sets the `language` for syntax highlighting.
     #[must_use]
-    pub fn with_language(mut self, language: impl Into<String>) -> Self {
+    pub fn with_language(mut self, language: impl Into<std::borrow::Cow<'a, str>>) -> Self {
         self.language = Some(language.into());
         self
     }

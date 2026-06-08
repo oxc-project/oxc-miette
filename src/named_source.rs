@@ -59,7 +59,7 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
         let inner_contents =
             self.inner().read_span(span, context_lines_before, context_lines_after)?;
         let mut contents = MietteSpanContents::new_named(
-            self.name.clone(),
+            std::borrow::Cow::Borrowed(self.name.as_str()),
             inner_contents.data(),
             *inner_contents.span(),
             inner_contents.line(),
