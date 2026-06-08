@@ -762,37 +762,31 @@ impl GraphicalReportHandler {
         let mut arrow = false;
         for (i, hl) in applicable.enumerate() {
             if line.span_starts(hl) {
-                gutter.push_str(&chars.ltop.style(hl.style).to_string());
-                gutter.push_str(
-                    &chars
-                        .hbar
-                        .to_string()
-                        .repeat(max_gutter.saturating_sub(i))
-                        .style(hl.style)
-                        .to_string(),
-                );
-                gutter.push_str(&chars.rarrow.style(hl.style).to_string());
+                write!(gutter, "{}", chars.ltop.style(hl.style))?;
+                write!(
+                    gutter,
+                    "{}",
+                    chars.hbar.to_string().repeat(max_gutter.saturating_sub(i)).style(hl.style)
+                )?;
+                write!(gutter, "{}", chars.rarrow.style(hl.style))?;
                 arrow = true;
                 break;
             } else if line.span_ends(hl) {
                 if hl.has_label() {
-                    gutter.push_str(&chars.lcross.style(hl.style).to_string());
+                    write!(gutter, "{}", chars.lcross.style(hl.style))?;
                 } else {
-                    gutter.push_str(&chars.lbot.style(hl.style).to_string());
+                    write!(gutter, "{}", chars.lbot.style(hl.style))?;
                 }
-                gutter.push_str(
-                    &chars
-                        .hbar
-                        .to_string()
-                        .repeat(max_gutter.saturating_sub(i))
-                        .style(hl.style)
-                        .to_string(),
-                );
-                gutter.push_str(&chars.rarrow.style(hl.style).to_string());
+                write!(
+                    gutter,
+                    "{}",
+                    chars.hbar.to_string().repeat(max_gutter.saturating_sub(i)).style(hl.style)
+                )?;
+                write!(gutter, "{}", chars.rarrow.style(hl.style))?;
                 arrow = true;
                 break;
             } else if line.span_flyby(hl) {
-                gutter.push_str(&chars.vbar.style(hl.style).to_string());
+                write!(gutter, "{}", chars.vbar.style(hl.style))?;
             } else {
                 gutter.push(' ');
             }
@@ -848,10 +842,12 @@ impl GraphicalReportHandler {
                 } else {
                     let num_repeat = max_gutter.saturating_sub(i) + 2;
 
-                    gutter.push_str(&chars.lbot.style(hl.style).to_string());
+                    write!(gutter, "{}", chars.lbot.style(hl.style))?;
 
-                    gutter.push_str(
-                        &chars
+                    write!(
+                        gutter,
+                        "{}",
+                        chars
                             .hbar
                             .to_string()
                             .repeat(
@@ -865,8 +861,7 @@ impl GraphicalReportHandler {
                                     },
                             )
                             .style(hl.style)
-                            .to_string(),
-                    );
+                    )?;
 
                     // we count 1 for the lbot char, and then a few more, the same number
                     // as we just repeated for. For each repeat we only add 1, even though
@@ -876,7 +871,7 @@ impl GraphicalReportHandler {
                 }
                 break;
             } else {
-                gutter.push_str(&chars.vbar.style(hl.style).to_string());
+                write!(gutter, "{}", chars.vbar.style(hl.style))?;
 
                 // we may push many bytes for the ansi escape codes style adds,
                 // but we still only add a single character-width to the string in a terminal
@@ -1100,8 +1095,10 @@ impl GraphicalReportHandler {
                 let num_right = end - vbar_offset - 1;
                 // Throws `Formatting argument out of range` when width is above u16::MAX.
                 let width = start.saturating_sub(highest).min(u16::MAX as usize);
-                underlines.push_str(
-                    &format!(
+                let _ = write!(
+                    underlines,
+                    "{}",
+                    format!(
                         "{:width$}{}{}{}",
                         "",
                         chars.underline.to_string().repeat(num_left),
@@ -1115,7 +1112,6 @@ impl GraphicalReportHandler {
                         chars.underline.to_string().repeat(num_right),
                     )
                     .style(hl.style)
-                    .to_string(),
                 );
                 highest = std::cmp::max(highest, end);
 
