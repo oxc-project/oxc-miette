@@ -281,7 +281,7 @@ impl NarratableReportHandler {
         &'a self,
         source: &'a dyn SourceCode,
         context_span: &'a SourceSpan,
-    ) -> Result<(MietteSpanContents<'a>, Vec<Line>), fmt::Error> {
+    ) -> Result<(MietteSpanContents<'a>, Vec<Line<'a>>), fmt::Error> {
         let context_data = source
             .read_span(context_span, self.context_lines, self.context_lines)
             .map_err(|_| fmt::Error)?;
@@ -289,9 +289,12 @@ impl NarratableReportHandler {
         let mut line = context_data.line();
         let mut column = context_data.column();
         let mut offset = context_data.span().offset() as usize;
+        // Byte offset of `context[0]` into the original source.
+        let base = offset;
         let mut line_offset = offset;
         let mut iter = context.chars().peekable();
-        let mut line_str = String::new();
+        // Bytes of visible text accumulated for the current line (no terminator).
+        let mut line_len = 0usize;
         let mut lines = Vec::new();
         while let Some(char) = iter.next() {
             offset += char.len_utf8();
@@ -303,7 +306,7 @@ impl NarratableReportHandler {
                         line += 1;
                         column = 0;
                     } else {
-                        line_str.push(char);
+                        line_len += char.len_utf8();
                         column += 1;
                     }
                     at_end_of_file = iter.peek().is_none();
@@ -314,7 +317,7 @@ impl NarratableReportHandler {
                     column = 0;
                 }
                 _ => {
-                    line_str.push(char);
+                    line_len += char.len_utf8();
                     column += 1;
                 }
             }
@@ -324,13 +327,14 @@ impl NarratableReportHandler {
             }
 
             if column == 0 || iter.peek().is_none() {
+                let text_start = line_offset - base;
                 lines.push(Line {
                     line_number: line,
                     offset: line_offset,
-                    text: line_str.clone(),
+                    text: &context[text_start..text_start + line_len],
                     at_end_of_file,
                 });
-                line_str.clear();
+                line_len = 0;
                 line_offset = offset;
             }
         }
@@ -352,10 +356,10 @@ impl ReportHandler for NarratableReportHandler {
 Support types
 */
 
-struct Line {
+struct Line<'a> {
     line_number: usize,
     offset: usize,
-    text: String,
+    text: &'a str,
     at_end_of_file: bool,
 }
 
@@ -386,7 +390,7 @@ fn safe_get_column(text: &str, offset: usize, start: bool) -> usize {
     column
 }
 
-impl Line {
+impl Line<'_> {
     fn span_attach(&self, span: &SourceSpan) -> Option<SpanAttach> {
         let span_offset = span.offset() as usize;
         let span_end = span_offset + span.len() as usize;
@@ -396,22 +400,22 @@ impl Line {
         let end_before = self.at_end_of_file || span_end <= line_end;
 
         if start_after && end_before {
-            let col_start = safe_get_column(&self.text, span_offset - self.offset, true);
+            let col_start = safe_get_column(self.text, span_offset - self.offset, true);
             let col_end = if span.is_empty() {
                 col_start
             } else {
                 // span_end refers to the next character after token
                 // while col_end refers to the exact character, so -1
-                safe_get_column(&self.text, span_end - self.offset, false)
+                safe_get_column(self.text, span_end - self.offset, false)
             };
             return Some(SpanAttach::Contained { col_start, col_end });
         }
         if start_after && span_offset <= line_end {
-            let col_start = safe_get_column(&self.text, span_offset - self.offset, true);
+            let col_start = safe_get_column(self.text, span_offset - self.offset, true);
             return Some(SpanAttach::Starts { col_start });
         }
         if end_before && span_end >= self.offset {
-            let col_end = safe_get_column(&self.text, span_end - self.offset, false);
+            let col_end = safe_get_column(self.text, span_end - self.offset, false);
             return Some(SpanAttach::Ends { col_end });
         }
         None
