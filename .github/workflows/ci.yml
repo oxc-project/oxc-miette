@@ -36,7 +36,6 @@ jobs:
     strategy:
       matrix:
         features: [fancy]
-        rust: [1.70.0, stable]
         os: [ubuntu-latest, macOS-latest, windows-latest]
 
     steps:
@@ -48,11 +47,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --all -- -D warnings
       - name: Run tests
-        if: matrix.rust == 'stable'
         run: cargo test --all --verbose --features ${{matrix.features}}
-      - name: Run tests
-        if: matrix.rust == '1.70.0'
-        run: cargo test --all --verbose --features ${{matrix.features}} no-format-args-capture
 
   wasm:
     name: Check Wasm build
