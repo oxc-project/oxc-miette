@@ -1287,9 +1287,8 @@ impl GraphicalReportHandler {
                     line_number: line,
                     offset: line_offset,
                     length: offset - line_offset,
-                    text: line_str.clone(),
+                    text: std::mem::take(&mut line_str),
                 });
-                line_str.clear();
                 line_offset = offset;
             }
         }

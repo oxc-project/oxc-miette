@@ -327,10 +327,9 @@ impl NarratableReportHandler {
                 lines.push(Line {
                     line_number: line,
                     offset: line_offset,
-                    text: line_str.clone(),
+                    text: std::mem::take(&mut line_str),
                     at_end_of_file,
                 });
-                line_str.clear();
                 line_offset = offset;
             }
         }
