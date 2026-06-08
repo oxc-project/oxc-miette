@@ -61,6 +61,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [3.0.0] - 2026-06-08
+
+### Performance
+
+- [**breaking**] Store source spans as u32 to shrink LabeledSpan ([#180](https://github.com/oxc-project/oxc-miette/pull/180))
+- Store diagnostic labels inline to avoid allocations ([#182](https://github.com/oxc-project/oxc-miette/pull/182))
+- Return `Cow<str>` from code/help/note/url instead of boxing ([#183](https://github.com/oxc-project/oxc-miette/pull/183))
+- Return concrete `MietteSpanContents` from `SourceCode::read_span` ([#184](https://github.com/oxc-project/oxc-miette/pull/184))
+- Return inline Related from Diagnostic::related ([#185](https://github.com/oxc-project/oxc-miette/pull/185))
+- Avoid allocating a styled label just to test its presence ([#186](https://github.com/oxc-project/oxc-miette/pull/186))
+- Write styled gutter/underline glyphs directly instead of allocating ([#187](https://github.com/oxc-project/oxc-miette/pull/187))
+- Avoid an intermediate String when building FancySpan labels ([#188](https://github.com/oxc-project/oxc-miette/pull/188))
+- Borrow name/language in MietteSpanContents instead of cloning ([#190](https://github.com/oxc-project/oxc-miette/pull/190))
+- Style FancySpan label parts once at construction ([#191](https://github.com/oxc-project/oxc-miette/pull/191))
+- Revert LabeledSpan.label to String to avoid a realloc per label ([#192](https://github.com/oxc-project/oxc-miette/pull/192))
+- Borrow source lines in the renderer instead of allocating a String each ([#193](https://github.com/oxc-project/oxc-miette/pull/193))
+- Avoid cloning LabeledSpans when building snippet contexts ([#194](https://github.com/oxc-project/oxc-miette/pull/194))
+
+### Refactor
+
+- Import Cow at the top instead of fully-qualifying inline ([#195](https://github.com/oxc-project/oxc-miette/pull/195))
+
+### Chore
+
+- *(deps)* Update github-actions ([#164](https://github.com/oxc-project/oxc-miette/pull/164))
+- *(deps)* Update rust crates ([#165](https://github.com/oxc-project/oxc-miette/pull/165))
+- *(deps)* Update taiki-e/install-action action to v2.75.7 ([#166](https://github.com/oxc-project/oxc-miette/pull/166))
+- *(deps)* Update dependency rust to v1.95.0 ([#168](https://github.com/oxc-project/oxc-miette/pull/168))
+- *(deps)* Update github-actions ([#170](https://github.com/oxc-project/oxc-miette/pull/170))
+- *(deps)* Update oxc-project/security-action action to v1.0.2 ([#171](https://github.com/oxc-project/oxc-miette/pull/171))
+- *(deps)* Update oxc-project/security-action action to v1.0.3 ([#172](https://github.com/oxc-project/oxc-miette/pull/172))
+- *(deps)* Update oxc-project/security-action action to v1.0.5 ([#173](https://github.com/oxc-project/oxc-miette/pull/173))
+- Use ubuntu-latest for security workflow ([#175](https://github.com/oxc-project/oxc-miette/pull/175))
+- *(deps)* Update actions/create-github-app-token action to v3.2.0 ([#176](https://github.com/oxc-project/oxc-miette/pull/176))
+- *(deps)* Update rust crate serde_json to v1.0.150 ([#177](https://github.com/oxc-project/oxc-miette/pull/177))
+- *(deps)* Update dependency rust to v1.96.0 ([#178](https://github.com/oxc-project/oxc-miette/pull/178))
+- *(deps)* Update github actions ([#179](https://github.com/oxc-project/oxc-miette/pull/179))
+- *(deps)* Update rust crates to v1.13.3 ([#181](https://github.com/oxc-project/oxc-miette/pull/181))
+
+### CI
+
+- Replace OXC_BOT_PAT with GitHub App tokens ([#167](https://github.com/oxc-project/oxc-miette/pull/167))
+- Add security analysis workflow ([#169](https://github.com/oxc-project/oxc-miette/pull/169))
 ## [2.7.1] - 2026-03-30
 
 ### Bug Fixes
