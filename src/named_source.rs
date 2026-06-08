@@ -55,7 +55,7 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
         span: &crate::SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
         let inner_contents =
             self.inner().read_span(span, context_lines_before, context_lines_after)?;
         let mut contents = MietteSpanContents::new_named(
@@ -69,7 +69,7 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
         if let Some(language) = &self.language {
             contents = contents.with_language(language);
         }
-        Ok(Box::new(contents))
+        Ok(contents)
     }
 
     fn name(&self) -> Option<&str> {

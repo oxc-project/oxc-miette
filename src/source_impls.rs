@@ -3,7 +3,7 @@ Default trait implementations for [`SourceCode`].
 */
 use std::{borrow::Cow, collections::VecDeque, fmt::Debug, sync::Arc};
 
-use crate::{MietteError, MietteSpanContents, SourceCode, SourceSpan, SpanContents};
+use crate::{MietteError, MietteSpanContents, SourceCode, SourceSpan};
 
 fn context_info<'a>(
     input: &'a [u8],
@@ -93,9 +93,9 @@ impl SourceCode for [u8] {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
         let contents = context_info(self, span, context_lines_before, context_lines_after)?;
-        Ok(Box::new(contents))
+        Ok(contents)
     }
 }
 
@@ -105,7 +105,7 @@ impl SourceCode for &[u8] {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
         <[u8] as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
     }
 }
@@ -116,7 +116,7 @@ impl SourceCode for Vec<u8> {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
         <[u8] as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
     }
 }
@@ -127,7 +127,7 @@ impl SourceCode for str {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
         <[u8] as SourceCode>::read_span(
             self.as_bytes(),
             span,
@@ -144,7 +144,7 @@ impl SourceCode for &str {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
         <str as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
     }
 }
@@ -155,7 +155,7 @@ impl SourceCode for String {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
         <str as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
     }
 }
@@ -166,7 +166,7 @@ impl<T: ?Sized + SourceCode> SourceCode for Arc<T> {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
         self.as_ref().read_span(span, context_lines_before, context_lines_after)
     }
 
@@ -189,7 +189,7 @@ where
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError> {
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
         self.as_ref().read_span(span, context_lines_before, context_lines_after)
     }
 
@@ -201,6 +201,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SpanContents;
 
     #[test]
     fn basic() -> Result<(), MietteError> {

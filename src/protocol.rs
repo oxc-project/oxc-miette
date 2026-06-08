@@ -263,7 +263,7 @@ pub trait SourceCode: Send + Sync {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<Box<dyn SpanContents<'a> + 'a>, MietteError>;
+    ) -> Result<MietteSpanContents<'a>, MietteError>;
 
     /// Returns the name of this source code, if any.
     fn name(&self) -> Option<&str> {

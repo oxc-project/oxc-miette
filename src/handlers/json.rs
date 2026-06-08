@@ -1,7 +1,8 @@
 use std::fmt::{self, Write};
 
 use crate::{
-    ReportHandler, Severity, SourceCode, diagnostic_chain::DiagnosticChain, protocol::Diagnostic,
+    ReportHandler, Severity, SourceCode, SpanContents, diagnostic_chain::DiagnosticChain,
+    protocol::Diagnostic,
 };
 
 /**

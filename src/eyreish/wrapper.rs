@@ -206,7 +206,7 @@ impl<C> StdError for WithSourceCode<Report, C> {
 mod tests {
     use thiserror::Error;
 
-    use crate::{Diagnostic, LabeledSpan, Report, SourceCode, SourceSpan};
+    use crate::{Diagnostic, LabeledSpan, Report, SourceCode, SourceSpan, SpanContents};
 
     #[derive(Error, Debug)]
     #[error("inner")]

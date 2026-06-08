@@ -3,7 +3,8 @@ use std::fmt;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
-    LabeledSpan, MietteError, ReportHandler, SourceCode, SourceSpan, SpanContents,
+    LabeledSpan, MietteError, MietteSpanContents, ReportHandler, SourceCode, SourceSpan,
+    SpanContents,
     diagnostic_chain::DiagnosticChain,
     protocol::{Diagnostic, Severity},
 };
@@ -168,7 +169,7 @@ impl NarratableReportHandler {
                         .map(|label| {
                             source.read_span(label.inner(), self.context_lines, self.context_lines)
                         })
-                        .collect::<Result<Vec<Box<dyn SpanContents<'_>>>, MietteError>>()
+                        .collect::<Result<Vec<MietteSpanContents<'_>>, MietteError>>()
                         .map_err(|_| fmt::Error)?;
                     let mut contexts = Vec::new();
                     for (right, right_conts) in labels.iter().cloned().zip(contents.iter()) {
@@ -279,7 +280,7 @@ impl NarratableReportHandler {
         &'a self,
         source: &'a dyn SourceCode,
         context_span: &'a SourceSpan,
-    ) -> Result<(Box<dyn SpanContents<'a> + 'a>, Vec<Line>), fmt::Error> {
+    ) -> Result<(MietteSpanContents<'a>, Vec<Line>), fmt::Error> {
         let context_data = source
             .read_span(context_span, self.context_lines, self.context_lines)
             .map_err(|_| fmt::Error)?;
