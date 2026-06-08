@@ -147,8 +147,19 @@ impl<'a> IntoIterator for &'a mut Labels {
 
 impl Extend<LabeledSpan> for Labels {
     fn extend<I: IntoIterator<Item = LabeledSpan>>(&mut self, iter: I) {
-        for label in iter {
-            self.push(label);
+        let mut iter = iter.into_iter();
+        // Fill the inline tiers first — allocation-free while staying at 1-2.
+        while !matches!(self, Labels::Many(_)) {
+            match iter.next() {
+                Some(label) => self.push(label),
+                None => return,
+            }
+        }
+        // Once on the heap, reserve once and bulk-extend instead of re-growing
+        // the `Vec` on every element.
+        if let Labels::Many(labels) = self {
+            labels.reserve(iter.size_hint().0);
+            labels.extend(iter);
         }
     }
 }
@@ -249,12 +260,8 @@ impl Diagnostic for MietteDiagnostic {
         self.url.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
     }
 
-    fn labels(&self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + '_>> {
-        if self.labels.is_empty() {
-            None
-        } else {
-            Some(Box::new(self.labels.iter().cloned()))
-        }
+    fn labels(&self) -> Labels {
+        self.labels.clone()
     }
 }
 

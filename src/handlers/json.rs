@@ -113,42 +113,37 @@ impl JSONReportHandler {
         if let Some(src) = src {
             self.render_snippets(f, diagnostic, src)?;
         }
-        match diagnostic.labels() {
-            Some(labels) => {
-                write!(f, r#""labels": ["#)?;
-                let mut add_comma = false;
-                for label in labels {
-                    if add_comma {
-                        write!(f, ",")?;
-                    } else {
-                        add_comma = true;
-                    }
-                    write!(f, "{{")?;
-                    if let Some(label_name) = label.label() {
-                        write!(f, r#""label": "{}","#, escape(label_name))?;
-                    }
-                    write!(f, r#""span": {{"#)?;
-                    write!(f, r#""offset": {},"#, label.offset())?;
-                    write!(f, r#""length": {},"#, label.len())?;
-
-                    if let Some(Ok(location)) = diagnostic
-                        .source_code()
-                        .or(parent_src)
-                        .map(|src| src.read_span(label.inner(), 0, 0))
-                    {
-                        write!(f, r#""line": {},"#, location.line() + 1)?;
-                        write!(f, r#""column": {}"#, location.column() + 1)?;
-                    } else {
-                        write!(f, r#""line": null,"column": null"#)?;
-                    }
-
-                    write!(f, "}}}}")?;
+        {
+            write!(f, r#""labels": ["#)?;
+            let mut add_comma = false;
+            for label in &diagnostic.labels() {
+                if add_comma {
+                    write!(f, ",")?;
+                } else {
+                    add_comma = true;
                 }
-                write!(f, "],")?;
+                write!(f, "{{")?;
+                if let Some(label_name) = label.label() {
+                    write!(f, r#""label": "{}","#, escape(label_name))?;
+                }
+                write!(f, r#""span": {{"#)?;
+                write!(f, r#""offset": {},"#, label.offset())?;
+                write!(f, r#""length": {},"#, label.len())?;
+
+                if let Some(Ok(location)) = diagnostic
+                    .source_code()
+                    .or(parent_src)
+                    .map(|src| src.read_span(label.inner(), 0, 0))
+                {
+                    write!(f, r#""line": {},"#, location.line() + 1)?;
+                    write!(f, r#""column": {}"#, location.column() + 1)?;
+                } else {
+                    write!(f, r#""line": null,"column": null"#)?;
+                }
+
+                write!(f, "}}}}")?;
             }
-            _ => {
-                write!(f, r#""labels": [],"#)?;
-            }
+            write!(f, "],")?;
         }
         match diagnostic.related() {
             Some(relates) => {
@@ -177,12 +172,10 @@ impl JSONReportHandler {
         diagnostic: &dyn Diagnostic,
         source: &dyn SourceCode,
     ) -> fmt::Result {
-        if let Some(mut labels) = diagnostic.labels() {
-            if let Some(label) = labels.next() {
-                if let Ok(span_content) = source.read_span(label.inner(), 0, 0) {
-                    let filename = span_content.name().unwrap_or_default();
-                    return write!(f, r#""filename": "{}","#, escape(filename));
-                }
+        if let Some(label) = diagnostic.labels().first() {
+            if let Ok(span_content) = source.read_span(label.inner(), 0, 0) {
+                let filename = span_content.name().unwrap_or_default();
+                return write!(f, r#""filename": "{}","#, escape(filename));
             }
         }
         write!(f, r#""filename": "","#)

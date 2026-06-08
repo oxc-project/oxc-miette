@@ -119,9 +119,8 @@ impl Diagnostic for CustomDiagnostic {
         Some(Box::new(Self::URL))
     }
 
-    fn labels<'a>(&'a self) -> Option<Box<dyn Iterator<Item = miette::LabeledSpan> + 'a>> {
-        let labels = miette::LabeledSpan::new(Some(Self::LABEL.to_owned()), 0, 7);
-        Some(Box::new(std::iter::once(labels)))
+    fn labels(&self) -> miette::Labels {
+        miette::Labels::One([miette::LabeledSpan::new(Some(Self::LABEL.to_owned()), 0, 7)])
     }
 
     fn source_code(&self) -> Option<&dyn miette::SourceCode> {
@@ -155,8 +154,8 @@ fn test_boxed_custom_diagnostic() {
         );
         assert_eq!(report.url().map(|url| url.to_string()), Some(CustomDiagnostic::URL.to_owned()));
         assert_eq!(
-            report.labels().map(std::iter::Iterator::collect),
-            Some(vec![LabeledSpan::new(Some(CustomDiagnostic::LABEL.to_owned()), 0, 7)]),
+            report.labels().as_slice(),
+            &[LabeledSpan::new(Some(CustomDiagnostic::LABEL.to_owned()), 0, 7)],
         );
         let span = SourceSpan::from(0..CustomDiagnostic::SOURCE_CODE.len() as u32);
         assert_eq!(

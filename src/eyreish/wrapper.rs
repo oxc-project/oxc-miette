@@ -2,7 +2,7 @@ use core::fmt::{self, Debug, Display};
 use std::error::Error as StdError;
 
 use crate as miette;
-use crate::{Diagnostic, LabeledSpan, Report, SourceCode};
+use crate::{Diagnostic, Report, SourceCode};
 
 #[repr(transparent)]
 pub(crate) struct MessageError<M>(pub(crate) M);
@@ -52,7 +52,7 @@ impl Diagnostic for BoxedError {
         self.0.url()
     }
 
-    fn labels<'a>(&'a self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + 'a>> {
+    fn labels(&self) -> crate::Labels {
         self.0.labels()
     }
 
@@ -123,7 +123,7 @@ impl<E: Diagnostic, C: SourceCode> Diagnostic for WithSourceCode<E, C> {
         self.error.url()
     }
 
-    fn labels<'a>(&'a self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + 'a>> {
+    fn labels(&self) -> crate::Labels {
         self.error.labels()
     }
 
@@ -161,7 +161,7 @@ impl<C: SourceCode> Diagnostic for WithSourceCode<Report, C> {
         self.error.url()
     }
 
-    fn labels<'a>(&'a self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + 'a>> {
+    fn labels(&self) -> crate::Labels {
         self.error.labels()
     }
 
@@ -216,8 +216,8 @@ mod tests {
     }
 
     impl Diagnostic for Inner {
-        fn labels(&self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + '_>> {
-            Some(Box::new(std::iter::once(LabeledSpan::underline(self.at))))
+        fn labels(&self) -> crate::Labels {
+            crate::Labels::One([LabeledSpan::underline(self.at)])
         }
 
         fn source_code(&self) -> Option<&dyn SourceCode> {

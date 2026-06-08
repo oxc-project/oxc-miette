@@ -159,8 +159,8 @@ impl NarratableReportHandler {
         source_code: Option<&dyn SourceCode>,
     ) -> fmt::Result {
         if let Some(source) = source_code {
-            if let Some(labels) = diagnostic.labels() {
-                let mut labels = labels.collect::<Vec<_>>();
+            {
+                let mut labels = diagnostic.labels();
                 labels.sort_unstable_by_key(|l| l.inner().offset());
                 if !labels.is_empty() {
                     let contents = labels

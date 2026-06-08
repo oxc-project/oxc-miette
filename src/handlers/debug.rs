@@ -50,9 +50,9 @@ impl DebugReportHandler {
         if let Some(note) = diagnostic.note() {
             diag.field("note", &note.to_string());
         }
-        if let Some(labels) = diagnostic.labels() {
-            let labels: Vec<_> = labels.collect();
-            diag.field("labels", &format!("{labels:?}"));
+        let labels = diagnostic.labels();
+        if !labels.is_empty() {
+            diag.field("labels", &format!("{:?}", labels.as_slice()));
         }
         if let Some(cause) = diagnostic.diagnostic_source() {
             diag.field("caused by", &format!("{cause:?}"));

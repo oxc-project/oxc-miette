@@ -468,12 +468,10 @@ impl GraphicalReportHandler {
             Some(source) => source,
             None => return Ok(()),
         };
-        let labels = match diagnostic.labels() {
-            Some(labels) => labels,
-            None => return Ok(()),
-        };
-
-        let mut labels = labels.collect::<Vec<_>>();
+        let mut labels = diagnostic.labels();
+        if labels.is_empty() {
+            return Ok(());
+        }
         labels.sort_unstable_by_key(|l| l.inner().offset());
 
         let mut contexts = Vec::with_capacity(labels.len());

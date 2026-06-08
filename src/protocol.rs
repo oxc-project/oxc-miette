@@ -61,8 +61,12 @@ pub trait Diagnostic: std::error::Error {
     }
 
     /// Labels to apply to this `Diagnostic`'s [`Diagnostic::source_code`]
-    fn labels(&self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + '_>> {
-        None
+    ///
+    /// Returns the owned [`Labels`] container. For the common one/two-label
+    /// case this is allocation-free (the labels are stored inline), and it
+    /// avoids the boxed-iterator allocation the previous signature required.
+    fn labels(&self) -> crate::Labels {
+        crate::Labels::None
     }
 
     /// Additional related `Diagnostic`s.
