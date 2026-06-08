@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 use crate::protocol::{LabeledSpan, SourceSpan};
 
 // Huge thanks to @jam1gamer for this hack:
@@ -9,11 +11,11 @@ impl<T> IsOption for Option<T> {}
 
 #[doc(hidden)]
 #[derive(Debug, Default)]
-pub struct OptionalWrapper<T>(pub core::marker::PhantomData<T>);
+pub struct OptionalWrapper<T>(pub PhantomData<T>);
 
 impl<T> OptionalWrapper<T> {
     pub fn new() -> Self {
-        Self(core::marker::PhantomData)
+        Self(PhantomData)
     }
 }
 

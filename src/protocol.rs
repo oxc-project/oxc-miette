@@ -4,9 +4,11 @@ traits that you can implement to get access to miette's (and related library's)
 full reporting and such features.
 */
 use std::{
-    borrow::Cow,
+    borrow::{Borrow, Cow},
+    error::Error,
     fmt::{self, Display},
-    fs,
+    fs, mem,
+    ops::{Deref, Range},
     panic::Location,
 };
 
@@ -18,7 +20,7 @@ use crate::MietteError;
 /// Adds rich metadata to your Error that can be used by
 /// [`Report`](crate::Report) to print really nice and human-friendly error
 /// messages.
-pub trait Diagnostic: std::error::Error {
+pub trait Diagnostic: Error {
     /// Unique diagnostic code that can be used to look up more information
     /// about this `Diagnostic`. Ideally also globally unique, and documented
     /// in the toplevel crate's documentation for easy searching. Rust path
@@ -132,7 +134,7 @@ impl<'a> Related<'a> {
             items.push(related);
             return;
         }
-        *self = match std::mem::take(self) {
+        *self = match mem::take(self) {
             Related::None => Related::One([related]),
             Related::One([a]) => Related::Two([a, related]),
             Related::Two([a, b]) => Related::Many(vec![a, b, related]),
@@ -141,7 +143,7 @@ impl<'a> Related<'a> {
     }
 }
 
-impl<'a> std::ops::Deref for Related<'a> {
+impl<'a> Deref for Related<'a> {
     type Target = [&'a dyn Diagnostic];
 
     fn deref(&self) -> &Self::Target {
@@ -184,12 +186,12 @@ impl<'a> FromIterator<&'a dyn Diagnostic> for Related<'a> {
 macro_rules! box_error_impls {
     ($($box_type:ty),*) => {
         $(
-            impl std::error::Error for $box_type {
-                fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            impl Error for $box_type {
+                fn source(&self) -> Option<&(dyn Error + 'static)> {
                     (**self).source()
                 }
 
-                fn cause(&self) -> Option<&dyn std::error::Error> {
+                fn cause(&self) -> Option<&dyn Error> {
                     self.source()
                 }
             }
@@ -206,7 +208,7 @@ box_error_impls! {
 macro_rules! box_borrow_impls {
     ($($box_type:ty),*) => {
         $(
-            impl std::borrow::Borrow<dyn Diagnostic> for $box_type {
+            impl Borrow<dyn Diagnostic> for $box_type {
                 fn borrow(&self) -> &(dyn Diagnostic + 'static) {
                     self.as_ref()
                 }
@@ -264,7 +266,7 @@ impl From<String> for Box<dyn Diagnostic + Send + Sync> {
     fn from(s: String) -> Self {
         struct StringError(String);
 
-        impl std::error::Error for StringError {}
+        impl Error for StringError {}
         impl Diagnostic for StringError {}
 
         impl Display for StringError {
@@ -284,11 +286,11 @@ impl From<String> for Box<dyn Diagnostic + Send + Sync> {
     }
 }
 
-impl From<Box<dyn std::error::Error + Send + Sync>> for Box<dyn Diagnostic + Send + Sync> {
-    fn from(s: Box<dyn std::error::Error + Send + Sync>) -> Self {
+impl From<Box<dyn Error + Send + Sync>> for Box<dyn Diagnostic + Send + Sync> {
+    fn from(s: Box<dyn Error + Send + Sync>) -> Self {
         #[derive(thiserror::Error)]
         #[error(transparent)]
-        struct BoxedDiagnostic(Box<dyn std::error::Error + Send + Sync>);
+        struct BoxedDiagnostic(Box<dyn Error + Send + Sync>);
         impl fmt::Debug for BoxedDiagnostic {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 fmt::Debug::fmt(&self.0, f)
@@ -722,8 +724,8 @@ impl From<(SourceOffset, u32)> for SourceSpan {
     }
 }
 
-impl From<std::ops::Range<ByteOffset>> for SourceSpan {
-    fn from(range: std::ops::Range<ByteOffset>) -> Self {
+impl From<Range<ByteOffset>> for SourceSpan {
+    fn from(range: Range<ByteOffset>) -> Self {
         // `Range::len` returns `0` for empty/reversed ranges, matching the
         // previous behavior and avoiding underflow.
         Self { offset: range.start.into(), length: range.len() as u32 }

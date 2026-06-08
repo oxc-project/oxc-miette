@@ -1,3 +1,5 @@
+use std::{env, fmt::Write, mem::size_of, panic::set_hook};
+
 use backtrace::Backtrace;
 use thiserror::Error;
 
@@ -5,7 +7,7 @@ use crate::{self as miette, Context, Diagnostic, Result};
 
 /// Tells miette to render panics using its rendering engine.
 pub fn set_panic_hook() {
-    std::panic::set_hook(Box::new(move |info| {
+    set_hook(Box::new(move |info| {
         let mut message = "Something went wrong".to_string();
         let payload = info.payload();
         if let Some(msg) = payload.downcast_ref::<&str>() {
@@ -32,10 +34,10 @@ struct Panic(String);
 
 impl Panic {
     fn backtrace() -> String {
-        use std::fmt::Write;
-        if let Ok(var) = std::env::var("RUST_BACKTRACE") {
+        use Write;
+        if let Ok(var) = env::var("RUST_BACKTRACE") {
             if !var.is_empty() && var != "0" {
-                const HEX_WIDTH: usize = std::mem::size_of::<usize>() + 2;
+                const HEX_WIDTH: usize = size_of::<usize>() + 2;
                 // Padding for next lines after frame's address
                 const NEXT_SYMBOL_PADDING: usize = HEX_WIDTH + 6;
                 let mut backtrace = String::new();

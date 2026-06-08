@@ -1,7 +1,9 @@
 use std::{
     borrow::Cow,
+    cmp::max,
     fmt::{self, Write},
-    io::IsTerminal,
+    io::{self, IsTerminal},
+    str::{CharIndices, from_utf8},
 };
 
 use owo_colors::{OwoColorize, Style};
@@ -63,7 +65,7 @@ impl GraphicalReportHandler {
     /// Create a new `GraphicalReportHandler` with the default
     /// [`GraphicalTheme`]. This will use both unicode characters and colors.
     pub fn new() -> Self {
-        let is_terminal = std::io::stdout().is_terminal() && std::io::stderr().is_terminal();
+        let is_terminal = io::stdout().is_terminal() && io::stderr().is_terminal();
         Self {
             links: if is_terminal { LinkStyle::Link } else { LinkStyle::Text },
             termwidth: 400,
@@ -492,7 +494,7 @@ impl GraphicalReportHandler {
                 // The snippets will overlap, so we create one Big Chunky Boi
                 let left_end = left.offset() + left.len();
                 let right_end = right.offset() + right.len();
-                let new_end = std::cmp::max(left_end, right_end);
+                let new_end = max(left_end, right_end);
 
                 let new_span = LabeledSpan::new(
                     left.label().map(String::from),
@@ -557,7 +559,7 @@ impl GraphicalReportHandler {
                     num_highlights += 1;
                 }
             }
-            max_gutter = std::cmp::max(max_gutter, num_highlights);
+            max_gutter = max(max_gutter, num_highlights);
         }
 
         // Oh and one more thing: We need to figure out how much room our line
@@ -946,7 +948,7 @@ impl GraphicalReportHandler {
     ) -> impl Iterator<Item = usize> + 'a + use<'a> {
         // Custom iterator that handles both ASCII and Unicode efficiently
         struct CharWidthIterator<'a> {
-            chars: std::str::CharIndices<'a>,
+            chars: CharIndices<'a>,
             grapheme_boundaries: Option<Vec<(usize, usize)>>, // (byte_pos, width) - None for ASCII
             current_grapheme_idx: usize,
             column: usize,
@@ -1114,7 +1116,7 @@ impl GraphicalReportHandler {
                     )
                     .style(hl.style)
                 );
-                highest = std::cmp::max(highest, end);
+                highest = max(highest, end);
 
                 (hl, vbar_offset)
             })
@@ -1245,7 +1247,7 @@ impl GraphicalReportHandler {
         let context_data = source
             .read_span(context_span, self.context_lines, self.context_lines)
             .map_err(|_| fmt::Error)?;
-        let context = std::str::from_utf8(context_data.data()).expect("Bad utf8 detected");
+        let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
         let mut line = context_data.line();
         let mut column = context_data.column();
         // Byte offset into the original source.

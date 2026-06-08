@@ -1,7 +1,10 @@
 use std::{
     borrow::Cow,
     error::Error,
-    fmt::{Debug, Display},
+    fmt::{self, Debug, Display},
+    mem,
+    ops::{Deref, DerefMut},
+    slice::{Iter, IterMut},
 };
 
 #[cfg(feature = "serde")]
@@ -102,7 +105,7 @@ impl Labels {
             labels.push(label);
             return;
         }
-        *self = match std::mem::take(self) {
+        *self = match mem::take(self) {
             Labels::None => Labels::One([label]),
             Labels::One([a]) => Labels::Two([a, label]),
             Labels::Two([a, b]) => Labels::Many(vec![a, b, label]),
@@ -111,7 +114,7 @@ impl Labels {
     }
 }
 
-impl std::ops::Deref for Labels {
+impl Deref for Labels {
     type Target = [LabeledSpan];
 
     fn deref(&self) -> &Self::Target {
@@ -119,7 +122,7 @@ impl std::ops::Deref for Labels {
     }
 }
 
-impl std::ops::DerefMut for Labels {
+impl DerefMut for Labels {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_mut_slice()
     }
@@ -127,7 +130,7 @@ impl std::ops::DerefMut for Labels {
 
 impl<'a> IntoIterator for &'a Labels {
     type Item = &'a LabeledSpan;
-    type IntoIter = std::slice::Iter<'a, LabeledSpan>;
+    type IntoIter = Iter<'a, LabeledSpan>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.as_slice().iter()
@@ -136,7 +139,7 @@ impl<'a> IntoIterator for &'a Labels {
 
 impl<'a> IntoIterator for &'a mut Labels {
     type Item = &'a mut LabeledSpan;
-    type IntoIter = std::slice::IterMut<'a, LabeledSpan>;
+    type IntoIter = IterMut<'a, LabeledSpan>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.as_mut_slice().iter_mut()
@@ -226,7 +229,7 @@ impl<'de> Deserialize<'de> for Labels {
 }
 
 impl Display for MietteDiagnostic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.message)
     }
 }

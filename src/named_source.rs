@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt};
 
 use crate::{MietteError, MietteSpanContents, SourceCode, SpanContents};
 
@@ -12,8 +12,8 @@ pub struct NamedSource<S: SourceCode + 'static> {
     language: Option<String>,
 }
 
-impl<S: SourceCode> std::fmt::Debug for NamedSource<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<S: SourceCode> fmt::Debug for NamedSource<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("NamedSource")
             .field("name", &self.name)
             .field("source", &"<redacted>")
