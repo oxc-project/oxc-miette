@@ -673,7 +673,7 @@ impl GraphicalReportHandler {
         labels: &[FancySpan],
         max_gutter: usize,
         linum_width: usize,
-        line: &Line,
+        line: &Line<'_>,
         label: &FancySpan,
     ) -> fmt::Result {
         // no line number!
@@ -750,7 +750,7 @@ impl GraphicalReportHandler {
         &self,
         f: &mut impl fmt::Write,
         max_gutter: usize,
-        line: &Line,
+        line: &Line<'_>,
         highlights: &[FancySpan],
     ) -> fmt::Result {
         if max_gutter == 0 {
@@ -806,7 +806,7 @@ impl GraphicalReportHandler {
         &self,
         f: &mut impl fmt::Write,
         max_gutter: usize,
-        line: &Line,
+        line: &Line<'_>,
         highlights: &[FancySpan],
         render_mode: LabelRenderMode,
     ) -> fmt::Result {
@@ -1021,7 +1021,7 @@ impl GraphicalReportHandler {
     /// If the offset occurs in the middle of a character, the returned column
     /// corresponds to that character's first column in `start` is true, or its
     /// last column if `start` is false.
-    fn visual_offset(&self, line: &Line, offset: usize, start: bool) -> usize {
+    fn visual_offset(&self, line: &Line<'_>, offset: usize, start: bool) -> usize {
         let line_range = line.offset..=(line.offset + line.length);
         assert!(line_range.contains(&offset));
 
@@ -1068,7 +1068,7 @@ impl GraphicalReportHandler {
     fn render_single_line_highlights(
         &self,
         f: &mut impl fmt::Write,
-        line: &Line,
+        line: &Line<'_>,
         linum_width: usize,
         max_gutter: usize,
         single_liners: &[&FancySpan],
@@ -1168,7 +1168,7 @@ impl GraphicalReportHandler {
     fn write_label_text(
         &self,
         f: &mut impl fmt::Write,
-        line: &Line,
+        line: &Line<'_>,
         linum_width: usize,
         max_gutter: usize,
         all_highlights: &[FancySpan],
@@ -1240,16 +1240,22 @@ impl GraphicalReportHandler {
         &'a self,
         source: &'a dyn SourceCode,
         context_span: &'a SourceSpan,
-    ) -> Result<(MietteSpanContents<'a>, Vec<Line>), fmt::Error> {
+    ) -> Result<(MietteSpanContents<'a>, Vec<Line<'a>>), fmt::Error> {
         let context_data = source
             .read_span(context_span, self.context_lines, self.context_lines)
             .map_err(|_| fmt::Error)?;
         let context = std::str::from_utf8(context_data.data()).expect("Bad utf8 detected");
         let mut line = context_data.line();
         let mut column = context_data.column();
+        // Byte offset into the original source.
         let mut offset = context_data.span().offset() as usize;
+        // Byte offset of `context[0]` into the original source, used to map a
+        // source offset to an index into `context`.
+        let base = offset;
         let mut line_offset = offset;
-        let mut line_str = String::with_capacity(context.len());
+        // Number of bytes of visible text accumulated for the current line
+        // (i.e. excluding the line terminator).
+        let mut line_len = 0usize;
         let mut lines = Vec::with_capacity(1);
         let mut iter = context.chars().peekable();
         while let Some(char) = iter.next() {
@@ -1262,7 +1268,7 @@ impl GraphicalReportHandler {
                         line += 1;
                         column = 0;
                     } else {
-                        line_str.push(char);
+                        line_len += char.len_utf8();
                         column += 1;
                     }
                     at_end_of_file = iter.peek().is_none();
@@ -1273,7 +1279,7 @@ impl GraphicalReportHandler {
                     column = 0;
                 }
                 _ => {
-                    line_str.push(char);
+                    line_len += char.len_utf8();
                     column += 1;
                 }
             }
@@ -1283,13 +1289,16 @@ impl GraphicalReportHandler {
             }
 
             if column == 0 || iter.peek().is_none() {
+                // The visible text is a contiguous slice of `context`, starting
+                // at the line's offset and excluding the line terminator.
+                let text_start = line_offset - base;
                 lines.push(Line {
                     line_number: line,
                     offset: line_offset,
                     length: offset - line_offset,
-                    text: line_str.clone(),
+                    text: &context[text_start..text_start + line_len],
                 });
-                line_str.clear();
+                line_len = 0;
                 line_offset = offset;
             }
         }
@@ -1322,14 +1331,14 @@ enum LabelRenderMode {
 }
 
 #[derive(Debug)]
-struct Line {
+struct Line<'a> {
     line_number: usize,
     offset: usize,
     length: usize,
-    text: String,
+    text: &'a str,
 }
 
-impl Line {
+impl Line<'_> {
     fn span_line_only(&self, span: &FancySpan) -> bool {
         span.offset() >= self.offset && span.offset() + span.len() <= self.offset + self.length
     }
