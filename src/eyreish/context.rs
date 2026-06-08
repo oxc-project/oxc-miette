@@ -150,7 +150,7 @@ where
         self.error.source_code()
     }
 
-    fn related<'a>(&'a self) -> Option<Box<dyn Iterator<Item = &'a dyn Diagnostic> + 'a>> {
+    fn related(&self) -> crate::Related<'_> {
         self.error.related()
     }
 }
@@ -183,7 +183,7 @@ where
         self.error.source_code()
     }
 
-    fn related<'a>(&'a self) -> Option<Box<dyn Iterator<Item = &'a dyn Diagnostic> + 'a>> {
+    fn related(&self) -> crate::Related<'_> {
         self.error.related()
     }
 }

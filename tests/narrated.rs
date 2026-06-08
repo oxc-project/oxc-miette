@@ -578,7 +578,6 @@ snippet line 1: source
 snippet line 2:   text
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-
 "#
     .trim_start()
     .to_string();
