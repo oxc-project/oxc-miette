@@ -1,5 +1,5 @@
 use core::fmt::{self, Debug, Display};
-use std::error::Error as StdError;
+use std::{borrow::Cow, error::Error as StdError};
 
 use crate as miette;
 use crate::{Diagnostic, Report, SourceCode};
@@ -32,7 +32,7 @@ impl<M> Diagnostic for MessageError<M> where M: Display + Debug + 'static {}
 pub(crate) struct BoxedError(pub(crate) Box<dyn Diagnostic + Send + Sync>);
 
 impl Diagnostic for BoxedError {
-    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn code(&self) -> Option<Cow<'_, str>> {
         self.0.code()
     }
 
@@ -40,15 +40,15 @@ impl Diagnostic for BoxedError {
         self.0.severity()
     }
 
-    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn help(&self) -> Option<Cow<'_, str>> {
         self.0.help()
     }
 
-    fn note(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn note(&self) -> Option<Cow<'_, str>> {
         self.0.note()
     }
 
-    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn url(&self) -> Option<Cow<'_, str>> {
         self.0.url()
     }
 
@@ -103,7 +103,7 @@ pub(crate) struct WithSourceCode<E, C> {
 }
 
 impl<E: Diagnostic, C: SourceCode> Diagnostic for WithSourceCode<E, C> {
-    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn code(&self) -> Option<Cow<'_, str>> {
         self.error.code()
     }
 
@@ -111,15 +111,15 @@ impl<E: Diagnostic, C: SourceCode> Diagnostic for WithSourceCode<E, C> {
         self.error.severity()
     }
 
-    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn help(&self) -> Option<Cow<'_, str>> {
         self.error.help()
     }
 
-    fn note(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn note(&self) -> Option<Cow<'_, str>> {
         self.error.note()
     }
 
-    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn url(&self) -> Option<Cow<'_, str>> {
         self.error.url()
     }
 
@@ -141,7 +141,7 @@ impl<E: Diagnostic, C: SourceCode> Diagnostic for WithSourceCode<E, C> {
 }
 
 impl<C: SourceCode> Diagnostic for WithSourceCode<Report, C> {
-    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn code(&self) -> Option<Cow<'_, str>> {
         self.error.code()
     }
 
@@ -149,15 +149,15 @@ impl<C: SourceCode> Diagnostic for WithSourceCode<Report, C> {
         self.error.severity()
     }
 
-    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn help(&self) -> Option<Cow<'_, str>> {
         self.error.help()
     }
 
-    fn note(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn note(&self) -> Option<Cow<'_, str>> {
         self.error.note()
     }
 
-    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn url(&self) -> Option<Cow<'_, str>> {
         self.error.url()
     }
 

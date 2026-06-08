@@ -1,4 +1,4 @@
-use std::io;
+use std::{borrow::Cow, io};
 
 use thiserror::Error;
 
@@ -21,31 +21,29 @@ pub enum MietteError {
 }
 
 impl Diagnostic for MietteError {
-    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn code(&self) -> Option<Cow<'_, str>> {
         match self {
-            MietteError::IoError(_) => Some(std::borrow::Cow::Borrowed("miette::io_error")),
+            MietteError::IoError(_) => Some(Cow::Borrowed("miette::io_error")),
+            MietteError::OutOfBounds => Some(Cow::Borrowed("miette::span_out_of_bounds")),
+        }
+    }
+
+    fn help(&self) -> Option<Cow<'_, str>> {
+        match self {
+            MietteError::IoError(_) => None,
             MietteError::OutOfBounds => {
-                Some(std::borrow::Cow::Borrowed("miette::span_out_of_bounds"))
+                Some(Cow::Borrowed("Double-check your spans. Do you have an off-by-one error?"))
             }
         }
     }
 
-    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
-        match self {
-            MietteError::IoError(_) => None,
-            MietteError::OutOfBounds => Some(std::borrow::Cow::Borrowed(
-                "Double-check your spans. Do you have an off-by-one error?",
-            )),
-        }
-    }
-
-    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn url(&self) -> Option<Cow<'_, str>> {
         let crate_version = env!("CARGO_PKG_VERSION");
         let variant = match self {
             MietteError::IoError(_) => "#variant.IoError",
             MietteError::OutOfBounds => "#variant.OutOfBounds",
         };
-        Some(std::borrow::Cow::Owned(format!(
+        Some(Cow::Owned(format!(
             "https://docs.rs/miette/{crate_version}/miette/enum.MietteError.html{variant}",
         )))
     }
