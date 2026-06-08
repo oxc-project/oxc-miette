@@ -233,24 +233,24 @@ impl Display for MietteDiagnostic {
 impl Error for MietteDiagnostic {}
 
 impl Diagnostic for MietteDiagnostic {
-    fn code<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
-        self.code.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
+    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+        self.code.as_deref().map(std::borrow::Cow::Borrowed)
     }
 
     fn severity(&self) -> Option<Severity> {
         self.severity
     }
 
-    fn help<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
-        self.help.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
+    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
+        self.help.as_deref().map(std::borrow::Cow::Borrowed)
     }
 
-    fn note<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
-        self.note.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
+    fn note(&self) -> Option<std::borrow::Cow<'_, str>> {
+        self.note.as_deref().map(std::borrow::Cow::Borrowed)
     }
 
-    fn url<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
-        self.url.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
+    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
+        self.url.as_deref().map(std::borrow::Cow::Borrowed)
     }
 
     fn labels(&self) -> Labels {

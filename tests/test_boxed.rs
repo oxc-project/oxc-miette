@@ -103,20 +103,20 @@ impl StdError for CustomDiagnostic {
 }
 
 impl Diagnostic for CustomDiagnostic {
-    fn code<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        Some(Box::new(Self::CODE))
+    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+        Some(std::borrow::Cow::Borrowed(Self::CODE))
     }
 
     fn severity(&self) -> Option<miette::Severity> {
         Some(miette::Severity::Advice)
     }
 
-    fn help<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        Some(Box::new(Self::HELP))
+    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
+        Some(std::borrow::Cow::Borrowed(Self::HELP))
     }
 
-    fn url<'a>(&'a self) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        Some(Box::new(Self::URL))
+    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
+        Some(std::borrow::Cow::Borrowed(Self::URL))
     }
 
     fn labels(&self) -> miette::Labels {

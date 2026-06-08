@@ -126,7 +126,7 @@ where
     D: Display,
     E: Diagnostic + 'static,
 {
-    fn code<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
         self.error.code()
     }
 
@@ -134,11 +134,11 @@ where
         self.error.severity()
     }
 
-    fn help<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
         self.error.help()
     }
 
-    fn url<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
         self.error.url()
     }
 
@@ -159,7 +159,7 @@ impl<D> Diagnostic for ContextError<D, Report>
 where
     D: Display,
 {
-    fn code<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
         unsafe { ErrorImpl::diagnostic(self.error.inner.by_ref()).code() }
     }
 
@@ -167,11 +167,11 @@ where
         unsafe { ErrorImpl::diagnostic(self.error.inner.by_ref()).severity() }
     }
 
-    fn help<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
         unsafe { ErrorImpl::diagnostic(self.error.inner.by_ref()).help() }
     }
 
-    fn url<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
         unsafe { ErrorImpl::diagnostic(self.error.inner.by_ref()).url() }
     }
 

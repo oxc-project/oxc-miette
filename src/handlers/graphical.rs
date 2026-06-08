@@ -407,7 +407,7 @@ impl GraphicalReportHandler {
                 opts = opts.word_splitter(word_splitter);
             }
 
-            writeln!(f, "{}", self.wrap(&help.to_string(), opts))?;
+            writeln!(f, "{}", self.wrap(&help, opts))?;
         }
         if let Some(note) = diagnostic.note() {
             // Renders as:
@@ -425,7 +425,7 @@ impl GraphicalReportHandler {
                 opts = opts.word_splitter(word_splitter);
             }
 
-            writeln!(f, "{}", self.wrap(&note.to_string(), opts))?;
+            writeln!(f, "{}", self.wrap(&note, opts))?;
         }
         Ok(())
     }
