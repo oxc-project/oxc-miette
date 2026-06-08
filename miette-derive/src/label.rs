@@ -207,7 +207,7 @@ impl Labels {
                 use miette::macro_helpers::ToOption;
                 let Self #display_pat = self;
 
-                let labels_iter = vec![
+                let labels_iter = [
                     #(#labels),*
                 ]
                 .into_iter()
@@ -294,7 +294,7 @@ impl Labels {
                         _ => Some(quote! {
                             Self::#variant_name #display_pat => {
                                 use miette::macro_helpers::ToOption;
-                                let labels_iter = vec![
+                                let labels_iter = [
                                     #(#variant_labels),*
                                 ]
                                 .into_iter()

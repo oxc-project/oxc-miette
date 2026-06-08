@@ -294,7 +294,20 @@ macro_rules! diagnostic {
     }};
     ($($key:ident = $value:expr_2021,)+ $fmt:literal $($arg:tt)*) => {{
         let mut diag = $crate::MietteDiagnostic::new(format!($fmt $($arg)*));
-        $(diag.$key = Some($value.into());)*
+        $($crate::__diagnostic_set_field!(diag, $key, $value);)*
         diag
     }};
+}
+
+/// Internal helper for [`diagnostic!`]: assigns a single field, special-casing
+/// `labels` since it is a [`Labels`](crate::Labels), not an `Option`.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __diagnostic_set_field {
+    ($diag:ident, labels, $value:expr_2021) => {
+        $diag.labels = ::core::iter::IntoIterator::into_iter($value).collect();
+    };
+    ($diag:ident, $key:ident, $value:expr_2021) => {
+        $diag.$key = Some($value.into());
+    };
 }
