@@ -376,7 +376,7 @@ pub trait SourceCode: Send + Sync {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LabeledSpan {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    label: Option<Box<str>>,
+    label: Option<String>,
     span: SourceSpan,
     primary: bool,
 }
@@ -384,29 +384,25 @@ pub struct LabeledSpan {
 impl LabeledSpan {
     /// Makes a new labeled span.
     #[must_use]
-    pub fn new(label: Option<String>, offset: ByteOffset, len: u32) -> Self {
-        Self {
-            label: label.map(String::into_boxed_str),
-            span: SourceSpan::new(SourceOffset(offset), len),
-            primary: false,
-        }
+    pub const fn new(label: Option<String>, offset: ByteOffset, len: u32) -> Self {
+        Self { label, span: SourceSpan::new(SourceOffset(offset), len), primary: false }
     }
 
     /// Makes a new labeled span using an existing span.
     #[must_use]
     pub fn new_with_span(label: Option<String>, span: impl Into<SourceSpan>) -> Self {
-        Self { label: label.map(String::into_boxed_str), span: span.into(), primary: false }
+        Self { label, span: span.into(), primary: false }
     }
 
     /// Makes a new labeled primary span using an existing span.
     #[must_use]
     pub fn new_primary_with_span(label: Option<String>, span: impl Into<SourceSpan>) -> Self {
-        Self { label: label.map(String::into_boxed_str), span: span.into(), primary: true }
+        Self { label, span: span.into(), primary: true }
     }
 
     /// Change the text of the label
     pub fn set_label(&mut self, label: Option<String>) {
-        self.label = label.map(String::into_boxed_str);
+        self.label = label;
     }
 
     /// Change the offset of the span
