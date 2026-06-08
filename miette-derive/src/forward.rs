@@ -60,13 +60,13 @@ impl WhichFn {
     pub fn signature(&self) -> TokenStream {
         match self {
             Self::Code => quote! {
-                fn code(& self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
+                fn code(&self) -> std::option::Option<std::borrow::Cow<'_, str>>
             },
             Self::Help => quote! {
-                fn help(& self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
+                fn help(&self) -> std::option::Option<std::borrow::Cow<'_, str>>
             },
             Self::Url => quote! {
-                fn url(& self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>>
+                fn url(&self) -> std::option::Option<std::borrow::Cow<'_, str>>
             },
             Self::Severity => quote! {
                 fn severity(&self) -> std::option::Option<miette::Severity>

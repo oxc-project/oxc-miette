@@ -73,7 +73,7 @@ impl JSONReportHandler {
     ) -> fmt::Result {
         write!(f, r#"{{"message": "{}","#, escape(&diagnostic.to_string()))?;
         if let Some(code) = diagnostic.code() {
-            write!(f, r#""code": "{}","#, escape(&code.to_string()))?;
+            write!(f, r#""code": "{}","#, escape(&code))?;
         }
         let severity = match diagnostic.severity() {
             Some(Severity::Error) | None => "error",
@@ -104,10 +104,10 @@ impl JSONReportHandler {
             write!(f, r#""url": "{}","#, &url.to_string())?;
         }
         if let Some(help) = diagnostic.help() {
-            write!(f, r#""help": "{}","#, escape(&help.to_string()))?;
+            write!(f, r#""help": "{}","#, escape(&help))?;
         }
         if let Some(note) = diagnostic.note() {
-            write!(f, r#""note": "{}","#, escape(&note.to_string()))?;
+            write!(f, r#""note": "{}","#, escape(&note))?;
         }
         let src = diagnostic.source_code().or(parent_src);
         if let Some(src) = src {

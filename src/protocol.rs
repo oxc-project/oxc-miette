@@ -23,7 +23,7 @@ pub trait Diagnostic: std::error::Error {
     /// in the toplevel crate's documentation for easy searching. Rust path
     /// format (`foo::bar::baz`) is recommended, but more classic codes like
     /// `E0123` or enums will work just fine.
-    fn code<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
         None
     }
 
@@ -38,20 +38,20 @@ pub trait Diagnostic: std::error::Error {
 
     /// Additional help text related to this `Diagnostic`. Do you have any
     /// advice for the poor soul who's just run into this issue?
-    fn help<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
         None
     }
 
     /// Supplementary context for this `Diagnostic`, separate from help text.
     /// Notes mirror rustc-style `= note:` lines and offer additional
     /// information when guidance (help) is insufficient.
-    fn note<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+    fn note(&self) -> Option<std::borrow::Cow<'_, str>> {
         None
     }
 
     /// URL to visit for a more detailed explanation/help about this
     /// `Diagnostic`.
-    fn url<'a>(&'a self) -> Option<Box<dyn Display + 'a>> {
+    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
         None
     }
 

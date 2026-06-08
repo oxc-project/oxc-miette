@@ -92,7 +92,7 @@ impl Url {
                     }
                 };
                 Some(quote! {
-                    Self::#ident #pat => std::option::Option::Some(std::boxed::Box::new(format!(#fmt #args))),
+                    Self::#ident #pat => std::option::Option::Some(std::borrow::Cow::Owned(format!(#fmt #args))),
                 })
             },
         )
@@ -125,10 +125,10 @@ impl Url {
             }
         };
         Some(quote! {
-            fn url(&self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>> {
+            fn url(&self) -> std::option::Option<std::borrow::Cow<'_, str>> {
                 #[allow(unused_variables, deprecated)]
                 let Self #pat = self;
-                std::option::Option::Some(std::boxed::Box::new(format!(#fmt #args)))
+                std::option::Option::Some(std::borrow::Cow::Owned(format!(#fmt #args)))
             }
         })
     }

@@ -85,7 +85,7 @@ impl Help {
                     Help::Display(display) => {
                         let (fmt, args) = display.expand_shorthand_cloned(&display_members);
                         Some(quote! {
-                            Self::#ident #display_pat => std::option::Option::Some(std::boxed::Box::new(format!(#fmt #args))),
+                            Self::#ident #display_pat => std::option::Option::Some(std::borrow::Cow::Owned(format!(#fmt #args))),
                         })
                     }
                     Help::Field(member, ty) => {
@@ -99,7 +99,7 @@ impl Help {
                         Some(quote! {
                             Self::#ident #display_pat => {
                                 use miette::macro_helpers::ToOption;
-                                miette::macro_helpers::OptionalWrapper::<#ty>::new().to_option(&#help).as_ref().map(|#var| -> std::boxed::Box<dyn std::fmt::Display + '_> { std::boxed::Box::new(format!("{}", #var)) })
+                                miette::macro_helpers::OptionalWrapper::<#ty>::new().to_option(&#help).as_ref().map(|#var| -> std::borrow::Cow<'_, str> { std::borrow::Cow::Owned(format!("{}", #var)) })
                             },
                         })
                     }
@@ -114,21 +114,21 @@ impl Help {
             Help::Display(display) => {
                 let (fmt, args) = display.expand_shorthand_cloned(&display_members);
                 Some(quote! {
-                    fn help(&self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>> {
+                    fn help(&self) -> std::option::Option<std::borrow::Cow<'_, str>> {
                         #[allow(unused_variables, deprecated)]
                         let Self #display_pat = self;
-                        std::option::Option::Some(std::boxed::Box::new(format!(#fmt #args)))
+                        std::option::Option::Some(std::borrow::Cow::Owned(format!(#fmt #args)))
                     }
                 })
             }
             Help::Field(member, ty) => {
                 let var = quote! { __miette_internal_var };
                 Some(quote! {
-                    fn help(&self) -> std::option::Option<std::boxed::Box<dyn std::fmt::Display + '_>> {
+                    fn help(&self) -> std::option::Option<std::borrow::Cow<'_, str>> {
                         #[allow(unused_variables, deprecated)]
                         let Self #display_pat = self;
                         use miette::macro_helpers::ToOption;
-                        miette::macro_helpers::OptionalWrapper::<#ty>::new().to_option(&self.#member).as_ref().map(|#var| -> std::boxed::Box<dyn std::fmt::Display + '_> { std::boxed::Box::new(format!("{}", #var)) })
+                        miette::macro_helpers::OptionalWrapper::<#ty>::new().to_option(&self.#member).as_ref().map(|#var| -> std::borrow::Cow<'_, str> { std::borrow::Cow::Owned(format!("{}", #var)) })
                     }
                 })
             }

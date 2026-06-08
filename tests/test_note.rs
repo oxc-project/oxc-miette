@@ -223,7 +223,7 @@ mod trait_implementation_tests {
     #[test]
     fn diagnostic_trait_note_method_exists() {
         let diag = MietteDiagnostic::new("test");
-        let _note: Option<Box<dyn std::fmt::Display>> = diag.note();
+        let _note: Option<std::borrow::Cow<'_, str>> = diag.note();
     }
 
     #[test]
