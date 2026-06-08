@@ -37,10 +37,7 @@ pub struct MietteDiagnostic {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub url: Option<String>,
     /// Labels to apply to this `Diagnostic`'s [`Diagnostic::source_code`]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default, skip_serializing_if = "Labels::is_empty")
-    )]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Labels::is_empty"))]
     pub labels: Labels,
 }
 
@@ -188,11 +185,7 @@ impl FromIterator<LabeledSpan> for Labels {
 
 impl From<Vec<LabeledSpan>> for Labels {
     fn from(labels: Vec<LabeledSpan>) -> Self {
-        if labels.len() <= 2 {
-            labels.into_iter().collect()
-        } else {
-            Labels::Many(labels)
-        }
+        if labels.len() <= 2 { labels.into_iter().collect() } else { Labels::Many(labels) }
     }
 }
 

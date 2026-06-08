@@ -62,7 +62,7 @@ pub trait Diagnostic: std::error::Error {
 
     /// Labels to apply to this `Diagnostic`'s [`Diagnostic::source_code`]
     ///
-    /// Returns the owned [`Labels`] container. For the common one/two-label
+    /// Returns the owned [`Labels`](crate::Labels) container. For the common one/two-label
     /// case this is allocation-free (the labels are stored inline), and it
     /// avoids the boxed-iterator allocation the previous signature required.
     fn labels(&self) -> crate::Labels {
