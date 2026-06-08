@@ -127,8 +127,8 @@ impl Diagnostic for CustomDiagnostic {
         Some(&Self::SOURCE_CODE)
     }
 
-    fn related<'a>(&'a self) -> Option<Box<dyn Iterator<Item = &'a dyn Diagnostic> + 'a>> {
-        Some(Box::new(self.related.iter().map(|d| &**d as &'a dyn Diagnostic)))
+    fn related(&self) -> miette::Related<'_> {
+        self.related.iter().map(|d| &**d as &dyn Diagnostic).collect()
     }
 
     fn diagnostic_source(&self) -> Option<&dyn Diagnostic> {

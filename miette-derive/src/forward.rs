@@ -72,7 +72,7 @@ impl WhichFn {
                 fn severity(&self) -> std::option::Option<miette::Severity>
             },
             Self::Related => quote! {
-                fn related(&self) -> std::option::Option<std::boxed::Box<dyn std::iter::Iterator<Item = &dyn miette::Diagnostic> + '_>>
+                fn related(&self) -> miette::Related<'_>
             },
             Self::Labels => quote! {
                 fn labels(&self) -> miette::Labels
@@ -89,6 +89,7 @@ impl WhichFn {
     pub fn catchall_arm(&self) -> TokenStream {
         match self {
             Self::Labels => quote! { _ => miette::Labels::None },
+            Self::Related => quote! { _ => miette::Related::None },
             _ => quote! { _ => std::option::Option::None },
         }
     }

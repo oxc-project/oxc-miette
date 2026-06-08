@@ -70,13 +70,113 @@ pub trait Diagnostic: std::error::Error {
     }
 
     /// Additional related `Diagnostic`s.
-    fn related<'a>(&'a self) -> Option<Box<dyn Iterator<Item = &'a dyn Diagnostic> + 'a>> {
-        None
+    ///
+    /// Returns the owned [`Related`] container. For the common one/two-related
+    /// case this is allocation-free, and it avoids the boxed-iterator
+    /// allocation the previous signature required.
+    fn related(&self) -> Related<'_> {
+        Related::None
     }
 
     /// The cause of the error.
     fn diagnostic_source(&self) -> Option<&dyn Diagnostic> {
         None
+    }
+}
+
+/// Container for a [`Diagnostic`]'s related diagnostics.
+///
+/// Most diagnostics carry only one or two related entries, so those cases are
+/// stored inline without a heap allocation. Three or more spill to a [`Vec`].
+#[derive(Default)]
+pub enum Related<'a> {
+    /// No related diagnostics.
+    #[default]
+    None,
+    /// A single related diagnostic, stored inline.
+    One([&'a dyn Diagnostic; 1]),
+    /// Two related diagnostics, stored inline.
+    Two([&'a dyn Diagnostic; 2]),
+    /// Three or more related diagnostics, stored on the heap.
+    Many(Vec<&'a dyn Diagnostic>),
+}
+
+impl<'a> Related<'a> {
+    /// Returns the related diagnostics as a contiguous slice.
+    #[must_use]
+    pub fn as_slice(&self) -> &[&'a dyn Diagnostic] {
+        match self {
+            Related::None => &[],
+            Related::One(related) => related,
+            Related::Two(related) => related,
+            Related::Many(related) => related,
+        }
+    }
+
+    /// Returns `true` if there are no related diagnostics.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Related::None)
+    }
+
+    /// Returns the number of related diagnostics.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    /// Appends a related diagnostic, keeping the storage inline while possible.
+    pub fn push(&mut self, related: &'a dyn Diagnostic) {
+        if let Related::Many(items) = self {
+            items.push(related);
+            return;
+        }
+        *self = match std::mem::take(self) {
+            Related::None => Related::One([related]),
+            Related::One([a]) => Related::Two([a, related]),
+            Related::Two([a, b]) => Related::Many(vec![a, b, related]),
+            Related::Many(_) => unreachable!("handled by the fast path above"),
+        };
+    }
+}
+
+impl<'a> std::ops::Deref for Related<'a> {
+    type Target = [&'a dyn Diagnostic];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl<'a> Extend<&'a dyn Diagnostic> for Related<'a> {
+    fn extend<I: IntoIterator<Item = &'a dyn Diagnostic>>(&mut self, iter: I) {
+        let mut iter = iter.into_iter();
+        while !matches!(self, Related::Many(_)) {
+            match iter.next() {
+                Some(related) => self.push(related),
+                None => return,
+            }
+        }
+        if let Related::Many(items) = self {
+            items.reserve(iter.size_hint().0);
+            items.extend(iter);
+        }
+    }
+}
+
+impl<'a> FromIterator<&'a dyn Diagnostic> for Related<'a> {
+    fn from_iter<I: IntoIterator<Item = &'a dyn Diagnostic>>(iter: I) -> Self {
+        let mut iter = iter.into_iter();
+        if iter.size_hint().0 > 2 {
+            return Related::Many(iter.collect());
+        }
+        let Some(a) = iter.next() else { return Related::None };
+        let Some(b) = iter.next() else { return Related::One([a]) };
+        let Some(c) = iter.next() else { return Related::Two([a, b]) };
+        let mut items = Vec::with_capacity(3 + iter.size_hint().0);
+        items.extend([a, b, c]);
+        items.extend(iter);
+        Related::Many(items)
     }
 }
 

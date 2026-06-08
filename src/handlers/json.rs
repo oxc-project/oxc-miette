@@ -146,23 +146,21 @@ impl JSONReportHandler {
             }
             write!(f, "],")?;
         }
-        match diagnostic.related() {
-            Some(relates) => {
-                write!(f, r#""related": ["#)?;
-                let mut add_comma = false;
-                for related in relates {
-                    if add_comma {
-                        write!(f, ",")?;
-                    } else {
-                        add_comma = true;
-                    }
-                    self._render_report(f, related, src)?;
+        let relates = diagnostic.related();
+        if relates.is_empty() {
+            write!(f, r#""related": []"#)?;
+        } else {
+            write!(f, r#""related": ["#)?;
+            let mut add_comma = false;
+            for related in relates.iter().copied() {
+                if add_comma {
+                    write!(f, ",")?;
+                } else {
+                    add_comma = true;
                 }
-                write!(f, "]")?;
+                self._render_report(f, related, src)?;
             }
-            _ => {
-                write!(f, r#""related": []"#)?;
-            }
+            write!(f, "]")?;
         }
         write!(f, "}}")
     }

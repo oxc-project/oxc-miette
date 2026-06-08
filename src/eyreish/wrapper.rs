@@ -60,7 +60,7 @@ impl Diagnostic for BoxedError {
         self.0.source_code()
     }
 
-    fn related<'a>(&'a self) -> Option<Box<dyn Iterator<Item = &'a dyn Diagnostic> + 'a>> {
+    fn related(&self) -> crate::Related<'_> {
         self.0.related()
     }
 
@@ -131,7 +131,7 @@ impl<E: Diagnostic, C: SourceCode> Diagnostic for WithSourceCode<E, C> {
         self.error.source_code().or(Some(&self.source_code))
     }
 
-    fn related<'a>(&'a self) -> Option<Box<dyn Iterator<Item = &'a dyn Diagnostic> + 'a>> {
+    fn related(&self) -> crate::Related<'_> {
         self.error.related()
     }
 
@@ -169,7 +169,7 @@ impl<C: SourceCode> Diagnostic for WithSourceCode<Report, C> {
         self.error.source_code().or(Some(&self.source_code))
     }
 
-    fn related<'a>(&'a self) -> Option<Box<dyn Iterator<Item = &'a dyn Diagnostic> + 'a>> {
+    fn related(&self) -> crate::Related<'_> {
         self.error.related()
     }
 
@@ -233,8 +233,8 @@ mod tests {
     }
 
     impl Diagnostic for Outer {
-        fn related<'a>(&'a self) -> Option<Box<dyn Iterator<Item = &'a dyn Diagnostic> + 'a>> {
-            Some(Box::new(self.errors.iter().map(|e| e as _)))
+        fn related(&self) -> crate::Related<'_> {
+            self.errors.iter().map(|e| e as &dyn Diagnostic).collect()
         }
     }
 
