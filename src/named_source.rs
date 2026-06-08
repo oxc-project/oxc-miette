@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{MietteError, MietteSpanContents, SourceCode, SpanContents};
 
 /// Utility struct for when you have a regular [`SourceCode`] type that doesn't
@@ -59,7 +61,7 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
         let inner_contents =
             self.inner().read_span(span, context_lines_before, context_lines_after)?;
         let mut contents = MietteSpanContents::new_named(
-            std::borrow::Cow::Borrowed(self.name.as_str()),
+            Cow::Borrowed(self.name.as_str()),
             inner_contents.data(),
             *inner_contents.span(),
             inner_contents.line(),

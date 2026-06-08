@@ -1,5 +1,5 @@
 use core::fmt::{self, Debug, Display, Write};
-use std::error::Error as StdError;
+use std::{borrow::Cow, error::Error as StdError};
 
 use super::{
     Report, WrapErr,
@@ -126,7 +126,7 @@ where
     D: Display,
     E: Diagnostic + 'static,
 {
-    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn code(&self) -> Option<Cow<'_, str>> {
         self.error.code()
     }
 
@@ -134,11 +134,11 @@ where
         self.error.severity()
     }
 
-    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn help(&self) -> Option<Cow<'_, str>> {
         self.error.help()
     }
 
-    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn url(&self) -> Option<Cow<'_, str>> {
         self.error.url()
     }
 
@@ -159,7 +159,7 @@ impl<D> Diagnostic for ContextError<D, Report>
 where
     D: Display,
 {
-    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn code(&self) -> Option<Cow<'_, str>> {
         unsafe { ErrorImpl::diagnostic(self.error.inner.by_ref()).code() }
     }
 
@@ -167,11 +167,11 @@ where
         unsafe { ErrorImpl::diagnostic(self.error.inner.by_ref()).severity() }
     }
 
-    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn help(&self) -> Option<Cow<'_, str>> {
         unsafe { ErrorImpl::diagnostic(self.error.inner.by_ref()).help() }
     }
 
-    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn url(&self) -> Option<Cow<'_, str>> {
         unsafe { ErrorImpl::diagnostic(self.error.inner.by_ref()).url() }
     }
 

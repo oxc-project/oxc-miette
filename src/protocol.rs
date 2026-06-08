@@ -4,6 +4,7 @@ traits that you can implement to get access to miette's (and related library's)
 full reporting and such features.
 */
 use std::{
+    borrow::Cow,
     fmt::{self, Display},
     fs,
     panic::Location,
@@ -23,7 +24,7 @@ pub trait Diagnostic: std::error::Error {
     /// in the toplevel crate's documentation for easy searching. Rust path
     /// format (`foo::bar::baz`) is recommended, but more classic codes like
     /// `E0123` or enums will work just fine.
-    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn code(&self) -> Option<Cow<'_, str>> {
         None
     }
 
@@ -38,20 +39,20 @@ pub trait Diagnostic: std::error::Error {
 
     /// Additional help text related to this `Diagnostic`. Do you have any
     /// advice for the poor soul who's just run into this issue?
-    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn help(&self) -> Option<Cow<'_, str>> {
         None
     }
 
     /// Supplementary context for this `Diagnostic`, separate from help text.
     /// Notes mirror rustc-style `= note:` lines and offer additional
     /// information when guidance (help) is insufficient.
-    fn note(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn note(&self) -> Option<Cow<'_, str>> {
         None
     }
 
     /// URL to visit for a more detailed explanation/help about this
     /// `Diagnostic`.
-    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
+    fn url(&self) -> Option<Cow<'_, str>> {
         None
     }
 
@@ -601,9 +602,9 @@ pub struct MietteSpanContents<'a> {
     // Number of line in this snippet.
     line_count: usize,
     // Optional filename
-    name: Option<std::borrow::Cow<'a, str>>,
+    name: Option<Cow<'a, str>>,
     // Optional language
-    language: Option<std::borrow::Cow<'a, str>>,
+    language: Option<Cow<'a, str>>,
 }
 
 impl<'a> MietteSpanContents<'a> {
@@ -620,7 +621,7 @@ impl<'a> MietteSpanContents<'a> {
 
     /// Make a new [`MietteSpanContents`] object, with a name for its 'file'.
     pub const fn new_named(
-        name: std::borrow::Cow<'a, str>,
+        name: Cow<'a, str>,
         data: &'a [u8],
         span: SourceSpan,
         line: usize,
@@ -640,7 +641,7 @@ impl<'a> MietteSpanContents<'a> {
 
     /// Sets the `language` for syntax highlighting.
     #[must_use]
-    pub fn with_language(mut self, language: impl Into<std::borrow::Cow<'a, str>>) -> Self {
+    pub fn with_language(mut self, language: impl Into<Cow<'a, str>>) -> Self {
         self.language = Some(language.into());
         self
     }

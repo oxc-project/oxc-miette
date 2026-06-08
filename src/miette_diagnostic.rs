@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     error::Error,
     fmt::{Debug, Display},
 };
@@ -233,24 +234,24 @@ impl Display for MietteDiagnostic {
 impl Error for MietteDiagnostic {}
 
 impl Diagnostic for MietteDiagnostic {
-    fn code(&self) -> Option<std::borrow::Cow<'_, str>> {
-        self.code.as_deref().map(std::borrow::Cow::Borrowed)
+    fn code(&self) -> Option<Cow<'_, str>> {
+        self.code.as_deref().map(Cow::Borrowed)
     }
 
     fn severity(&self) -> Option<Severity> {
         self.severity
     }
 
-    fn help(&self) -> Option<std::borrow::Cow<'_, str>> {
-        self.help.as_deref().map(std::borrow::Cow::Borrowed)
+    fn help(&self) -> Option<Cow<'_, str>> {
+        self.help.as_deref().map(Cow::Borrowed)
     }
 
-    fn note(&self) -> Option<std::borrow::Cow<'_, str>> {
-        self.note.as_deref().map(std::borrow::Cow::Borrowed)
+    fn note(&self) -> Option<Cow<'_, str>> {
+        self.note.as_deref().map(Cow::Borrowed)
     }
 
-    fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
-        self.url.as_deref().map(std::borrow::Cow::Borrowed)
+    fn url(&self) -> Option<Cow<'_, str>> {
+        self.url.as_deref().map(Cow::Borrowed)
     }
 
     fn labels(&self) -> Labels {
