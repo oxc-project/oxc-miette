@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fmt::{self, Write},
     io::IsTerminal,
 };
@@ -475,14 +476,14 @@ impl GraphicalReportHandler {
         }
         labels.sort_unstable_by_key(|l| l.inner().offset());
 
-        let mut contexts = Vec::with_capacity(labels.len());
-        for right in labels.iter().cloned() {
+        let mut contexts: Vec<(Cow<'_, LabeledSpan>, _)> = Vec::with_capacity(labels.len());
+        for right in labels.iter() {
             let right_conts = source
                 .read_span(right.inner(), self.context_lines, self.context_lines)
                 .map_err(|_| fmt::Error)?;
 
             if contexts.is_empty() {
-                contexts.push((right, right_conts));
+                contexts.push((Cow::Borrowed(right), right_conts));
                 continue;
             }
 
@@ -504,12 +505,12 @@ impl GraphicalReportHandler {
                 {
                     contexts.pop();
                     // We'll throw the contents away later
-                    contexts.push((new_span, new_conts));
+                    contexts.push((Cow::Owned(new_span), new_conts));
                     continue;
                 }
             }
 
-            contexts.push((right, right_conts));
+            contexts.push((Cow::Borrowed(right), right_conts));
         }
         for (ctx, _) in contexts {
             self.render_context(f, source, &ctx, &labels[..])?;
