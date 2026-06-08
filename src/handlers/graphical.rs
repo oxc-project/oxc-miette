@@ -1137,7 +1137,7 @@ impl GraphicalReportHandler {
                     )?;
                 } else {
                     let mut first = true;
-                    for label_line in &label {
+                    for label_line in label {
                         self.write_label_text(
                             f,
                             line,
@@ -1402,25 +1402,21 @@ impl PartialEq for FancySpan {
     }
 }
 
-fn split_label(v: &str) -> Vec<String> {
-    v.split('\n').map(|i| i.to_string()).collect()
+fn split_label(v: &str, style: Style) -> Vec<String> {
+    v.split('\n').map(|i| i.style(style).to_string()).collect()
 }
 
 impl FancySpan {
     fn new(label: Option<&str>, span: SourceSpan, style: Style) -> Self {
-        FancySpan { label: label.map(split_label), span, style }
-    }
-
-    fn style(&self) -> Style {
-        self.style
+        FancySpan { label: label.map(|l| split_label(l, style)), span, style }
     }
 
     fn has_label(&self) -> bool {
         self.label.is_some()
     }
 
-    fn label_parts(&self) -> Option<Vec<String>> {
-        self.label.as_ref().map(|l| l.iter().map(|i| i.style(self.style()).to_string()).collect())
+    fn label_parts(&self) -> Option<&[String]> {
+        self.label.as_deref()
     }
 
     fn offset(&self) -> usize {
