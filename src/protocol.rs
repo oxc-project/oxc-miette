@@ -61,8 +61,12 @@ pub trait Diagnostic: std::error::Error {
     }
 
     /// Labels to apply to this `Diagnostic`'s [`Diagnostic::source_code`]
-    fn labels(&self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + '_>> {
-        None
+    ///
+    /// Returns the owned [`Labels`](crate::Labels) container. For the common one/two-label
+    /// case this is allocation-free (the labels are stored inline), and it
+    /// avoids the boxed-iterator allocation the previous signature required.
+    fn labels(&self) -> crate::Labels {
+        crate::Labels::None
     }
 
     /// Additional related `Diagnostic`s.
@@ -272,7 +276,7 @@ pub trait SourceCode: Send + Sync {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LabeledSpan {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    label: Option<String>,
+    label: Option<Box<str>>,
     span: SourceSpan,
     primary: bool,
 }
@@ -280,25 +284,29 @@ pub struct LabeledSpan {
 impl LabeledSpan {
     /// Makes a new labeled span.
     #[must_use]
-    pub const fn new(label: Option<String>, offset: ByteOffset, len: u32) -> Self {
-        Self { label, span: SourceSpan::new(SourceOffset(offset), len), primary: false }
+    pub fn new(label: Option<String>, offset: ByteOffset, len: u32) -> Self {
+        Self {
+            label: label.map(String::into_boxed_str),
+            span: SourceSpan::new(SourceOffset(offset), len),
+            primary: false,
+        }
     }
 
     /// Makes a new labeled span using an existing span.
     #[must_use]
     pub fn new_with_span(label: Option<String>, span: impl Into<SourceSpan>) -> Self {
-        Self { label, span: span.into(), primary: false }
+        Self { label: label.map(String::into_boxed_str), span: span.into(), primary: false }
     }
 
     /// Makes a new labeled primary span using an existing span.
     #[must_use]
     pub fn new_primary_with_span(label: Option<String>, span: impl Into<SourceSpan>) -> Self {
-        Self { label, span: span.into(), primary: true }
+        Self { label: label.map(String::into_boxed_str), span: span.into(), primary: true }
     }
 
     /// Change the text of the label
     pub fn set_label(&mut self, label: Option<String>) {
-        self.label = label;
+        self.label = label.map(String::into_boxed_str);
     }
 
     /// Change the offset of the span

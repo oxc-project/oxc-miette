@@ -5,7 +5,7 @@ use super::{
     Report, WrapErr,
     error::{ContextError, ErrorImpl},
 };
-use crate::{Diagnostic, LabeledSpan};
+use crate::Diagnostic;
 
 mod ext {
     use super::*;
@@ -142,7 +142,7 @@ where
         self.error.url()
     }
 
-    fn labels<'a>(&'a self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + 'a>> {
+    fn labels(&self) -> crate::Labels {
         self.error.labels()
     }
 
@@ -175,7 +175,7 @@ where
         unsafe { ErrorImpl::diagnostic(self.error.inner.by_ref()).url() }
     }
 
-    fn labels<'a>(&'a self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + 'a>> {
+    fn labels(&self) -> crate::Labels {
         unsafe { ErrorImpl::diagnostic(self.error.inner.by_ref()).labels() }
     }
 

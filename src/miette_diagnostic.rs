@@ -37,8 +37,191 @@ pub struct MietteDiagnostic {
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub url: Option<String>,
     /// Labels to apply to this `Diagnostic`'s [`Diagnostic::source_code`]
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    pub labels: Option<Vec<LabeledSpan>>,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Labels::is_empty"))]
+    pub labels: Labels,
+}
+
+/// Container for a [`MietteDiagnostic`]'s labels.
+///
+/// Most diagnostics carry only one or two labels, so those cases are stored
+/// inline without a heap allocation. Diagnostics with three or more labels spill
+/// to a [`Vec`].
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum Labels {
+    /// No labels.
+    #[default]
+    None,
+    /// A single label, stored inline.
+    One([LabeledSpan; 1]),
+    /// Two labels, stored inline.
+    Two([LabeledSpan; 2]),
+    /// Three or more labels, stored on the heap.
+    Many(Vec<LabeledSpan>),
+}
+
+impl Labels {
+    /// Returns the labels as a contiguous slice.
+    #[must_use]
+    pub fn as_slice(&self) -> &[LabeledSpan] {
+        match self {
+            Labels::None => &[],
+            Labels::One(labels) => labels,
+            Labels::Two(labels) => labels,
+            Labels::Many(labels) => labels,
+        }
+    }
+
+    /// Returns the labels as a mutable contiguous slice.
+    #[must_use]
+    pub fn as_mut_slice(&mut self) -> &mut [LabeledSpan] {
+        match self {
+            Labels::None => &mut [],
+            Labels::One(labels) => labels,
+            Labels::Two(labels) => labels,
+            Labels::Many(labels) => labels,
+        }
+    }
+
+    /// Returns `true` if there are no labels.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Labels::None)
+    }
+
+    /// Returns the number of labels.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    /// Appends a label, keeping the storage inline while possible.
+    pub fn push(&mut self, label: LabeledSpan) {
+        // Fast path: already on the heap, push in place without moving the `Vec`.
+        if let Labels::Many(labels) = self {
+            labels.push(label);
+            return;
+        }
+        *self = match std::mem::take(self) {
+            Labels::None => Labels::One([label]),
+            Labels::One([a]) => Labels::Two([a, label]),
+            Labels::Two([a, b]) => Labels::Many(vec![a, b, label]),
+            Labels::Many(_) => unreachable!("handled by the fast path above"),
+        };
+    }
+}
+
+impl std::ops::Deref for Labels {
+    type Target = [LabeledSpan];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl std::ops::DerefMut for Labels {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
+    }
+}
+
+impl<'a> IntoIterator for &'a Labels {
+    type Item = &'a LabeledSpan;
+    type IntoIter = std::slice::Iter<'a, LabeledSpan>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Labels {
+    type Item = &'a mut LabeledSpan;
+    type IntoIter = std::slice::IterMut<'a, LabeledSpan>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
+    }
+}
+
+impl Extend<LabeledSpan> for Labels {
+    fn extend<I: IntoIterator<Item = LabeledSpan>>(&mut self, iter: I) {
+        let mut iter = iter.into_iter();
+        // Fill the inline tiers first — allocation-free while staying at 1-2.
+        while !matches!(self, Labels::Many(_)) {
+            match iter.next() {
+                Some(label) => self.push(label),
+                None => return,
+            }
+        }
+        // Once on the heap, reserve once and bulk-extend instead of re-growing
+        // the `Vec` on every element.
+        if let Labels::Many(labels) = self {
+            labels.reserve(iter.size_hint().0);
+            labels.extend(iter);
+        }
+    }
+}
+
+impl FromIterator<LabeledSpan> for Labels {
+    fn from_iter<I: IntoIterator<Item = LabeledSpan>>(iter: I) -> Self {
+        let mut iter = iter.into_iter();
+        // If the iterator already reports more than two elements, it will spill
+        // to the heap regardless, so collect straight into a `Vec`. For a
+        // `vec::IntoIter` source `collect` reuses the original allocation, so
+        // `with_labels(vec)` does not allocate at all.
+        if iter.size_hint().0 > 2 {
+            return Labels::Many(iter.collect());
+        }
+        // Otherwise pull up to three elements to pick the smallest variant
+        // that fits without allocating for the common one/two-label cases.
+        let Some(a) = iter.next() else { return Labels::None };
+        let Some(b) = iter.next() else { return Labels::One([a]) };
+        let Some(c) = iter.next() else { return Labels::Two([a, b]) };
+        let mut labels = Vec::with_capacity(3 + iter.size_hint().0);
+        labels.extend([a, b, c]);
+        labels.extend(iter);
+        Labels::Many(labels)
+    }
+}
+
+impl From<Vec<LabeledSpan>> for Labels {
+    fn from(labels: Vec<LabeledSpan>) -> Self {
+        if labels.len() <= 2 { labels.into_iter().collect() } else { Labels::Many(labels) }
+    }
+}
+
+impl From<LabeledSpan> for Labels {
+    fn from(label: LabeledSpan) -> Self {
+        Labels::One([label])
+    }
+}
+
+impl From<[LabeledSpan; 1]> for Labels {
+    fn from(labels: [LabeledSpan; 1]) -> Self {
+        Labels::One(labels)
+    }
+}
+
+impl From<[LabeledSpan; 2]> for Labels {
+    fn from(labels: [LabeledSpan; 2]) -> Self {
+        Labels::Two(labels)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for Labels {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.as_slice().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Labels {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        // Accept both a sequence and `null` (the latter mirrors the previous
+        // `Option<Vec<LabeledSpan>>` representation).
+        let labels = Option::<Vec<LabeledSpan>>::deserialize(deserializer)?;
+        Ok(labels.map_or(Labels::None, Labels::from))
+    }
 }
 
 impl Display for MietteDiagnostic {
@@ -70,12 +253,8 @@ impl Diagnostic for MietteDiagnostic {
         self.url.as_ref().map(Box::new).map(|c| c as Box<dyn Display>)
     }
 
-    fn labels(&self) -> Option<Box<dyn Iterator<Item = LabeledSpan> + '_>> {
-        self.labels
-            .as_ref()
-            .map(|ls| ls.iter().cloned())
-            .map(Box::new)
-            .map(|b| b as Box<dyn Iterator<Item = LabeledSpan>>)
+    fn labels(&self) -> Labels {
+        self.labels.clone()
     }
 }
 
@@ -94,7 +273,7 @@ impl MietteDiagnostic {
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
-            labels: None,
+            labels: Labels::None,
             severity: None,
             code: None,
             help: None,
@@ -201,11 +380,11 @@ impl MietteDiagnostic {
     /// let label = LabeledSpan::at(0..3, "This should be Rust");
     /// let diag = MietteDiagnostic::new("Wrong best language").with_label(label.clone());
     /// assert_eq!(diag.message, "Wrong best language");
-    /// assert_eq!(diag.labels, Some(vec![label]));
+    /// assert_eq!(diag.labels.as_slice(), &[label]);
     /// ```
     #[must_use]
     pub fn with_label(mut self, label: impl Into<LabeledSpan>) -> Self {
-        self.labels = Some(vec![label.into()]);
+        self.labels = Labels::One([label.into()]);
         self
     }
 
@@ -225,11 +404,11 @@ impl MietteDiagnostic {
     /// ];
     /// let diag = MietteDiagnostic::new("Typos in 'hello world'").with_labels(labels.clone());
     /// assert_eq!(diag.message, "Typos in 'hello world'");
-    /// assert_eq!(diag.labels, Some(labels));
+    /// assert_eq!(diag.labels.as_slice(), labels.as_slice());
     /// ```
     #[must_use]
     pub fn with_labels(mut self, labels: impl IntoIterator<Item = LabeledSpan>) -> Self {
-        self.labels = Some(labels.into_iter().collect());
+        self.labels = labels.into_iter().collect();
         self
     }
 
@@ -247,13 +426,11 @@ impl MietteDiagnostic {
     ///     .and_label(label1.clone())
     ///     .and_label(label2.clone());
     /// assert_eq!(diag.message, "Typos in 'hello world'");
-    /// assert_eq!(diag.labels, Some(vec![label1, label2]));
+    /// assert_eq!(diag.labels.as_slice(), &[label1, label2]);
     /// ```
     #[must_use]
     pub fn and_label(mut self, label: impl Into<LabeledSpan>) -> Self {
-        let mut labels = self.labels.unwrap_or_default();
-        labels.push(label.into());
-        self.labels = Some(labels);
+        self.labels.push(label.into());
         self
     }
 
@@ -272,13 +449,11 @@ impl MietteDiagnostic {
     ///     .and_label(label1.clone())
     ///     .and_labels([label2.clone(), label3.clone()]);
     /// assert_eq!(diag.message, "Typos in 'hello world!'");
-    /// assert_eq!(diag.labels, Some(vec![label1, label2, label3]));
+    /// assert_eq!(diag.labels.as_slice(), &[label1, label2, label3]);
     /// ```
     #[must_use]
     pub fn and_labels(mut self, labels: impl IntoIterator<Item = LabeledSpan>) -> Self {
-        let mut all_labels = self.labels.unwrap_or_default();
-        all_labels.extend(labels);
-        self.labels = Some(all_labels);
+        self.labels.extend(labels);
         self
     }
 }

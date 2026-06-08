@@ -28,7 +28,8 @@ fn attr_collection_in_enum() {
         highlight: (9, 4).into(),
         highlight2: vec![(1, 2).into(), (3, 4).into()],
     };
-    let mut label_iter = err.labels().unwrap();
+    let labels = err.labels();
+    let mut label_iter = labels.iter().cloned();
     let err_span = label_iter.next().unwrap();
     let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
@@ -59,7 +60,8 @@ fn attr_collection_in_struct() {
         highlight: (9, 4).into(),
         highlight2: vec![(1, 2).into(), (3, 4).into()],
     };
-    let mut label_iter = err.labels().unwrap();
+    let labels = err.labels();
+    let mut label_iter = labels.iter().cloned();
     let err_span = label_iter.next().unwrap();
     let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
@@ -90,7 +92,8 @@ fn attr_collection_as_deque() {
         highlight: (9, 4).into(),
         highlight2: VecDeque::from([(1, 2).into(), (3, 4).into()]),
     };
-    let mut label_iter = err.labels().unwrap();
+    let labels = err.labels();
+    let mut label_iter = labels.iter().cloned();
     let err_span = label_iter.next().unwrap();
     let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
@@ -121,7 +124,8 @@ fn attr_collection_as_linked_list() {
         highlight: (9, 4).into(),
         highlight2: LinkedList::from([(1, 2).into(), (3, 4).into()]),
     };
-    let mut label_iter = err.labels().unwrap();
+    let labels = err.labels();
+    let mut label_iter = labels.iter().cloned();
     let err_span = label_iter.next().unwrap();
     let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
@@ -152,7 +156,8 @@ fn attr_collection_of_tuple() {
         highlight: (9, 4).into(),
         highlight2: vec![(1, 2), (3, 4)],
     };
-    let mut label_iter = err.labels().unwrap();
+    let labels = err.labels();
+    let mut label_iter = labels.iter().cloned();
     let err_span = label_iter.next().unwrap();
     let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
@@ -183,7 +188,8 @@ fn attr_collection_of_range() {
         highlight: (9, 4).into(),
         highlight2: vec![1..3, 3..7],
     };
-    let mut label_iter = err.labels().unwrap();
+    let labels = err.labels();
+    let mut label_iter = labels.iter().cloned();
     let err_span = label_iter.next().unwrap();
     let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
@@ -217,7 +223,8 @@ fn attr_collection_of_labeled_span_in_struct() {
             LabeledSpan::new_with_span(None, (3, 4)),
         ],
     };
-    let mut label_iter = err.labels().unwrap();
+    let labels = err.labels();
+    let mut label_iter = labels.iter().cloned();
     let err_span = label_iter.next().unwrap();
     let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
@@ -253,7 +260,8 @@ fn attr_collection_of_labeled_span_in_enum() {
             LabeledSpan::new_with_span(None, (3, 4)),
         ],
     };
-    let mut label_iter = err.labels().unwrap();
+    let labels = err.labels();
+    let mut label_iter = labels.iter().cloned();
     let err_span = label_iter.next().unwrap();
     let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
@@ -287,7 +295,8 @@ fn attr_collection_multi() {
         highlight2: vec![(1, 2).into(), (3, 4).into()],
         highlight3: vec![(5, 6).into(), (7, 8).into()],
     };
-    let mut label_iter = err.labels().unwrap();
+    let labels = err.labels();
+    let mut label_iter = labels.iter().cloned();
     let err_span = label_iter.next().unwrap();
     let expectation = LabeledSpan::new(Some("this bit here".into()), 9u32, 4u32);
     assert_eq!(err_span, expectation);
