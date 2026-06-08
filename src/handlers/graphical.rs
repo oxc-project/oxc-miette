@@ -652,7 +652,7 @@ impl GraphicalReportHandler {
                 )?;
             }
             for hl in multi_line {
-                if hl.label().is_some() && line.span_ends(hl) && !line.span_starts(hl) {
+                if hl.has_label() && line.span_ends(hl) && !line.span_starts(hl) {
                     self.render_multi_line_end(f, &labels, max_gutter, linum_width, line, hl)?;
                 }
             }
@@ -775,7 +775,7 @@ impl GraphicalReportHandler {
                 arrow = true;
                 break;
             } else if line.span_ends(hl) {
-                if hl.label().is_some() {
+                if hl.has_label() {
                     gutter.push_str(&chars.lcross.style(hl.style).to_string());
                 } else {
                     gutter.push_str(&chars.lbot.style(hl.style).to_string());
@@ -1107,7 +1107,7 @@ impl GraphicalReportHandler {
                         chars.underline.to_string().repeat(num_left),
                         if hl.len() == 0 {
                             chars.uarrow
-                        } else if hl.label().is_some() {
+                        } else if hl.has_label() {
                             chars.underbar
                         } else {
                             chars.underline
@@ -1419,8 +1419,8 @@ impl FancySpan {
         self.style
     }
 
-    fn label(&self) -> Option<String> {
-        self.label.as_ref().map(|l| l.join("\n").style(self.style()).to_string())
+    fn has_label(&self) -> bool {
+        self.label.is_some()
     }
 
     fn label_parts(&self) -> Option<Vec<String>> {
