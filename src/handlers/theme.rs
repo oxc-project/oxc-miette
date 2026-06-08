@@ -1,4 +1,7 @@
-use std::{env, io::IsTerminal};
+use std::{
+    env,
+    io::{self, IsTerminal},
+};
 
 use owo_colors::Style;
 
@@ -31,10 +34,8 @@ impl Default for GraphicalTheme {
         if force_color() {
             return Self::unicode();
         }
-        match std::env::var("NO_COLOR") {
-            _ if !std::io::stdout().is_terminal() || !std::io::stderr().is_terminal() => {
-                Self::none()
-            }
+        match env::var("NO_COLOR") {
+            _ if !io::stdout().is_terminal() || !io::stderr().is_terminal() => Self::none(),
             Ok(string) if string != "0" => Self::unicode_nocolor(),
             _ => Self::unicode(),
         }
@@ -46,7 +47,7 @@ impl GraphicalTheme {
         if force_color() {
             return Self::unicode();
         }
-        match std::env::var("NO_COLOR") {
+        match env::var("NO_COLOR") {
             _ if !is_terminal => Self::none(),
             Ok(string) if string != "0" => Self::unicode_nocolor(),
             _ => Self::unicode(),

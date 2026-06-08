@@ -9,7 +9,7 @@ Error enum for miette. Used by certain operations in the protocol.
 */
 #[derive(Debug, Error)]
 pub enum MietteError {
-    /// Wrapper around [`std::io::Error`]. This is returned when something went
+    /// Wrapper around [`io::Error`]. This is returned when something went
     /// wrong while reading a [`SourceCode`](crate::SourceCode).
     #[error(transparent)]
     IoError(#[from] io::Error),

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{env, fmt};
 
 use crate::{
     GraphicalReportHandler, GraphicalTheme, NarratableReportHandler, ReportHandler,
@@ -277,7 +277,7 @@ impl MietteHandlerOpts {
             !force_narrated
         } else if let Some(force_graphical) = self.force_graphical {
             force_graphical
-        } else if let Ok(env) = std::env::var("NO_GRAPHICS") {
+        } else if let Ok(env) = env::var("NO_GRAPHICS") {
             env == "0"
         } else {
             true
