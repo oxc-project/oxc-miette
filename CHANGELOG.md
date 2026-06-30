@@ -61,6 +61,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [3.0.1] - 2026-06-30
+
+### Refactor
+
+- Move long std/core paths to top-level imports ([#196](https://github.com/oxc-project/oxc-miette/pull/196))
+
+### Chore
+
+- Bump cargo-shear to 1.13.1 ([#200](https://github.com/oxc-project/oxc-miette/pull/200))
+
+### CI
+
+- Use latest rust toolchain, drop stale 1.70.0 matrix ([#198](https://github.com/oxc-project/oxc-miette/pull/198))
+- Add crates environment to release workflow
 ## [3.0.0] - 2026-06-08
 
 ### Performance
