@@ -142,8 +142,6 @@ mod miette_diagnostic_tests {
     #[test]
     #[cfg(feature = "serde")]
     fn note_serializes_to_json() {
-        use serde_json::json;
-
         let diag = MietteDiagnostic::new("message").with_note("note text");
         let json = serde_json::to_value(&diag).unwrap();
 
@@ -154,8 +152,6 @@ mod miette_diagnostic_tests {
     #[test]
     #[cfg(feature = "serde")]
     fn note_absent_skips_in_serde() {
-        use serde_json::json;
-
         let diag = MietteDiagnostic::new("message");
         let json = serde_json::to_value(&diag).unwrap();
 

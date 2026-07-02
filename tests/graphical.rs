@@ -1,5 +1,4 @@
 #![cfg(all(feature = "fancy-no-backtrace", not(miri)))]
-#![expect(unused_assignments)]
 
 use miette::{
     Diagnostic, GraphicalReportHandler, GraphicalTheme, MietteError, NamedSource,
