@@ -30,6 +30,7 @@ where
     T: IsOption,
 {
     #[doc(hidden)]
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_option(self, value: &T) -> &T {
         value
     }
