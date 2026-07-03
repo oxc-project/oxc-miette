@@ -12,3 +12,11 @@ under the Apache License. Some code is taken from
 [`ariadne`](https://github.com/zesterer/ariadne), which is MIT licensed.
 
 [`miette!`]: https://docs.rs/miette/latest/miette/macro.miette.html
+
+## ❤ Who's [Sponsoring Oxc](https://github.com/sponsors/Boshen)?
+
+<p align="center">
+  <a href="https://github.com/sponsors/Boshen">
+    <img src="https://raw.githubusercontent.com/Boshen/sponsors/main/sponsors.svg" alt="Our sponsors" />
+  </a>
+</p>
