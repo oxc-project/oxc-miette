@@ -230,7 +230,7 @@ impl<'de> Deserialize<'de> for Labels {
 
 impl Display for MietteDiagnostic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.message)
+        write!(f, "{}", self.message)
     }
 }
 
