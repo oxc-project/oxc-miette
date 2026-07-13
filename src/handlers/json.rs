@@ -102,7 +102,7 @@ impl JSONReportHandler {
             write!(f, r#""causes": [],"#)?;
         }
         if let Some(url) = diagnostic.url() {
-            write!(f, r#""url": "{}","#, &url.to_string())?;
+            write!(f, r#""url": "{}","#, url)?;
         }
         if let Some(help) = diagnostic.help() {
             write!(f, r#""help": "{}","#, escape(&help))?;
