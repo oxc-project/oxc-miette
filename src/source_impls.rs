@@ -15,16 +15,46 @@ fn context_info<'a>(
 ) -> Result<MietteSpanContents<'a>, MietteError> {
     let span_offset = span.offset() as usize;
     let span_len = span.len() as usize;
-    let mut offset = 0usize;
     let mut line_count = 0usize;
     let mut start_line = 0usize;
-    let mut start_column = 0usize;
     let mut before_lines_starts = VecDeque::new();
     let mut current_line_start = 0usize;
     let mut end_lines = 0usize;
     let mut post_span = false;
     let mut post_span_got_newline = false;
-    let mut iter = input.iter().copied().peekable();
+
+    // The byte-by-byte loop below only needs to run from just before the
+    // span to the end of the trailing context: bytes strictly before
+    // `span_offset - 1` can only exercise its "before the span" branches,
+    // so that region is scanned in bulk with memchr instead. `cut` is
+    // adjusted so a CRLF pair is never split across the boundary.
+    let mut cut = span_offset.saturating_sub(1).min(input.len());
+    if cut > 0 && input[cut - 1] == b'\r' {
+        cut -= 1;
+    }
+    let mut skip_lf_at = usize::MAX;
+    for pos in memchr::memchr2_iter(b'\r', b'\n', &input[..cut]) {
+        if pos == skip_lf_at {
+            continue;
+        }
+        // A CRLF pair counts as a single line break, ending at the `\n`.
+        let mut line_end = pos;
+        if input[pos] == b'\r' && pos + 1 < cut && input[pos + 1] == b'\n' {
+            line_end = pos + 1;
+            skip_lf_at = pos + 1;
+        }
+        line_count += 1;
+        before_lines_starts.push_back(current_line_start);
+        if before_lines_starts.len() > context_lines_before {
+            start_line += 1;
+            before_lines_starts.pop_front();
+        }
+        current_line_start = line_end + 1;
+    }
+    // `current_line_start..cut` contains no line breaks.
+    let mut start_column = cut - current_line_start;
+    let mut offset = cut;
+    let mut iter = input[cut..].iter().copied().peekable();
     while let Some(char) = iter.next() {
         if matches!(char, b'\r' | b'\n') {
             line_count += 1;
@@ -77,6 +107,11 @@ fn context_info<'a>(
             .front()
             .copied()
             .unwrap_or(if context_lines_before == 0 { span_offset } else { 0 });
+        // A zero-length span starting just past the end of the input passes
+        // the check above but has no content to slice.
+        if starting_offset > offset {
+            return Err(MietteError::OutOfBounds);
+        }
         Ok(MietteSpanContents::new(
             &input[starting_offset..offset],
             (starting_offset as u32, (offset - starting_offset) as u32).into(),
@@ -275,6 +310,16 @@ mod tests {
         let span: SourceSpan = (8, 14).into();
         assert_eq!(&span, contents.span());
         Ok(())
+    }
+
+    #[test]
+    fn zero_length_span_just_past_eof() {
+        // Used to panic with a slice out-of-range instead of returning an
+        // error (found by differential fuzzing).
+        let src = String::from("a");
+        assert!(matches!(src.read_span(&(2, 0).into(), 0, 0), Err(MietteError::OutOfBounds)));
+        let src = String::new();
+        assert!(matches!(src.read_span(&(1, 0).into(), 0, 0), Err(MietteError::OutOfBounds)));
     }
 
     #[test]

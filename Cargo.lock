@@ -302,6 +302,7 @@ dependencies = [
  "indenter",
  "insta",
  "lazy_static",
+ "memchr",
  "owo-colors",
  "oxc-miette-derive",
  "regex",
