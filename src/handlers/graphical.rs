@@ -506,7 +506,6 @@ impl GraphicalReportHandler {
                     source.read_span(new_span.inner(), self.context_lines, self.context_lines)
                 {
                     contexts.pop();
-                    // We'll throw the contents away later
                     contexts.push((Cow::Owned(new_span), new_conts));
                     continue;
                 }
@@ -514,8 +513,8 @@ impl GraphicalReportHandler {
 
             contexts.push((Cow::Borrowed(right), right_conts));
         }
-        for (ctx, _) in contexts {
-            self.render_context(f, source, &ctx, &labels[..])?;
+        for (ctx, conts) in contexts {
+            self.render_context(f, source, &ctx, conts, &labels[..])?;
         }
 
         Ok(())
@@ -526,9 +525,10 @@ impl GraphicalReportHandler {
         f: &mut impl fmt::Write,
         source: &dyn SourceCode,
         context: &LabeledSpan,
+        contents: MietteSpanContents<'_>,
         labels: &[LabeledSpan],
     ) -> fmt::Result {
-        let (contents, lines) = self.get_lines(source, context.inner())?;
+        let lines = self.get_lines(&contents);
 
         // only consider labels from the context as primary label
         let ctx_labels = labels.iter().filter(|l| {
@@ -1239,14 +1239,11 @@ impl GraphicalReportHandler {
         Ok(())
     }
 
-    fn get_lines<'a>(
-        &'a self,
-        source: &'a dyn SourceCode,
-        context_span: &'a SourceSpan,
-    ) -> Result<(MietteSpanContents<'a>, Vec<Line<'a>>), fmt::Error> {
-        let context_data = source
-            .read_span(context_span, self.context_lines, self.context_lines)
-            .map_err(|_| fmt::Error)?;
+    /// Splits already-read span contents into [`Line`]s. Takes the contents
+    /// produced by the `read_span` call in [`Self::render_snippets`] so the
+    /// span doesn't have to be re-read (each read is a scan of the source up
+    /// to the span).
+    fn get_lines<'a>(&self, context_data: &MietteSpanContents<'a>) -> Vec<Line<'a>> {
         let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
         let mut line = context_data.line();
         let mut column = context_data.column();
@@ -1305,7 +1302,7 @@ impl GraphicalReportHandler {
                 line_offset = offset;
             }
         }
-        Ok((context_data, lines))
+        lines
     }
 }
 

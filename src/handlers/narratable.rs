@@ -3,8 +3,7 @@ use std::{fmt, str::from_utf8};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
-    LabeledSpan, MietteError, MietteSpanContents, ReportHandler, SourceCode, SourceSpan,
-    SpanContents,
+    LabeledSpan, MietteSpanContents, ReportHandler, SourceCode, SourceSpan, SpanContents,
     diagnostic_chain::DiagnosticChain,
     protocol::{Diagnostic, Severity},
 };
@@ -165,57 +164,50 @@ impl NarratableReportHandler {
                 let mut labels = diagnostic.labels();
                 labels.sort_unstable_by_key(|l| l.inner().offset());
                 if !labels.is_empty() {
-                    let contents = labels
-                        .iter()
-                        .map(|label| {
-                            source.read_span(label.inner(), self.context_lines, self.context_lines)
-                        })
-                        .collect::<Result<Vec<MietteSpanContents<'_>>, MietteError>>()
-                        .map_err(|_| fmt::Error)?;
-                    let mut contexts = Vec::new();
-                    for (right, right_conts) in labels.iter().cloned().zip(contents.iter()) {
+                    let mut contexts: Vec<(LabeledSpan, MietteSpanContents<'_>)> =
+                        Vec::with_capacity(labels.len());
+                    for right in labels.iter() {
+                        let right_conts = source
+                            .read_span(right.inner(), self.context_lines, self.context_lines)
+                            .map_err(|_| fmt::Error)?;
+
                         if contexts.is_empty() {
-                            contexts.push((right, right_conts));
-                        } else {
-                            let (left, left_conts) = contexts.last().unwrap().clone();
+                            contexts.push((right.clone(), right_conts));
+                            continue;
+                        }
+
+                        let (left, left_conts) = contexts.last().unwrap();
+                        if left_conts.line() + left_conts.line_count() >= right_conts.line() {
+                            // The snippets will overlap, so we create one Big Chunky Boi
                             let left_end = left.offset() + left.len();
                             let right_end = right.offset() + right.len();
-                            if left_conts.line() + left_conts.line_count() >= right_conts.line() {
-                                // The snippets will overlap, so we create one Big Chunky Boi
-                                let new_span = LabeledSpan::new(
-                                    left.label().map(String::from),
-                                    left.offset(),
-                                    if right_end >= left_end {
-                                        // Right end goes past left end
-                                        right_end - left.offset()
-                                    } else {
-                                        // right is contained inside left
-                                        left.len()
-                                    },
-                                );
-                                if source
-                                    .read_span(
-                                        new_span.inner(),
-                                        self.context_lines,
-                                        self.context_lines,
-                                    )
-                                    .is_ok()
-                                {
-                                    contexts.pop();
-                                    contexts.push((
-                                        new_span, // We'll throw this away later
-                                        left_conts,
-                                    ));
+                            let new_span = LabeledSpan::new(
+                                left.label().map(String::from),
+                                left.offset(),
+                                if right_end >= left_end {
+                                    // Right end goes past left end
+                                    right_end - left.offset()
                                 } else {
-                                    contexts.push((right, right_conts));
-                                }
-                            } else {
-                                contexts.push((right, right_conts));
+                                    // right is contained inside left
+                                    left.len()
+                                },
+                            );
+                            // Check that the two contexts can be combined
+                            if let Ok(new_conts) = source.read_span(
+                                new_span.inner(),
+                                self.context_lines,
+                                self.context_lines,
+                            ) {
+                                contexts.pop();
+                                contexts.push((new_span, new_conts));
+                                continue;
                             }
                         }
+
+                        contexts.push((right.clone(), right_conts));
                     }
-                    for (ctx, _) in contexts {
-                        self.render_context(f, source, &ctx, &labels[..])?;
+                    for (_, conts) in contexts {
+                        self.render_context(f, conts, &labels[..])?;
                     }
                 }
             }
@@ -226,11 +218,10 @@ impl NarratableReportHandler {
     fn render_context(
         &self,
         f: &mut impl fmt::Write,
-        source: &dyn SourceCode,
-        context: &LabeledSpan,
+        contents: MietteSpanContents<'_>,
         labels: &[LabeledSpan],
     ) -> fmt::Result {
-        let (contents, lines) = self.get_lines(source, context.inner())?;
+        let lines = self.get_lines(&contents);
         write!(f, "Begin snippet")?;
         if let Some(filename) = contents.name() {
             write!(f, " for {filename}")?;
@@ -277,14 +268,11 @@ impl NarratableReportHandler {
         Ok(())
     }
 
-    fn get_lines<'a>(
-        &'a self,
-        source: &'a dyn SourceCode,
-        context_span: &'a SourceSpan,
-    ) -> Result<(MietteSpanContents<'a>, Vec<Line<'a>>), fmt::Error> {
-        let context_data = source
-            .read_span(context_span, self.context_lines, self.context_lines)
-            .map_err(|_| fmt::Error)?;
+    /// Splits already-read span contents into [`Line`]s. Takes the contents
+    /// produced by the `read_span` call in [`Self::render_snippets`] so the
+    /// span doesn't have to be re-read (each read is a scan of the source up
+    /// to the span).
+    fn get_lines<'a>(&self, context_data: &MietteSpanContents<'a>) -> Vec<Line<'a>> {
         let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
         let mut line = context_data.line();
         let mut column = context_data.column();
@@ -338,7 +326,7 @@ impl NarratableReportHandler {
                 line_offset = offset;
             }
         }
-        Ok((context_data, lines))
+        lines
     }
 }
 
