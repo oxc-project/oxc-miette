@@ -32,17 +32,17 @@ fn context_info<'a>(
     if cut > 0 && input[cut - 1] == b'\r' {
         cut -= 1;
     }
-    let mut skip_lf_at = usize::MAX;
     for pos in memchr::memchr2_iter(b'\r', b'\n', &input[..cut]) {
-        if pos == skip_lf_at {
+        // Skip the `\n` of a CRLF pair already counted at its `\r`.
+        if input[pos] == b'\n' && pos > 0 && input[pos - 1] == b'\r' {
             continue;
         }
         // A CRLF pair counts as a single line break, ending at the `\n`.
-        let mut line_end = pos;
-        if input[pos] == b'\r' && pos + 1 < cut && input[pos + 1] == b'\n' {
-            line_end = pos + 1;
-            skip_lf_at = pos + 1;
-        }
+        let line_end = if input[pos] == b'\r' && pos + 1 < cut && input[pos + 1] == b'\n' {
+            pos + 1
+        } else {
+            pos
+        };
         line_count += 1;
         before_lines_starts.push_back(current_line_start);
         if before_lines_starts.len() > context_lines_before {
