@@ -24,8 +24,13 @@ ready:
   cargo check
   cargo clippy
   cargo test --features fancy
+  cargo check --benches --features fancy
   cargo doc
   git status
+
+# Run the benchmarks (fixtures are downloaded from benchmark-files on first run)
+bench:
+  cargo bench --features fancy
 
 watch *args='':
   watchexec {{args}}

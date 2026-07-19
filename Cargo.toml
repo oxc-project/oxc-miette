@@ -27,6 +27,14 @@ exclude = ["images/", "tests/", "miette-derive/"]
 [lib]
 name = "miette"
 
+[[bench]]
+name = "render"
+harness = false
+# Downloads fixtures on first run, so keep it out of `cargo test` (which would
+# run it once). It is still built by the benchmark workflow and `just bench`.
+test = false
+required-features = ["fancy"]
+
 [lints.rust]
 absolute_paths_not_starting_with_crate = "warn"
 non_ascii_idents = "warn"
@@ -68,6 +76,10 @@ lazy_static = "1.5"
 serde_json = "1.0.140"
 insta = "1.46.1"
 
+# Benchmark deps
+criterion2 = { version = "3", default-features = false }
+ureq = "3"
+
 [features]
 default = ["derive"]
 derive = ["oxc-miette-derive"]
@@ -87,6 +99,9 @@ fancy-no-backtrace = [
     "supports-unicode",
 ]
 fancy = ["fancy-no-backtrace", "backtrace", "backtrace-ext"]
+# Enables CodSpeed's instrumented harness for `cargo codspeed`. Pulls in `fancy`
+# because the benchmark renders diagnostics via `GraphicalReportHandler`.
+codspeed = ["criterion2/codspeed", "fancy"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -96,3 +111,7 @@ all-features = true
 # See: https://insta.rs/docs/quickstart/#optional-faster-runs
 insta.opt-level = 3
 similar.opt-level = 3
+
+[profile.bench]
+lto = true
+codegen-units = 1
