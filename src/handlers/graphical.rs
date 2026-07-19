@@ -591,6 +591,7 @@ impl GraphicalReportHandler {
                 let base = contents.span().offset() as usize;
                 let rel = (label.inner().offset() as usize).saturating_sub(base);
                 line_column_at(contents.data(), contents.line(), contents.column(), rel)
+                    .ok_or(fmt::Error)?
             }
             None => (contents.line(), contents.column()),
         };
@@ -1417,16 +1418,29 @@ fn split_label(v: &str, style: Style) -> Vec<String> {
 ///
 /// This exists to avoid a second full `read_span` (which re-scans the source
 /// from byte 0) just to locate a label that already lies inside `data`. It
-/// walks only the `data[..rel]` prefix and mirrors the newline handling in
-/// `source_impls::context_info` — a `\r\n` pair and a lone `\r` or `\n` each
-/// count as a single line break — so the result equals
-/// `read_span(&(base_offset + rel, 0).into(), 0, 0)`'s `line()`/`column()`.
-fn line_column_at(data: &[u8], base_line: usize, base_column: usize, rel: usize) -> (usize, usize) {
-    let mut rel = rel.min(data.len());
+/// scans only the `data[..rel]` prefix — with the same `memchr2` newline search
+/// `source_impls::context_info` uses, so a long (e.g. minified) line stays cheap
+/// — and mirrors its line-break handling (a `\r\n` pair and a lone `\r`/`\n`
+/// each count once). The result equals `read_span(&(base_offset + rel, 0).into(),
+/// 0, 0)`'s `line()`/`column()`, or `None` when that offset is out of bounds
+/// (`rel > data.len()`), which `read_span` reports as `OutOfBounds`.
+fn line_column_at(
+    data: &[u8],
+    base_line: usize,
+    base_column: usize,
+    rel: usize,
+) -> Option<(usize, usize)> {
+    // A label past the end of the payload is out of bounds; the caller treats
+    // this like the `OutOfBounds` the equivalent `read_span` would return,
+    // rather than clamping to a misleading end-of-snippet position.
+    if rel > data.len() {
+        return None;
+    }
+    let mut rel = rel;
     // An offset landing on the `\n` of a `\r\n` pair sits *inside* an unfinished
     // line break: `context_info` has not yet advanced the line at that byte, so
     // it reports the position of the preceding `\r`. Normalize to that byte so
-    // the prefix walk below agrees.
+    // the prefix scan below agrees.
     if rel > 0 && rel < data.len() && data[rel - 1] == b'\r' && data[rel] == b'\n' {
         rel -= 1;
     }
@@ -1435,33 +1449,26 @@ fn line_column_at(data: &[u8], base_line: usize, base_column: usize, rel: usize)
     // line that `rel` falls on. `None` until the first break is seen, meaning
     // `rel` is still on `data`'s first line.
     let mut line_start: Option<usize> = None;
-    let mut i = 0;
-    while i < rel {
-        match data[i] {
-            b'\n' => {
-                line += 1;
-                line_start = Some(i + 1);
-            }
-            b'\r' => {
-                line += 1;
-                // Pair `\r\n` into a single break only when the `\n` is within
-                // the walked prefix; a trailing `\r` counts as a lone break,
-                // matching `context_info` at the same offset.
-                if i + 1 < rel && data[i + 1] == b'\n' {
-                    i += 1;
-                }
-                line_start = Some(i + 1);
-            }
-            _ => {}
+    for pos in memchr::memchr2_iter(b'\r', b'\n', &data[..rel]) {
+        // Skip the `\n` of a `\r\n` pair already counted at its `\r`.
+        if data[pos] == b'\n' && pos > 0 && data[pos - 1] == b'\r' {
+            continue;
         }
-        i += 1;
+        line += 1;
+        // A `\r\n` pair is a single break ending at the `\n`.
+        let line_end = if data[pos] == b'\r' && pos + 1 < rel && data[pos + 1] == b'\n' {
+            pos + 1
+        } else {
+            pos
+        };
+        line_start = Some(line_end + 1);
     }
-    match line_start {
+    Some(match line_start {
         // `rel` lies on a later line, which by definition starts at column 0.
         Some(start) => (line, rel - start),
         // Still on the first line, so offset from `data`'s starting column.
         None => (line, base_column + rel),
-    }
+    })
 }
 
 impl FancySpan {
@@ -1507,10 +1514,12 @@ mod line_column_tests {
         }
     }
 
-    /// Assert `line_column_at` reproduces a real `read_span(&(off, 0), 0, 0)`
-    /// for an offset that falls inside a `read_span(&(off, len), ctx, ctx)`
-    /// payload — exactly how `render_context` consumes it. Returns whether a
-    /// case was actually checked (both reads in bounds).
+    /// Assert `line_column_at` matches a real `read_span(&(off, 0), 0, 0)` for an
+    /// offset inside a `read_span(&(off, len), ctx, ctx)` payload — exactly how
+    /// `render_context` consumes it. Full equivalence, *including* the error
+    /// case: `line_column_at` must return `None` iff the direct read is
+    /// `OutOfBounds` (a label past the snippet, e.g. `off == src.len() + 1`).
+    /// Returns whether a case was actually checked (the context read succeeded).
     fn check(src: &str, off: usize, len: usize, ctx: usize) -> bool {
         let Ok(contents) = src.read_span(&(off as u32, len as u32).into(), ctx, ctx) else {
             return false;
@@ -1519,21 +1528,23 @@ mod line_column_tests {
         let rel = off.saturating_sub(base);
         let got = line_column_at(contents.data(), contents.line(), contents.column(), rel);
 
-        // The context read succeeded, so the label is in bounds; deriving its
-        // position must never diverge from a direct zero-context read.
-        let expected = src
-            .read_span(&(off as u32, 0u32).into(), 0, 0)
-            .expect("in-bounds label must have a resolvable line/column");
-        assert_eq!(
-            got,
-            (expected.line(), expected.column()),
-            "mismatch for src={src:?} off={off} len={len} ctx={ctx}"
-        );
+        match src.read_span(&(off as u32, 0u32).into(), 0, 0) {
+            Ok(expected) => assert_eq!(
+                got,
+                Some((expected.line(), expected.column())),
+                "mismatch for src={src:?} off={off} len={len} ctx={ctx}"
+            ),
+            Err(_) => assert_eq!(
+                got, None,
+                "accepted an out-of-bounds label for src={src:?} off={off} len={len} ctx={ctx}"
+            ),
+        }
         true
     }
 
     /// Exhaustively check every char-boundary offset of many small randomized
-    /// sources, across LF / CRLF / lone-CR and multibyte alphabets.
+    /// sources — plus offsets one and two bytes past EOF — across LF / CRLF /
+    /// lone-CR and multibyte alphabets.
     #[test]
     #[cfg_attr(
         miri,
@@ -1558,7 +1569,12 @@ mod line_column_tests {
                 for _ in 0..n {
                     s.push_str(alpha[rng.below(alpha.len())]);
                 }
-                for off in (0..=s.len()).filter(|&i| s.is_char_boundary(i)) {
+                // Include `len + 1` / `len + 2`, which are past EOF (never char
+                // boundaries) to exercise the out-of-bounds rejection.
+                for off in 0..=s.len() + 2 {
+                    if off <= s.len() && !s.is_char_boundary(off) {
+                        continue;
+                    }
                     for ctx in 0..=2 {
                         for &len in &[0usize, 1, 4] {
                             if check(&s, off, len, ctx) {
