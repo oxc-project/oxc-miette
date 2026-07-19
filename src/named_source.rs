@@ -77,4 +77,8 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
     fn name(&self) -> Option<&str> {
         Some(&self.name)
     }
+
+    fn contiguous_bytes(&self) -> Option<&[u8]> {
+        self.inner().contiguous_bytes()
+    }
 }
