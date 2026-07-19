@@ -372,6 +372,26 @@ pub trait SourceCode: Send + Sync {
     fn name(&self) -> Option<&str> {
         None
     }
+
+    /// Returns the entire source as one contiguous byte buffer, if it is
+    /// backed by one.
+    ///
+    /// This is an optional fast path: renderers use it to locate several spans
+    /// in a single scan of the source instead of issuing one [`read_span`]
+    /// (a scan from byte 0) per span. Implementations that return `Some` must
+    /// return the same bytes [`read_span`] reads — same content, same offsets
+    /// — and report the source's name via [`name`], since renderers taking
+    /// this path derive span contents from the buffer without calling
+    /// [`read_span`].
+    ///
+    /// The default returns `None`, which keeps every read going through
+    /// [`read_span`].
+    ///
+    /// [`read_span`]: SourceCode::read_span
+    /// [`name`]: SourceCode::name
+    fn contiguous_bytes(&self) -> Option<&[u8]> {
+        None
+    }
 }
 
 /// A labeled [`SourceSpan`].
