@@ -514,7 +514,7 @@ impl GraphicalReportHandler {
             contexts.push((Cow::Borrowed(right), right_conts));
         }
         for (ctx, conts) in contexts {
-            self.render_context(f, source, &ctx, conts, &labels[..])?;
+            self.render_context(f, &ctx, conts, &labels[..])?;
         }
 
         Ok(())
@@ -523,7 +523,6 @@ impl GraphicalReportHandler {
     fn render_context(
         &self,
         f: &mut impl fmt::Write,
-        source: &dyn SourceCode,
         context: &LabeledSpan,
         contents: MietteSpanContents<'_>,
         labels: &[LabeledSpan],
@@ -581,34 +580,31 @@ impl GraphicalReportHandler {
             self.theme.characters.hbar,
         )?;
 
-        // If there is a primary label, then use its span
-        // as the reference point for line/column information.
-        let primary_contents = match primary_label {
-            Some(label) => source.read_span(label.inner(), 0, 0).map_err(|_| fmt::Error)?,
-            None => contents,
+        // The snippet header reports the primary label's line/column. Rather
+        // than issuing a second full `read_span` (which re-scans the source
+        // from byte 0 — as costly as the read that produced `contents`),
+        // derive them from `contents`: its data begins at a line boundary at
+        // line `contents.line()`, and the primary label always lies within it,
+        // so only the short prefix up to the label needs to be walked.
+        let (primary_line, primary_column) = match primary_label {
+            Some(label) => {
+                let base = contents.span().offset() as usize;
+                let rel = (label.inner().offset() as usize).saturating_sub(base);
+                line_column_at(contents.data(), contents.line(), contents.column(), rel)
+            }
+            None => (contents.line(), contents.column()),
         };
 
-        match primary_contents.name() {
+        match contents.name() {
             Some(source_name) => {
                 let source_name = source_name.style(self.theme.styles.link);
-                writeln!(
-                    f,
-                    "[{}:{}:{}]",
-                    source_name,
-                    primary_contents.line() + 1,
-                    primary_contents.column() + 1
-                )?;
+                writeln!(f, "[{}:{}:{}]", source_name, primary_line + 1, primary_column + 1)?;
             }
             _ => {
                 if lines.len() <= 1 {
                     writeln!(f, "{}", self.theme.characters.hbar.to_string().repeat(3))?;
                 } else {
-                    writeln!(
-                        f,
-                        "[{}:{}]",
-                        primary_contents.line() + 1,
-                        primary_contents.column() + 1
-                    )?;
+                    writeln!(f, "[{}:{}]", primary_line + 1, primary_column + 1)?;
                 }
             }
         }
@@ -1415,6 +1411,59 @@ fn split_label(v: &str, style: Style) -> Vec<String> {
     v.split('\n').map(|i| i.style(style).to_string()).collect()
 }
 
+/// Derive the 0-indexed line and column of the byte at `data[rel]` — a payload
+/// returned by [`SourceCode::read_span`] whose first byte sits at absolute line
+/// `base_line` / column `base_column`.
+///
+/// This exists to avoid a second full `read_span` (which re-scans the source
+/// from byte 0) just to locate a label that already lies inside `data`. It
+/// walks only the `data[..rel]` prefix and mirrors the newline handling in
+/// `source_impls::context_info` — a `\r\n` pair and a lone `\r` or `\n` each
+/// count as a single line break — so the result equals
+/// `read_span(&(base_offset + rel, 0).into(), 0, 0)`'s `line()`/`column()`.
+fn line_column_at(data: &[u8], base_line: usize, base_column: usize, rel: usize) -> (usize, usize) {
+    let mut rel = rel.min(data.len());
+    // An offset landing on the `\n` of a `\r\n` pair sits *inside* an unfinished
+    // line break: `context_info` has not yet advanced the line at that byte, so
+    // it reports the position of the preceding `\r`. Normalize to that byte so
+    // the prefix walk below agrees.
+    if rel > 0 && rel < data.len() && data[rel - 1] == b'\r' && data[rel] == b'\n' {
+        rel -= 1;
+    }
+    let mut line = base_line;
+    // Byte index just past the most recent line break, i.e. the start of the
+    // line that `rel` falls on. `None` until the first break is seen, meaning
+    // `rel` is still on `data`'s first line.
+    let mut line_start: Option<usize> = None;
+    let mut i = 0;
+    while i < rel {
+        match data[i] {
+            b'\n' => {
+                line += 1;
+                line_start = Some(i + 1);
+            }
+            b'\r' => {
+                line += 1;
+                // Pair `\r\n` into a single break only when the `\n` is within
+                // the walked prefix; a trailing `\r` counts as a lone break,
+                // matching `context_info` at the same offset.
+                if i + 1 < rel && data[i + 1] == b'\n' {
+                    i += 1;
+                }
+                line_start = Some(i + 1);
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    match line_start {
+        // `rel` lies on a later line, which by definition starts at column 0.
+        Some(start) => (line, rel - start),
+        // Still on the first line, so offset from `data`'s starting column.
+        None => (line, base_column + rel),
+    }
+}
+
 impl FancySpan {
     fn new(label: Option<&str>, span: SourceSpan, style: Style) -> Self {
         FancySpan { label: label.map(|l| split_label(l, style)), span, style }
@@ -1434,5 +1483,92 @@ impl FancySpan {
 
     fn len(&self) -> usize {
         self.span.len() as usize
+    }
+}
+
+#[cfg(test)]
+mod line_column_tests {
+    use super::line_column_at;
+    use crate::{SourceCode, SpanContents};
+
+    /// Deterministic xorshift so any failure reproduces from a fixed seed.
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            self.0 = x;
+            x
+        }
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n as u64) as usize
+        }
+    }
+
+    /// Assert `line_column_at` reproduces a real `read_span(&(off, 0), 0, 0)`
+    /// for an offset that falls inside a `read_span(&(off, len), ctx, ctx)`
+    /// payload — exactly how `render_context` consumes it. Returns whether a
+    /// case was actually checked (both reads in bounds).
+    fn check(src: &str, off: usize, len: usize, ctx: usize) -> bool {
+        let Ok(contents) = src.read_span(&(off as u32, len as u32).into(), ctx, ctx) else {
+            return false;
+        };
+        let base = contents.span().offset() as usize;
+        let rel = off.saturating_sub(base);
+        let got = line_column_at(contents.data(), contents.line(), contents.column(), rel);
+
+        // The context read succeeded, so the label is in bounds; deriving its
+        // position must never diverge from a direct zero-context read.
+        let expected = src
+            .read_span(&(off as u32, 0u32).into(), 0, 0)
+            .expect("in-bounds label must have a resolvable line/column");
+        assert_eq!(
+            got,
+            (expected.line(), expected.column()),
+            "mismatch for src={src:?} off={off} len={len} ctx={ctx}"
+        );
+        true
+    }
+
+    /// Exhaustively check every char-boundary offset of many small randomized
+    /// sources, across LF / CRLF / lone-CR and multibyte alphabets.
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "equivalence fuzzer over safe, bounds-checked code — Miri finds no UB here \
+                  and interprets it orders of magnitude slower; the derivation is still exercised \
+                  under Miri by the normal snapshot tests"
+    )]
+    fn matches_read_span_exhaustively() {
+        let alphabets: &[&[&str]] = &[
+            &["a", "\n"],
+            &["a", "b", "c", "\n"],
+            &["a", "b", "\r\n"],
+            &["a", "\r", "\n", "\r\n"],
+            &["x", "y", "\n", "é", "🦀", "\r\n"],
+        ];
+        let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
+        let mut checked = 0usize;
+        for alpha in alphabets {
+            for _ in 0..3000 {
+                let n = rng.below(14);
+                let mut s = String::new();
+                for _ in 0..n {
+                    s.push_str(alpha[rng.below(alpha.len())]);
+                }
+                for off in (0..=s.len()).filter(|&i| s.is_char_boundary(i)) {
+                    for ctx in 0..=2 {
+                        for &len in &[0usize, 1, 4] {
+                            if check(&s, off, len, ctx) {
+                                checked += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(checked > 100_000, "expected a broad sweep, only checked {checked}");
     }
 }
