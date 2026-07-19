@@ -588,10 +588,7 @@ impl GraphicalReportHandler {
         // so only the short prefix up to the label needs to be walked.
         let (primary_line, primary_column) = match primary_label {
             Some(label) => {
-                let base = contents.span().offset() as usize;
-                let rel = (label.inner().offset() as usize).saturating_sub(base);
-                line_column_at(contents.data(), contents.line(), contents.column(), rel)
-                    .ok_or(fmt::Error)?
+                contents.line_column_at(label.inner().offset() as usize).ok_or(fmt::Error)?
             }
             None => (contents.line(), contents.column()),
         };
@@ -1412,65 +1409,6 @@ fn split_label(v: &str, style: Style) -> Vec<String> {
     v.split('\n').map(|i| i.style(style).to_string()).collect()
 }
 
-/// Derive the 0-indexed line and column of the byte at `data[rel]` — a payload
-/// returned by [`SourceCode::read_span`] whose first byte sits at absolute line
-/// `base_line` / column `base_column`.
-///
-/// This exists to avoid a second full `read_span` (which re-scans the source
-/// from byte 0) just to locate a label that already lies inside `data`. It
-/// scans only the `data[..rel]` prefix — with the same `memchr2` newline search
-/// `source_impls::context_info` uses, so a long (e.g. minified) line stays cheap
-/// — and mirrors its line-break handling (a `\r\n` pair and a lone `\r`/`\n`
-/// each count once). The result equals `read_span(&(base_offset + rel, 0).into(),
-/// 0, 0)`'s `line()`/`column()`, or `None` when that offset is out of bounds
-/// (`rel > data.len()`), which `read_span` reports as `OutOfBounds`.
-fn line_column_at(
-    data: &[u8],
-    base_line: usize,
-    base_column: usize,
-    rel: usize,
-) -> Option<(usize, usize)> {
-    // A label past the end of the payload is out of bounds; the caller treats
-    // this like the `OutOfBounds` the equivalent `read_span` would return,
-    // rather than clamping to a misleading end-of-snippet position.
-    if rel > data.len() {
-        return None;
-    }
-    let mut rel = rel;
-    // An offset landing on the `\n` of a `\r\n` pair sits *inside* an unfinished
-    // line break: `context_info` has not yet advanced the line at that byte, so
-    // it reports the position of the preceding `\r`. Normalize to that byte so
-    // the prefix scan below agrees.
-    if rel > 0 && rel < data.len() && data[rel - 1] == b'\r' && data[rel] == b'\n' {
-        rel -= 1;
-    }
-    let mut line = base_line;
-    // Byte index just past the most recent line break, i.e. the start of the
-    // line that `rel` falls on. `None` until the first break is seen, meaning
-    // `rel` is still on `data`'s first line.
-    let mut line_start: Option<usize> = None;
-    for pos in memchr::memchr2_iter(b'\r', b'\n', &data[..rel]) {
-        // Skip the `\n` of a `\r\n` pair already counted at its `\r`.
-        if data[pos] == b'\n' && pos > 0 && data[pos - 1] == b'\r' {
-            continue;
-        }
-        line += 1;
-        // A `\r\n` pair is a single break ending at the `\n`.
-        let line_end = if data[pos] == b'\r' && pos + 1 < rel && data[pos + 1] == b'\n' {
-            pos + 1
-        } else {
-            pos
-        };
-        line_start = Some(line_end + 1);
-    }
-    Some(match line_start {
-        // `rel` lies on a later line, which by definition starts at column 0.
-        Some(start) => (line, rel - start),
-        // Still on the first line, so offset from `data`'s starting column.
-        None => (line, base_column + rel),
-    })
-}
-
 impl FancySpan {
     fn new(label: Option<&str>, span: SourceSpan, style: Style) -> Self {
         FancySpan { label: label.map(|l| split_label(l, style)), span, style }
@@ -1490,95 +1428,5 @@ impl FancySpan {
 
     fn len(&self) -> usize {
         self.span.len() as usize
-    }
-}
-
-#[cfg(test)]
-mod line_column_tests {
-    use super::line_column_at;
-    use crate::{SourceCode, SpanContents};
-
-    /// Deterministic xorshift so any failure reproduces from a fixed seed.
-    struct Rng(u64);
-    impl Rng {
-        fn next(&mut self) -> u64 {
-            let mut x = self.0;
-            x ^= x << 13;
-            x ^= x >> 7;
-            x ^= x << 17;
-            self.0 = x;
-            x
-        }
-        fn below(&mut self, n: usize) -> usize {
-            (self.next() % n as u64) as usize
-        }
-    }
-
-    /// Assert `line_column_at` matches a real `read_span(&(off, 0), 0, 0)` for an
-    /// offset inside a `read_span(&(off, len), ctx, ctx)` payload — exactly how
-    /// `render_context` consumes it. Full equivalence, *including* the error
-    /// case: `line_column_at` must return `None` iff the direct read is
-    /// `OutOfBounds` (a label past the snippet, e.g. `off == src.len() + 1`).
-    /// Returns whether a case was actually checked (the context read succeeded).
-    fn check(src: &str, off: usize, len: usize, ctx: usize) -> bool {
-        let Ok(contents) = src.read_span(&(off as u32, len as u32).into(), ctx, ctx) else {
-            return false;
-        };
-        let base = contents.span().offset() as usize;
-        let rel = off.saturating_sub(base);
-        let got = line_column_at(contents.data(), contents.line(), contents.column(), rel);
-
-        match src.read_span(&(off as u32, 0u32).into(), 0, 0) {
-            Ok(expected) => assert_eq!(
-                got,
-                Some((expected.line(), expected.column())),
-                "mismatch for src={src:?} off={off} len={len} ctx={ctx}"
-            ),
-            Err(_) => assert_eq!(
-                got, None,
-                "accepted an out-of-bounds label for src={src:?} off={off} len={len} ctx={ctx}"
-            ),
-        }
-        true
-    }
-
-    /// Exhaustively check every char-boundary offset of many small randomized
-    /// sources — plus offsets one and two bytes past EOF — across LF / CRLF /
-    /// lone-CR and multibyte alphabets.
-    #[test]
-    fn matches_read_span_exhaustively() {
-        let alphabets: &[&[&str]] = &[
-            &["a", "\n"],
-            &["a", "b", "c", "\n"],
-            &["a", "b", "\r\n"],
-            &["a", "\r", "\n", "\r\n"],
-            &["x", "y", "\n", "é", "🦀", "\r\n"],
-        ];
-        let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
-        let mut checked = 0usize;
-        for alpha in alphabets {
-            for _ in 0..3000 {
-                let n = rng.below(14);
-                let mut s = String::new();
-                for _ in 0..n {
-                    s.push_str(alpha[rng.below(alpha.len())]);
-                }
-                // Include `len + 1` / `len + 2`, which are past EOF (never char
-                // boundaries) to exercise the out-of-bounds rejection.
-                for off in 0..=s.len() + 2 {
-                    if off <= s.len() && !s.is_char_boundary(off) {
-                        continue;
-                    }
-                    for ctx in 0..=2 {
-                        for &len in &[0usize, 1, 4] {
-                            if check(&s, off, len, ctx) {
-                                checked += 1;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        assert!(checked > 100_000, "expected a broad sweep, only checked {checked}");
     }
 }
