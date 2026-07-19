@@ -1552,8 +1552,9 @@ mod single_scan_tests {
         ];
         let mut rng = Rng(0x2545_F491_4F6C_DD1D);
         let mut checked = 0usize;
+        let (sources_per_alphabet, want_checked) = (300, 4000);
         for alpha in alphabets {
-            for _ in 0..300 {
+            for _ in 0..sources_per_alphabet {
                 let n = rng.below(24);
                 let mut src = String::new();
                 for _ in 0..n {
@@ -1619,6 +1620,68 @@ mod single_scan_tests {
                 }
             }
         }
-        assert!(checked >= 4000, "expected a broad sweep, only checked {checked}");
+        assert!(checked >= want_checked, "expected a broad sweep, only checked {checked}");
+    }
+
+    /// The randomized differential above only builds sources of a few dozen
+    /// bytes, so the scanner's bulk paths (the memchr prefix skip on the
+    /// first lookup, bulk index extension across the gap between far-apart
+    /// labels) never run at length. Render a ~200 KB deterministic source
+    /// through both paths — labels clustered near the end (the realistic
+    /// merge chain) and labels spread across the file (which the merge
+    /// heuristic combines into one giant snippet) — and require identical
+    /// output.
+    #[test]
+    #[cfg_attr(miri, ignore = "interprets a multi-hundred-KB render; far too slow under Miri")]
+    fn large_source_paths_render_identically() {
+        // Mixed line lengths and endings, with multibyte text sprinkled in.
+        let mut src = String::new();
+        let mut line = 0usize;
+        while src.len() < 200 * 1024 {
+            match line % 5 {
+                0 => src.push_str("const value = compute(input, options);\n"),
+                1 => src.push_str("if (value !== undefined) { emit(value); }\r\n"),
+                2 => src.push_str("// géométrie 🦀 comment\n"),
+                3 => src.push_str(&"x".repeat(200 + line % 57)),
+                _ => src.push('\n'),
+            }
+            line += 1;
+        }
+        let span_near = |fraction: f64, delta: usize| {
+            let mut at = (src.len() as f64 * fraction) as usize + delta;
+            at = at.min(src.len() - 8);
+            while !src.is_char_boundary(at) {
+                at -= 1;
+            }
+            // Rendering slices as UTF-8, so the end must sit on a char
+            // boundary as well.
+            let mut end = at + 4;
+            while !src.is_char_boundary(end) {
+                end -= 1;
+            }
+            LabeledSpan::new_with_span(Some(format!("at {at}")), (at as u32, (end - at) as u32))
+        };
+        for labels in [
+            vec![span_near(0.9, 0), span_near(0.9, 300), span_near(0.9, 600)],
+            vec![span_near(0.3, 0), span_near(0.6, 0), span_near(0.9, 0)],
+        ] {
+            for context_lines in [0, 1, 2] {
+                let with_buffer = TestDiag {
+                    src: NamedSource::new("large.ts", src.clone()),
+                    labels: labels.clone(),
+                };
+                let without_buffer = TestDiag {
+                    src: Opaque(NamedSource::new("large.ts", src.clone())),
+                    labels: labels.clone(),
+                };
+                let (buffer_result, buffer_out) = render(&with_buffer, context_lines);
+                let (read_span_result, read_span_out) = render(&without_buffer, context_lines);
+                assert_eq!(buffer_result, read_span_result);
+                assert_eq!(
+                    buffer_out, read_span_out,
+                    "diverged for context_lines={context_lines} labels={labels:?}"
+                );
+            }
+        }
     }
 }

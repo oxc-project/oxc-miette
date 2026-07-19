@@ -820,8 +820,9 @@ mod line_column_tests {
         ];
         let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
         let mut checked = 0usize;
+        let (sources_per_alphabet, want_checked) = (3000, 100_000);
         for alpha in alphabets {
-            for _ in 0..3000 {
+            for _ in 0..sources_per_alphabet {
                 let n = rng.below(14);
                 let mut s = String::new();
                 for _ in 0..n {
@@ -843,7 +844,7 @@ mod line_column_tests {
                 }
             }
         }
-        assert!(checked > 100_000, "expected a broad sweep, only checked {checked}");
+        assert!(checked > want_checked, "expected a broad sweep, only checked {checked}");
     }
 }
 
@@ -927,8 +928,9 @@ mod scanner_tests {
         ];
         let mut rng = Rng(0xA076_1D64_78BD_642F);
         let mut checked = 0usize;
+        let (sources_per_alphabet, want_checked) = (700, 100_000);
         for alpha in alphabets {
-            for _ in 0..700 {
+            for _ in 0..sources_per_alphabet {
                 let n = rng.below(16);
                 let mut s = String::new();
                 for _ in 0..n {
@@ -963,7 +965,7 @@ mod scanner_tests {
                 }
             }
         }
-        assert!(checked > 100_000, "expected a broad sweep, only checked {checked}");
+        assert!(checked > want_checked, "expected a broad sweep, only checked {checked}");
     }
 
     /// The empty-source and just-past-EOF edge cases `context_info` special
