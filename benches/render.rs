@@ -60,6 +60,27 @@ struct LintDiagnostic {
     span: SourceSpan,
 }
 
+/// A diagnostic with several labels spread across the file — the shape of
+/// oxlint diagnostics that point at a declaration plus related uses. Each
+/// label makes the renderer locate a line/column far into the source.
+#[derive(Debug, Diagnostic, Error)]
+#[error("'resolve' is assigned a value but never used")]
+#[diagnostic(
+    severity = "Warning",
+    code = "eslint(no-unused-vars)",
+    help = "Consider removing this declaration or prefixing it with an underscore"
+)]
+struct MultiLabelDiagnostic {
+    #[source_code]
+    src: NamedSource<String>,
+    #[label("'resolve' is declared here")]
+    decl: SourceSpan,
+    #[label("it is written here")]
+    write: SourceSpan,
+    #[label("but never read after this point")]
+    last: SourceSpan,
+}
+
 /// oxc's interactive default: `GraphicalReportHandler::new()` in a terminal
 /// resolves to unicode characters + RGB colors at a 400 column width.
 fn colored_handler() -> GraphicalReportHandler {
@@ -167,6 +188,41 @@ fn bench(c: &mut Criterion) {
         }
         group.finish();
     }
+
+    // Several labels near each other — a declaration and two related uses in
+    // the same stretch of code, the realistic multi-label shape. The snippet
+    // contexts overlap, so the renderer combines them into one window; every
+    // label read and every merge attempt historically issued its own
+    // `read_span`, i.e. its own scan of the source from byte 0 (five scans
+    // for this shape), so this measures how rendering scales with label count.
+    let mut group = c.benchmark_group("render_multi_label");
+    let handler = colored_handler();
+    for fixture in &fixtures {
+        let start = fixture.span.offset() as usize;
+        // A little under a screen of code apart, scaled down for tiny files
+        // and clamped so every span stays in bounds.
+        let delta = (fixture.source.len() / 20).clamp(1, 250);
+        let near = |n: usize| {
+            let at = (start + n * delta).min(fixture.source.len().saturating_sub(SPAN_LEN));
+            span_at(&fixture.source, at as f64 / fixture.source.len() as f64, SPAN_LEN)
+        };
+        let diagnostic = MultiLabelDiagnostic {
+            src: NamedSource::new(fixture.name, fixture.source.clone()),
+            decl: near(0),
+            write: near(1),
+            last: near(2),
+        };
+        group.bench_function(BenchmarkId::from_parameter(fixture.name), |b| {
+            b.iter(|| {
+                let mut out = String::new();
+                handler
+                    .render_report(&mut out, black_box(&diagnostic as &dyn Diagnostic))
+                    .expect("render succeeds");
+                black_box(out);
+            });
+        });
+    }
+    group.finish();
 }
 
 criterion_group!(
