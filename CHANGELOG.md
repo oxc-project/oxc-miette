@@ -61,6 +61,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [3.0.1] - 2026-07-19
+
+### Performance
+
+- Reuse span contents in render_context instead of re-reading ([#212](https://github.com/oxc-project/oxc-miette/pull/212))
+- Speed up read_span with bulk memchr line scanning ([#211](https://github.com/oxc-project/oxc-miette/pull/211))
+
+### Documentation
+
+- Normalize README sponsor section ([#204](https://github.com/oxc-project/oxc-miette/pull/204))
+- Update sponsor section ([#213](https://github.com/oxc-project/oxc-miette/pull/213))
+
+### Refactor
+
+- Move long std/core paths to top-level imports ([#196](https://github.com/oxc-project/oxc-miette/pull/196))
+
+### Chore
+
+- Bump cargo-shear to 1.13.1 ([#200](https://github.com/oxc-project/oxc-miette/pull/200))
+- Configure clippy exported api lint ([#203](https://github.com/oxc-project/oxc-miette/pull/203))
+- Standardize rustfmt config ([#205](https://github.com/oxc-project/oxc-miette/pull/205))
+- *(deps)* Update dependency rust to v1.96.1 ([#207](https://github.com/oxc-project/oxc-miette/pull/207))
+- *(deps)* Update oxc-project/security-action action to v1.0.8 ([#201](https://github.com/oxc-project/oxc-miette/pull/201))
+- *(deps)* Update rust crates ([#199](https://github.com/oxc-project/oxc-miette/pull/199))
+- *(deps)* Update rust crates ([#209](https://github.com/oxc-project/oxc-miette/pull/209))
+- *(deps)* Update rust to v1.97.0 ([#210](https://github.com/oxc-project/oxc-miette/pull/210))
+- *(deps)* Update dependency rust to v1.97.1 ([#208](https://github.com/oxc-project/oxc-miette/pull/208))
+
+### CI
+
+- Use latest rust toolchain, drop stale 1.70.0 matrix ([#198](https://github.com/oxc-project/oxc-miette/pull/198))
+- Add crates environment to release workflow
 ## [3.0.0] - 2026-06-08
 
 ### Performance
