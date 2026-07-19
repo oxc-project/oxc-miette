@@ -1,11 +1,14 @@
-//! Differential fuzz test: the two span-reading paths in
-//! [`render_snippets`](super::GraphicalReportHandler::render_snippets) — the
-//! shared `SpanScanner` scan and the per-label `read_span` fallback — must
-//! render byte-identically. See the test's own doc comment for the details.
+#![cfg(feature = "fancy-no-backtrace")]
+//! Differential fuzz test for the graphical renderer's two span-reading paths.
+//!
+//! `render_snippets` reads each label's span either through a shared
+//! `SpanScanner` scan (when the source exposes its backing buffer) or through
+//! one `SourceCode::read_span` call per label. Both paths must render
+//! byte-identical reports. See the test's own doc comment for the full matrix.
 
 use std::fmt;
 
-use crate::{
+use miette::{
     Diagnostic, GraphicalReportHandler, GraphicalTheme, LabeledSpan, Labels, MietteError,
     MietteSpanContents, NamedSource, SourceCode, SourceSpan,
 };
@@ -79,7 +82,7 @@ fn render(diagnostic: &dyn Diagnostic, context_lines: usize) -> (fmt::Result, St
 }
 
 /// `render_snippets` has two ways to read spans — a shared
-/// [`SpanScanner`](crate::source_impls::SpanScanner) scan when the source
+/// `SpanScanner` scan when the source
 /// exposes [`SourceCode::contiguous_bytes`], and one `read_span` per
 /// lookup otherwise. Rendering the same diagnostic through both must
 /// produce byte-identical reports (or fail identically, for labels past

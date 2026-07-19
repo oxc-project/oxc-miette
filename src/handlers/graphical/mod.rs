@@ -23,9 +23,6 @@ mod report;
 mod snippet;
 mod span;
 
-#[cfg(test)]
-mod single_scan_tests;
-
 use std::fmt;
 
 pub use handler::GraphicalReportHandler;
