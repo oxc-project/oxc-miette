@@ -18,4 +18,4 @@ doctest = false
 # Relaxed version so the user can decide which version to use.
 proc-macro2 = "1"
 quote = "1"
-syn = "2"
+syn = "3"
