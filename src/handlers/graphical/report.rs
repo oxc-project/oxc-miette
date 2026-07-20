@@ -25,7 +25,6 @@ impl GraphicalReportHandler {
         f: &mut impl fmt::Write,
         diagnostic: &dyn Diagnostic,
     ) -> fmt::Result {
-        // self.render_header(f, diagnostic)?;
         writeln!(f)?;
         self.render_causes(f, diagnostic)?;
         let src = diagnostic.source_code();
@@ -110,64 +109,6 @@ impl GraphicalReportHandler {
         };
         let title = textwrap::fill(&title, opts);
         writeln!(f, "{title}")?;
-
-        // if !self.with_cause_chain {
-        // return Ok(());
-        // }
-
-        // if let Some(mut cause_iter) = diagnostic
-        // .diagnostic_source()
-        // .map(DiagnosticChain::from_diagnostic)
-        // .or_else(|| diagnostic.source().map(DiagnosticChain::from_stderror))
-        // .map(|it| it.peekable())
-        // {
-        // while let Some(error) = cause_iter.next() {
-        // let is_last = cause_iter.peek().is_none();
-        // let char = if !is_last {
-        // self.theme.characters.lcross
-        // } else {
-        // self.theme.characters.lbot
-        // };
-        // let initial_indent = format!(
-        // "  {}{}{} ",
-        // char, self.theme.characters.hbar, self.theme.characters.rarrow
-        // )
-        // .style(severity_style)
-        // .to_string();
-        // let rest_indent =
-        // format!("  {}   ", if is_last { ' ' } else { self.theme.characters.vbar })
-        // .style(severity_style)
-        // .to_string();
-        // let mut opts = textwrap::Options::new(width)
-        // .initial_indent(&initial_indent)
-        // .subsequent_indent(&rest_indent)
-        // .break_words(self.break_words);
-        // if let Some(word_separator) = self.word_separator {
-        // opts = opts.word_separator(word_separator);
-        // }
-        // if let Some(word_splitter) = self.word_splitter.clone() {
-        // opts = opts.word_splitter(word_splitter);
-        // }
-
-        // match error {
-        // ErrorKind::Diagnostic(diag) => {
-        // let mut inner = String::new();
-
-        // let mut inner_renderer = self.clone();
-        // // Don't print footer for inner errors
-        // inner_renderer.footer = None;
-        // // Cause chains are already flattened, so don't double-print the nested error
-        // inner_renderer.with_cause_chain = false;
-        // inner_renderer.render_report(&mut inner, diag)?;
-
-        // writeln!(f, "{}", self.wrap(&inner, opts))?;
-        // }
-        // ErrorKind::StdError(err) => {
-        // writeln!(f, "{}", self.wrap(&err.to_string(), opts))?;
-        // }
-        // }
-        // }
-        // }
 
         Ok(())
     }
