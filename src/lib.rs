@@ -243,24 +243,6 @@
 //! }
 //! ```
 //!
-//! `miette` also includes an `anyhow`/`eyre`-style `Context`/`WrapErr` traits
-//! that you can import to add ad-hoc context messages to your `Diagnostic`s, as
-//! well, though you'll still need to use `.into_diagnostic()` to make use of
-//! it:
-//!
-//! ```rust
-//! // my_app/lib/my_internal_file.rs
-//! use miette::{IntoDiagnostic, Result, WrapErr};
-//! use semver::Version;
-//!
-//! pub fn some_tool() -> Result<Version> {
-//!     "1.2.x"
-//!         .parse()
-//!         .into_diagnostic()
-//!         .wrap_err("Parsing this tool's semver version failed.")
-//! }
-//! ```
-//!
 //! To construct your own simple adhoc error use the [miette!] macro:
 //! ```rust
 //! // my_app/lib/my_internal_file.rs
@@ -767,7 +749,6 @@ pub use oxc_miette_derive::*;
 pub use panic::*;
 pub use protocol::*;
 pub use report::*;
-pub use wrap_err::{Context, WrapErr};
 
 mod chain;
 mod diagnostic_chain;
@@ -790,4 +771,4 @@ mod ptr;
 mod report;
 mod report_impl;
 mod source_impls;
-mod wrap_err;
+mod wrapper;

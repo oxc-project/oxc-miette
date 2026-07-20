@@ -57,10 +57,3 @@ fn test_io_source() {
     let error: Report = miette!(TestError::Io(io));
     assert_eq!("oh no!", error.source().unwrap().to_string());
 }
-
-#[test]
-fn test_miette_from_miette() {
-    let error: Report = miette!("oh no!").wrap_err("context");
-    let error = miette!(error);
-    assert_eq!("oh no!", error.source().unwrap().to_string());
-}

@@ -44,13 +44,6 @@ fn test_boxed_thiserror() {
     assert_eq!("oh no!!!!", report.source().unwrap().to_string());
 }
 
-#[test]
-fn test_boxed_miette() {
-    let error: Report = miette!("oh no!").wrap_err("it failed");
-    let error = miette!(error);
-    assert_eq!("oh no!", error.source().unwrap().to_string());
-}
-
 #[derive(Debug)]
 struct CustomDiagnostic {
     source: Option<Report>,
@@ -185,15 +178,4 @@ fn test_boxed_custom_diagnostic() {
     let main_diagnostic = Box::new(main_diagnostic) as Box<dyn Diagnostic + Send + Sync + 'static>;
     let report = miette!(main_diagnostic);
     assert_report(&report);
-}
-
-#[test]
-#[ignore = "I don't know why this isn't working but it needs fixing."]
-fn test_boxed_sources() {
-    let error = MyError { source: io::Error::other("oh no!") };
-    let error = Box::<dyn Diagnostic + Send + Sync>::from(error);
-    let error: Report = miette!(error).wrap_err("it failed");
-    assert_eq!("it failed", error.to_string());
-    assert_eq!("outer", error.source().unwrap().to_string());
-    assert_eq!("oh no!", error.source().expect("outer").source().expect("inner").to_string());
 }
