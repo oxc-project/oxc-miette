@@ -46,7 +46,6 @@ pub struct GraphicalReportHandler {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LinkStyle {
-    None,
     Link,
     Text,
 }
@@ -97,19 +96,6 @@ impl GraphicalReportHandler {
     /// Whether to enable error code linkification using [`Diagnostic::url()`](crate::Diagnostic::url).
     pub fn with_links(mut self, links: bool) -> Self {
         self.links = if links { LinkStyle::Link } else { LinkStyle::Text };
-        self
-    }
-
-    /// Whether to include [`Diagnostic::url()`](crate::Diagnostic::url) in the output.
-    ///
-    /// Disabling this is not recommended, but can be useful for more easily
-    /// reproducible tests, as `url(docsrs)` links are version-dependent.
-    pub fn with_urls(mut self, urls: bool) -> Self {
-        self.links = match (self.links, urls) {
-            (_, false) => LinkStyle::None,
-            (LinkStyle::None, true) => LinkStyle::Link,
-            (links, true) => links,
-        };
         self
     }
 
