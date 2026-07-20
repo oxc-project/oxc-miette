@@ -1,3 +1,13 @@
+//! The guts of [`Report`](crate::Report): `ErrorImpl` and the hand-built
+//! `ErrorVTable` that let `Report` be a single-word pointer instead of a
+//! `Box<dyn Error>` fat pointer.
+//!
+//! Vendored from [eyre](https://docs.rs/eyre) / [anyhow](https://docs.rs/anyhow).
+//! An `ErrorImpl<E>` sits behind a thin pointer next to a vtable of function
+//! pointers (`object_drop`, `object_ref`, `object_downcast`, …) that stand in
+//! for the erased type `E`. The `unsafe` upholds subtle layout and
+//! type-erasure invariants — prefer re-syncing from upstream over editing it.
+
 use core::{
     any::TypeId,
     fmt::{self, Debug, Display},

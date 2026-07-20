@@ -1,3 +1,7 @@
+//! `Display` / `Debug` for `ErrorImpl`, routed through the installed
+//! [`ReportHandler`](crate::ReportHandler) (or the value's own formatting when
+//! there is no handler).
+
 use core::fmt;
 
 use crate::{ptr::Ref, report_impl::ErrorImpl};

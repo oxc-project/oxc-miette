@@ -1,3 +1,6 @@
+//! The [`IntoDiagnostic`] extension trait: `.into_diagnostic()` turns any
+//! [`std::error::Error`] into a [`Report`](crate::Report).
+
 use thiserror::Error;
 
 use crate::{Diagnostic, Report};

@@ -1,4 +1,14 @@
 #![allow(clippy::needless_doctest_main, clippy::new_ret_no_self, clippy::wrong_self_convention)]
+//! [`Report`] — miette's boxed, type-erased diagnostic — plus the
+//! [`ReportHandler`] rendering hook, [`set_hook`], and the [`Result`] alias.
+//!
+//! `Report` is one machine word: a thin pointer to a heap `ErrorImpl` whose
+//! pointer/vtable machinery lives in `report_impl` and `ptr`. This module and
+//! its siblings (`report_impl`, `ptr`, `kind`, `macros`, `wrap_err`,
+//! `into_diagnostic`, `fmt`) are a vendored fork of [eyre](https://docs.rs/eyre)
+//! / [anyhow](https://docs.rs/anyhow), adapted to carry a miette
+//! [`Diagnostic`](crate::Diagnostic).
+
 use std::{error::Error as StdError, sync::OnceLock};
 
 #[doc(hidden)]
