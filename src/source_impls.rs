@@ -17,6 +17,7 @@ struct PrefixInfo {
 /// Scan the prefix before a span, retaining only its leading context lines.
 #[inline]
 fn scan_prefix(input: &[u8], cut: usize, context_lines_before: usize) -> PrefixInfo {
+    let prefix = &input[..cut];
     let mut line_count = 0usize;
     let mut start_line = 0usize;
     let mut line_starts = VecDeque::new();
@@ -27,25 +28,35 @@ fn scan_prefix(input: &[u8], cut: usize, context_lines_before: usize) -> PrefixI
         // a scalar instead of pushing and popping a VecDeque for every line in
         // the source prefix.
         let mut previous_line_start = None;
-        for pos in memchr::memchr2_iter(b'\r', b'\n', &input[..cut]) {
-            // Skip the `\n` of a CRLF pair already counted at its `\r`.
-            if input[pos] == b'\n' && pos > 0 && input[pos - 1] == b'\r' {
-                continue;
+        if memchr::memchr(b'\r', prefix).is_none() {
+            // Most source files only use LF. After one bulk CR check, the hot
+            // iterator can search for one byte and skip all CRLF branches.
+            for pos in memchr::memchr_iter(b'\n', prefix) {
+                line_count += 1;
+                previous_line_start = Some(current_line_start);
+                current_line_start = pos + 1;
             }
-            // A CRLF pair counts as a single line break, ending at the `\n`.
-            let line_end = if input[pos] == b'\r' && pos + 1 < cut && input[pos + 1] == b'\n' {
-                pos + 1
-            } else {
-                pos
-            };
-            line_count += 1;
-            previous_line_start = Some(current_line_start);
-            current_line_start = line_end + 1;
+        } else {
+            for pos in memchr::memchr2_iter(b'\r', b'\n', prefix) {
+                // Skip the `\n` of a CRLF pair already counted at its `\r`.
+                if input[pos] == b'\n' && pos > 0 && input[pos - 1] == b'\r' {
+                    continue;
+                }
+                // A CRLF pair counts as a single line break, ending at the `\n`.
+                let line_end = if input[pos] == b'\r' && pos + 1 < cut && input[pos + 1] == b'\n' {
+                    pos + 1
+                } else {
+                    pos
+                };
+                line_count += 1;
+                previous_line_start = Some(current_line_start);
+                current_line_start = line_end + 1;
+            }
         }
         start_line = line_count.saturating_sub(1);
         line_starts.extend(previous_line_start);
     } else {
-        for pos in memchr::memchr2_iter(b'\r', b'\n', &input[..cut]) {
+        for pos in memchr::memchr2_iter(b'\r', b'\n', prefix) {
             // Skip the `\n` of a CRLF pair already counted at its `\r`.
             if input[pos] == b'\n' && pos > 0 && input[pos - 1] == b'\r' {
                 continue;
@@ -680,6 +691,19 @@ where
 mod tests {
     use super::*;
     use crate::SpanContents;
+
+    #[test]
+    fn lf_prefix_fast_path_matches_generic_path() {
+        let input = b"zero\none\n\ntwo\nthree\n";
+        for cut in 0..=input.len() {
+            let fast = scan_prefix(input, cut, 1);
+            let generic = scan_prefix(input, cut, 2);
+            assert_eq!(fast.line_count, generic.line_count, "cut={cut}");
+            assert_eq!(fast.current_line_start, generic.current_line_start, "cut={cut}");
+            assert_eq!(fast.line_starts.front(), generic.line_starts.back(), "cut={cut}");
+            assert_eq!(fast.start_line, fast.line_count.saturating_sub(1), "cut={cut}");
+        }
+    }
 
     #[test]
     fn basic() -> Result<(), MietteError> {
