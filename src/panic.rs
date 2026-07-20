@@ -3,7 +3,7 @@ use std::{env, fmt::Write, mem::size_of, panic::set_hook};
 use backtrace::Backtrace;
 use thiserror::Error;
 
-use crate::{self as miette, Context, Diagnostic, Result};
+use crate::{self as miette, Diagnostic, Report};
 
 /// Tells miette to render panics using its rendering engine.
 pub fn set_panic_hook() {
@@ -16,14 +16,11 @@ pub fn set_panic_hook() {
         if let Some(msg) = payload.downcast_ref::<String>() {
             message = msg.clone();
         }
-        let mut report: Result<()> = Err(Panic(message).into());
         if let Some(loc) = info.location() {
-            report = report
-                .with_context(|| format!("at {}:{}:{}", loc.file(), loc.line(), loc.column()));
+            let _ = write!(message, "\n\tat {}:{}:{}", loc.file(), loc.line(), loc.column());
         }
-        if let Err(err) = report.with_context(|| "Main thread panicked.".to_string()) {
-            eprintln!("Error: {err:?}");
-        }
+        let report: Report = Panic(message).into();
+        eprintln!("Error: {report:?}");
     }));
 }
 
