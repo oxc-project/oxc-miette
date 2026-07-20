@@ -7,11 +7,12 @@ use core::{
 };
 use std::error::Error as StdError;
 
-use super::{
-    Report, ReportHandler,
+use crate::{
+    Diagnostic, Report, ReportHandler, SourceCode,
+    chain::Chain,
     ptr::{Mut, Own, Ref},
+    wrap_err::WithSourceCode,
 };
-use crate::{Diagnostic, SourceCode, chain::Chain, eyreish::wrapper::WithSourceCode};
 
 impl Report {
     /// Create a new error object from any error type.
@@ -102,7 +103,7 @@ impl Report {
         };
 
         // Safety: passing vtable that operates on the right type E.
-        let handler = Some(super::capture_handler(&error));
+        let handler = Some(crate::report::capture_handler(&error));
 
         unsafe { Report::construct(error, vtable, handler) }
     }
@@ -112,7 +113,7 @@ impl Report {
     where
         M: Display + Debug + Send + Sync + 'static,
     {
-        use super::wrapper::MessageError;
+        use crate::wrap_err::MessageError;
         let error: MessageError<M> = MessageError(message);
         let vtable = &ErrorVTable {
             object_drop: object_drop::<MessageError<M>>,
@@ -126,7 +127,7 @@ impl Report {
 
         // Safety: MessageError is repr(transparent) so it is okay for the
         // vtable to allow casting the MessageError<M> to M.
-        let handler = Some(super::capture_handler(&error));
+        let handler = Some(crate::report::capture_handler(&error));
 
         unsafe { Report::construct(error, vtable, handler) }
     }
@@ -150,16 +151,16 @@ impl Report {
         };
 
         // Safety: passing vtable that operates on the right type.
-        let handler = Some(super::capture_handler(&error));
+        let handler = Some(crate::report::capture_handler(&error));
 
         unsafe { Report::construct(error, vtable, handler) }
     }
 
     #[track_caller]
     pub(crate) fn from_boxed(error: Box<dyn Diagnostic + Send + Sync>) -> Self {
-        use super::wrapper::BoxedError;
+        use crate::wrap_err::BoxedError;
         let error = BoxedError(error);
-        let handler = Some(super::capture_handler(&error));
+        let handler = Some(crate::report::capture_handler(&error));
 
         let vtable = &ErrorVTable {
             object_drop: object_drop::<BoxedError>,
