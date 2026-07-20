@@ -29,8 +29,6 @@ pub struct GraphicalReportHandler {
     ///
     /// Default: `4`
     pub(crate) tab_width: usize,
-    /// Unused.
-    pub(crate) with_cause_chain: bool,
     /// Whether to wrap lines to fit the width.
     ///
     /// Default: `true`
@@ -65,7 +63,6 @@ impl GraphicalReportHandler {
             footer: None,
             context_lines: 1,
             tab_width: 4,
-            with_cause_chain: false,
             wrap_lines: true,
             break_words: true,
             word_separator: None,
@@ -84,7 +81,6 @@ impl GraphicalReportHandler {
             context_lines: 1,
             tab_width: 4,
             wrap_lines: true,
-            with_cause_chain: true,
             break_words: true,
             word_separator: None,
             word_splitter: None,
@@ -101,20 +97,6 @@ impl GraphicalReportHandler {
     /// Whether to enable error code linkification using [`Diagnostic::url()`](crate::Diagnostic::url).
     pub fn with_links(mut self, links: bool) -> Self {
         self.links = if links { LinkStyle::Link } else { LinkStyle::Text };
-        self
-    }
-
-    /// Include the cause chain of the top-level error in the graphical output,
-    /// if available.
-    pub fn with_cause_chain(mut self) -> Self {
-        self.with_cause_chain = true;
-        self
-    }
-
-    /// Do not include the cause chain of the top-level error in the graphical
-    /// output.
-    pub fn without_cause_chain(mut self) -> Self {
-        self.with_cause_chain = false;
         self
     }
 

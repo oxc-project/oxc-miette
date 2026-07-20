@@ -139,9 +139,7 @@ impl GraphicalReportHandler {
     ) -> fmt::Result {
         let related = diagnostic.related();
         if !related.is_empty() {
-            let mut inner_renderer = self.clone();
-            // Re-enable the printing of nested cause chains for related errors
-            inner_renderer.with_cause_chain = true;
+            let inner_renderer = self.clone();
             writeln!(f)?;
             for rel in related.iter().copied() {
                 match rel.severity() {
