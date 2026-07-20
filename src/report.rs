@@ -11,15 +11,9 @@
 
 use std::{error::Error as StdError, sync::OnceLock};
 
-#[doc(hidden)]
-#[allow(unreachable_pub)]
-pub use Report as ErrReport;
 /// Compatibility re-export of `Report` for interop with `anyhow`
 #[allow(unreachable_pub)]
 pub use Report as Error;
-#[doc(hidden)]
-#[allow(unreachable_pub)]
-pub use ReportHandler as EyreContext;
 
 #[cfg(not(feature = "fancy-base"))]
 use crate::DebugReportHandler;
