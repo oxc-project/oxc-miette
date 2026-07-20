@@ -122,24 +122,80 @@ impl Iterator for LineBreaks<'_> {
 struct LeadingContext {
     limit: usize,
     start_line: usize,
-    line_starts: VecDeque<usize>,
+    line_starts: RetainedLineStarts,
+}
+
+/// Storage for the retained line starts. The renderer's default one-line
+/// context stays inline instead of allocating a `VecDeque` for every span.
+enum RetainedLineStarts {
+    One(Option<usize>),
+    Many(VecDeque<usize>),
 }
 
 impl LeadingContext {
     fn new(limit: usize) -> Self {
-        Self { limit, start_line: 0, line_starts: VecDeque::new() }
+        let line_starts = if limit == 1 {
+            RetainedLineStarts::One(None)
+        } else {
+            RetainedLineStarts::Many(VecDeque::new())
+        };
+        Self { limit, start_line: 0, line_starts }
+    }
+
+    fn one(start_line: usize, line_start: Option<usize>) -> Self {
+        Self { limit: 1, start_line, line_starts: RetainedLineStarts::One(line_start) }
+    }
+
+    #[cfg(feature = "fancy-base")]
+    fn len(&self) -> usize {
+        match &self.line_starts {
+            RetainedLineStarts::One(line_start) => usize::from(line_start.is_some()),
+            RetainedLineStarts::Many(line_starts) => line_starts.len(),
+        }
+    }
+
+    fn first(&self) -> Option<usize> {
+        match &self.line_starts {
+            RetainedLineStarts::One(line_start) => *line_start,
+            RetainedLineStarts::Many(line_starts) => line_starts.front().copied(),
+        }
+    }
+
+    #[cfg(test)]
+    fn last(&self) -> Option<usize> {
+        match &self.line_starts {
+            RetainedLineStarts::One(line_start) => *line_start,
+            RetainedLineStarts::Many(line_starts) => line_starts.back().copied(),
+        }
     }
 
     fn push(&mut self, line_start: usize) {
-        self.line_starts.push_back(line_start);
-        if self.line_starts.len() > self.limit {
-            self.start_line += 1;
-            self.line_starts.pop_front();
+        match &mut self.line_starts {
+            RetainedLineStarts::One(retained) => {
+                if retained.replace(line_start).is_some() {
+                    self.start_line += 1;
+                }
+            }
+            RetainedLineStarts::Many(line_starts) => {
+                line_starts.push_back(line_start);
+                if line_starts.len() > self.limit {
+                    self.start_line += 1;
+                    line_starts.pop_front();
+                }
+            }
         }
     }
 
     fn starting_offset(&self, span_offset: usize) -> usize {
-        self.line_starts.front().copied().unwrap_or(if self.limit == 0 { span_offset } else { 0 })
+        self.first().unwrap_or(if self.limit == 0 { span_offset } else { 0 })
+    }
+
+    #[cfg(feature = "fancy-base")]
+    fn append_to(self, target: &mut Vec<usize>) {
+        match self.line_starts {
+            RetainedLineStarts::One(line_start) => target.extend(line_start),
+            RetainedLineStarts::Many(line_starts) => target.extend(line_starts),
+        }
     }
 }
 
@@ -196,9 +252,7 @@ impl PrefixScan {
             }
         }
 
-        let mut leading = LeadingContext::new(1);
-        leading.start_line = line_count.saturating_sub(1);
-        leading.line_starts.extend(previous_line_start);
+        let leading = LeadingContext::one(line_count.saturating_sub(1), previous_line_start);
         Self { line_count, leading, current_line_start }
     }
 }
@@ -415,10 +469,10 @@ impl<'a> LineIndex<'a> {
     fn init(&mut self, cut: usize, context_lines_before: usize) {
         let PrefixScan { line_count, leading, current_line_start } =
             PrefixScan::new(self.input, cut, context_lines_before);
-        debug_assert_eq!(leading.start_line + leading.line_starts.len(), line_count);
+        debug_assert_eq!(leading.start_line + leading.len(), line_count);
         self.base_line = leading.start_line;
-        self.line_starts.reserve(leading.line_starts.len() + 8);
-        self.line_starts.extend(leading.line_starts);
+        self.line_starts.reserve(leading.len() + 8);
+        leading.append_to(&mut self.line_starts);
         self.line_starts.push(current_line_start);
         self.frontier = cut;
     }
@@ -840,11 +894,7 @@ mod tests {
             let generic = PrefixScan::new(input, cut, 2);
             assert_eq!(fast.line_count, generic.line_count, "cut={cut}");
             assert_eq!(fast.current_line_start, generic.current_line_start, "cut={cut}");
-            assert_eq!(
-                fast.leading.line_starts.front(),
-                generic.leading.line_starts.back(),
-                "cut={cut}"
-            );
+            assert_eq!(fast.leading.first(), generic.leading.last(), "cut={cut}");
             assert_eq!(fast.leading.start_line, fast.line_count.saturating_sub(1), "cut={cut}");
         }
     }
