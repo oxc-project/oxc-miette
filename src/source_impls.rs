@@ -7,176 +7,326 @@ use std::{borrow::Cow, collections::VecDeque, fmt::Debug, sync::Arc};
 
 use crate::{MietteError, MietteSpanContents, SourceCode, SourceSpan, SpanContents};
 
-struct PrefixInfo {
-    line_count: usize,
+#[derive(Clone, Copy)]
+struct ContextLines {
+    before: usize,
+    after: usize,
+}
+
+impl ContextLines {
+    const fn new(before: usize, after: usize) -> Self {
+        Self { before, after }
+    }
+}
+
+/// The normalized, integer-only form of a [`SourceSpan`] query.
+#[derive(Clone, Copy)]
+struct SpanRequest {
+    offset: usize,
+    len: usize,
+}
+
+impl SpanRequest {
+    fn new(span: &SourceSpan) -> Self {
+        Self { offset: span.offset() as usize, len: span.len() as usize }
+    }
+
+    /// Boundary between the bulk prefix scan and the detailed span scan.
+    /// Never splits a CRLF pair.
+    fn prefix_end(self, input: &[u8]) -> usize {
+        let mut end = self.offset.saturating_sub(1).min(input.len());
+        if end > 0 && input[end - 1] == b'\r' {
+            end -= 1;
+        }
+        end
+    }
+
+    /// First byte at which the detailed scan has consumed the requested span.
+    fn end_threshold(self) -> usize {
+        self.offset.saturating_add(self.len).saturating_sub(1)
+    }
+
+    /// First line break that can belong to the trailing context.
+    fn trailing_break_threshold(self) -> usize {
+        self.offset.saturating_add(self.len.saturating_sub(1))
+    }
+}
+
+/// A logical line break. `start == end` for LF or CR and differs by one for
+/// CRLF, allowing all scanners to share the same newline handling.
+#[derive(Clone, Copy)]
+struct LineBreak {
+    #[cfg(feature = "fancy-base")]
+    start: usize,
+    end: usize,
+}
+
+impl LineBreak {
+    #[cfg(feature = "fancy-base")]
+    fn ending_at(input: &[u8], end: usize) -> Self {
+        let start =
+            if end > 0 && input[end] == b'\n' && input[end - 1] == b'\r' { end - 1 } else { end };
+        Self { start, end }
+    }
+
+    const fn next_line_start(self) -> usize {
+        self.end + 1
+    }
+
+    #[cfg(feature = "fancy-base")]
+    const fn shifted(self, offset: usize) -> Self {
+        Self { start: self.start + offset, end: self.end + offset }
+    }
+}
+
+/// Iterator over logical line breaks in a slice. It consumes CRLF as one item,
+/// so callers do not need their own "skip the LF" branches.
+struct LineBreaks<'a> {
+    input: &'a [u8],
+    positions: memchr::Memchr2<'a>,
+}
+
+impl<'a> LineBreaks<'a> {
+    fn new(input: &'a [u8]) -> Self {
+        Self { input, positions: memchr::memchr2_iter(b'\r', b'\n', input) }
+    }
+}
+
+impl Iterator for LineBreaks<'_> {
+    type Item = LineBreak;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let start = self.positions.next()?;
+            // The CR already represents this CRLF pair.
+            if start > 0 && self.input[start] == b'\n' && self.input[start - 1] == b'\r' {
+                continue;
+            }
+            let end = if self.input[start] == b'\r' && self.input.get(start + 1) == Some(&b'\n') {
+                start + 1
+            } else {
+                start
+            };
+            return Some(LineBreak {
+                #[cfg(feature = "fancy-base")]
+                start,
+                end,
+            });
+        }
+    }
+}
+
+/// The retained leading-context lines and the absolute line number of the
+/// first one. The size invariant lives here instead of being repeated by each
+/// scanner.
+struct LeadingContext {
+    limit: usize,
     start_line: usize,
     line_starts: VecDeque<usize>,
+}
+
+impl LeadingContext {
+    fn new(limit: usize) -> Self {
+        Self { limit, start_line: 0, line_starts: VecDeque::new() }
+    }
+
+    fn push(&mut self, line_start: usize) {
+        self.line_starts.push_back(line_start);
+        if self.line_starts.len() > self.limit {
+            self.start_line += 1;
+            self.line_starts.pop_front();
+        }
+    }
+
+    fn starting_offset(&self, span_offset: usize) -> usize {
+        self.line_starts.front().copied().unwrap_or(if self.limit == 0 { span_offset } else { 0 })
+    }
+}
+
+/// State produced by scanning the source prefix before a span.
+struct PrefixScan {
+    line_count: usize,
+    leading: LeadingContext,
     current_line_start: usize,
 }
 
-/// Scan the prefix before a span, retaining only its leading context lines.
-#[inline]
-fn scan_prefix(input: &[u8], cut: usize, context_lines_before: usize) -> PrefixInfo {
-    let prefix = &input[..cut];
-    let mut line_count = 0usize;
-    let mut start_line = 0usize;
-    let mut line_starts = VecDeque::new();
-    let mut current_line_start = 0usize;
+impl PrefixScan {
+    /// Scan the prefix before a span, retaining only its leading context lines.
+    #[inline]
+    fn new(input: &[u8], end: usize, context_lines_before: usize) -> Self {
+        let prefix = &input[..end];
+        if context_lines_before == 1 {
+            return Self::one_context_line(prefix);
+        }
 
-    if context_lines_before == 1 {
-        // The graphical handler's default. Keep only the one value we need in
-        // a scalar instead of pushing and popping a VecDeque for every line in
-        // the source prefix.
+        let mut scan = Self {
+            line_count: 0,
+            leading: LeadingContext::new(context_lines_before),
+            current_line_start: 0,
+        };
+        for line_break in LineBreaks::new(prefix) {
+            scan.line_count += 1;
+            scan.leading.push(scan.current_line_start);
+            scan.current_line_start = line_break.next_line_start();
+        }
+        scan
+    }
+
+    /// The graphical handler's default. Keep the one retained line start in a
+    /// scalar while scanning instead of updating a `VecDeque` for every line.
+    fn one_context_line(prefix: &[u8]) -> Self {
+        let mut line_count = 0;
+        let mut current_line_start = 0;
         let mut previous_line_start = None;
+
         if memchr::memchr(b'\r', prefix).is_none() {
-            // Most source files only use LF. After one bulk CR check, the hot
-            // iterator can search for one byte and skip all CRLF branches.
-            for pos in memchr::memchr_iter(b'\n', prefix) {
-                line_count += 1;
-                previous_line_start = Some(current_line_start);
-                current_line_start = pos + 1;
+            // Most source files only use LF. Count all breaks in one SIMD pass,
+            // then recover the two line starts the caller needs from the end.
+            line_count = bytecount::count(prefix, b'\n');
+            if let Some(last_break) = memchr::memrchr(b'\n', prefix) {
+                current_line_start = last_break + 1;
+                previous_line_start =
+                    Some(memchr::memrchr(b'\n', &prefix[..last_break]).map_or(0, |pos| pos + 1));
             }
         } else {
-            for pos in memchr::memchr2_iter(b'\r', b'\n', prefix) {
-                // Skip the `\n` of a CRLF pair already counted at its `\r`.
-                if input[pos] == b'\n' && pos > 0 && input[pos - 1] == b'\r' {
-                    continue;
-                }
-                // A CRLF pair counts as a single line break, ending at the `\n`.
-                let line_end = if input[pos] == b'\r' && pos + 1 < cut && input[pos + 1] == b'\n' {
-                    pos + 1
-                } else {
-                    pos
-                };
+            for line_break in LineBreaks::new(prefix) {
                 line_count += 1;
                 previous_line_start = Some(current_line_start);
-                current_line_start = line_end + 1;
+                current_line_start = line_break.next_line_start();
             }
         }
-        start_line = line_count.saturating_sub(1);
-        line_starts.extend(previous_line_start);
-    } else {
-        for pos in memchr::memchr2_iter(b'\r', b'\n', prefix) {
-            // Skip the `\n` of a CRLF pair already counted at its `\r`.
-            if input[pos] == b'\n' && pos > 0 && input[pos - 1] == b'\r' {
-                continue;
-            }
-            // A CRLF pair counts as a single line break, ending at the `\n`.
-            let line_end = if input[pos] == b'\r' && pos + 1 < cut && input[pos + 1] == b'\n' {
-                pos + 1
-            } else {
-                pos
-            };
-            line_count += 1;
-            line_starts.push_back(current_line_start);
-            if line_starts.len() > context_lines_before {
-                start_line += 1;
-                line_starts.pop_front();
-            }
-            current_line_start = line_end + 1;
-        }
-    }
 
-    PrefixInfo { line_count, start_line, line_starts, current_line_start }
+        let mut leading = LeadingContext::new(1);
+        leading.start_line = line_count.saturating_sub(1);
+        leading.line_starts.extend(previous_line_start);
+        Self { line_count, leading, current_line_start }
+    }
 }
 
-fn context_info<'a>(
+/// Tracks when the requested span has been consumed and how much trailing
+/// context has subsequently been collected.
+#[derive(Default)]
+struct TrailingContext {
+    active: bool,
+    saw_newline: bool,
+    line_count: usize,
+}
+
+impl TrailingContext {
+    fn activate(&mut self) {
+        self.active = true;
+    }
+
+    fn record_break(&mut self) {
+        if self.saw_newline {
+            self.line_count += 1;
+        } else {
+            self.saw_newline = true;
+        }
+    }
+
+    fn is_complete(&self, requested_lines: usize) -> bool {
+        self.line_count >= requested_lines
+    }
+}
+
+/// A single `read_span` operation. Keeping its counters together makes the
+/// phase transitions and the final payload invariants explicit.
+struct SpanReader<'a> {
     input: &'a [u8],
-    span: &SourceSpan,
-    context_lines_before: usize,
-    context_lines_after: usize,
-) -> Result<MietteSpanContents<'a>, MietteError> {
-    let span_offset = span.offset() as usize;
-    let span_len = span.len() as usize;
-    let mut end_lines = 0usize;
-    let mut post_span = false;
-    let mut post_span_got_newline = false;
+    request: SpanRequest,
+    context: ContextLines,
+    leading: LeadingContext,
+    trailing: TrailingContext,
+    line_count: usize,
+    current_line_start: usize,
+    start_column: usize,
+    offset: usize,
+}
 
-    // The byte-by-byte loop below only needs to run from just before the
-    // span to the end of the trailing context: bytes strictly before
-    // `span_offset - 1` can only exercise its "before the span" branches,
-    // so that region is scanned in bulk with memchr instead. `cut` is
-    // adjusted so a CRLF pair is never split across the boundary.
-    let mut cut = span_offset.saturating_sub(1).min(input.len());
-    if cut > 0 && input[cut - 1] == b'\r' {
-        cut -= 1;
-    }
-    let PrefixInfo {
-        mut line_count,
-        mut start_line,
-        line_starts: mut before_lines_starts,
-        mut current_line_start,
-    } = scan_prefix(input, cut, context_lines_before);
-    // `current_line_start..cut` contains no line breaks.
-    let mut start_column = cut - current_line_start;
-    let mut offset = cut;
-    let mut iter = input[cut..].iter().copied().peekable();
-    while let Some(char) = iter.next() {
-        if matches!(char, b'\r' | b'\n') {
-            line_count += 1;
-            if char == b'\r' && iter.next_if_eq(&b'\n').is_some() {
-                offset += 1;
-            }
-            if offset < span_offset {
-                // We're before the start of the span.
-                start_column = 0;
-                before_lines_starts.push_back(current_line_start);
-                if before_lines_starts.len() > context_lines_before {
-                    start_line += 1;
-                    before_lines_starts.pop_front();
-                }
-            } else if offset >= span_offset + span_len.saturating_sub(1) {
-                // We're after the end of the span, but haven't necessarily
-                // started collecting end lines yet (we might still be
-                // collecting context lines).
-                if post_span {
-                    start_column = 0;
-                    if post_span_got_newline {
-                        end_lines += 1;
-                    } else {
-                        post_span_got_newline = true;
-                    }
-                    if end_lines >= context_lines_after {
-                        offset += 1;
-                        break;
-                    }
-                }
-            }
-            current_line_start = offset + 1;
-        } else if offset < span_offset {
-            start_column += 1;
+impl<'a> SpanReader<'a> {
+    fn new(input: &'a [u8], request: SpanRequest, context: ContextLines) -> Self {
+        let offset = request.prefix_end(input);
+        let PrefixScan { line_count, leading, current_line_start } =
+            PrefixScan::new(input, offset, context.before);
+        Self {
+            input,
+            request,
+            context,
+            leading,
+            trailing: TrailingContext::default(),
+            line_count,
+            current_line_start,
+            start_column: offset - current_line_start,
+            offset,
         }
-
-        if offset >= (span_offset + span_len).saturating_sub(1) {
-            post_span = true;
-            if end_lines >= context_lines_after {
-                offset += 1;
-                break;
-            }
-        }
-
-        offset += 1;
     }
 
-    if offset >= (span_offset + span_len).saturating_sub(1) {
-        let starting_offset = before_lines_starts
-            .front()
-            .copied()
-            .unwrap_or(if context_lines_before == 0 { span_offset } else { 0 });
-        // A zero-length span starting just past the end of the input passes
-        // the check above but has no content to slice.
-        if starting_offset > offset {
+    fn read(mut self) -> Result<MietteSpanContents<'a>, MietteError> {
+        while self.offset < self.input.len() {
+            let byte = self.input[self.offset];
+            if matches!(byte, b'\r' | b'\n') {
+                let end = if byte == b'\r' && self.input.get(self.offset + 1) == Some(&b'\n') {
+                    self.offset + 1
+                } else {
+                    self.offset
+                };
+                if self.consume_line_break(end) {
+                    self.offset = end + 1;
+                    break;
+                }
+                self.offset = end;
+            } else if self.offset < self.request.offset {
+                self.start_column += 1;
+            }
+
+            if self.offset >= self.request.end_threshold() {
+                self.trailing.activate();
+                if self.trailing.is_complete(self.context.after) {
+                    self.offset += 1;
+                    break;
+                }
+            }
+            self.offset += 1;
+        }
+        self.finish()
+    }
+
+    /// Returns whether the requested trailing context is complete.
+    fn consume_line_break(&mut self, end: usize) -> bool {
+        self.line_count += 1;
+        if end < self.request.offset {
+            self.start_column = 0;
+            self.leading.push(self.current_line_start);
+        } else if end >= self.request.trailing_break_threshold() && self.trailing.active {
+            self.start_column = 0;
+            self.trailing.record_break();
+            if self.trailing.is_complete(self.context.after) {
+                return true;
+            }
+        }
+        self.current_line_start = end + 1;
+        false
+    }
+
+    fn finish(self) -> Result<MietteSpanContents<'a>, MietteError> {
+        if self.offset < self.request.end_threshold() {
             return Err(MietteError::OutOfBounds);
         }
+
+        let start = self.leading.starting_offset(self.request.offset);
+        // A zero-length span starting just past the end of the input reaches
+        // the threshold but has no content to slice.
+        let Some(data) = self.input.get(start..self.offset) else {
+            return Err(MietteError::OutOfBounds);
+        };
         Ok(MietteSpanContents::new(
-            &input[starting_offset..offset],
-            (starting_offset as u32, (offset - starting_offset) as u32).into(),
-            start_line,
-            if context_lines_before == 0 { start_column } else { 0 },
-            line_count,
+            data,
+            (start as u32, (self.offset - start) as u32).into(),
+            self.leading.start_line,
+            if self.context.before == 0 { self.start_column } else { 0 },
+            self.line_count,
         ))
-    } else {
-        Err(MietteError::OutOfBounds)
     }
 }
 
@@ -190,7 +340,7 @@ impl MietteSpanContents<'_> {
     /// that already holds a `SpanContents` locate a label inside it instead of
     /// issuing a second full [`SourceCode::read_span`]. Returns `None` when
     /// `offset` is past this payload (which `read_span` reports as
-    /// `OutOfBounds`). Newline handling mirrors [`context_info`] (a `\r\n` pair
+    /// `OutOfBounds`). Newline handling mirrors [`SpanReader`] (a `\r\n` pair
     /// and a lone `\r`/`\n` each count once), scanned with the same `memchr2`
     /// primitive so a long (e.g. minified) line stays cheap.
     // Only the `fancy` graphical renderer consumes this today; without it the
@@ -207,7 +357,7 @@ impl MietteSpanContents<'_> {
             return None;
         }
         // An offset landing on the `\n` of a `\r\n` pair sits inside an
-        // unfinished break: `context_info` has not advanced the line at that
+        // unfinished break: `SpanReader` has not advanced the line at that
         // byte and reports the preceding `\r`. Normalize to that byte.
         if rel > 0 && rel < data.len() && data[rel - 1] == b'\r' && data[rel] == b'\n' {
             rel -= 1;
@@ -217,19 +367,9 @@ impl MietteSpanContents<'_> {
         // line `offset` falls on. `None` until the first break is seen, meaning
         // `offset` is still on this payload's first line.
         let mut line_start: Option<usize> = None;
-        for pos in memchr::memchr2_iter(b'\r', b'\n', &data[..rel]) {
-            // Skip the `\n` of a `\r\n` pair already counted at its `\r`.
-            if data[pos] == b'\n' && pos > 0 && data[pos - 1] == b'\r' {
-                continue;
-            }
+        for line_break in LineBreaks::new(&data[..rel]) {
             line += 1;
-            // A `\r\n` pair is a single break ending at the `\n`.
-            let line_end = if data[pos] == b'\r' && pos + 1 < rel && data[pos + 1] == b'\n' {
-                pos + 1
-            } else {
-                pos
-            };
-            line_start = Some(line_end + 1);
+            line_start = Some(line_break.next_line_start());
         }
         Some(match line_start {
             // A later line, which by definition starts at column 0.
@@ -240,32 +380,10 @@ impl MietteSpanContents<'_> {
     }
 }
 
-/// A line-break index over a contiguous source buffer, built with a single
-/// forward `memchr` scan and able to answer repeated [`read_span`]-shaped
-/// queries without re-reading the source.
-///
-/// [`GraphicalReportHandler`] needs one span lookup per label plus one per
-/// attempted snippet merge, and every [`context_info`] call scans the source
-/// from byte 0 again — a diagnostic with several labels pays for the same
-/// prefix repeatedly. A `SpanScanner` instead scans each source byte at most
-/// once: the first query skips the prefix in bulk exactly like
-/// [`context_info`] does, every line start from the first context window on
-/// is recorded as the scan advances, and each query's result is computed from
-/// that index. Results are identical to what [`context_info`] returns for the
-/// same query — including its quirks, since [`GraphicalReportHandler`] mixes
-/// scanner-served contents with `read_span`-served ones — and the
-/// `scanner_matches_context_info_exhaustively` test enforces the equivalence.
-/// Queries the index cannot serve (an offset before the first indexed line,
-/// which the renderer's sorted label order never produces) fall back to
-/// [`context_info`].
-///
-/// [`read_span`]: crate::SourceCode::read_span
-/// [`GraphicalReportHandler`]: crate::handlers::GraphicalReportHandler
+/// Lazily built line-start index over a contiguous source buffer.
 #[cfg(feature = "fancy-base")]
-pub(crate) struct SpanScanner<'a> {
+struct LineIndex<'a> {
     input: &'a [u8],
-    context_lines_before: usize,
-    context_lines_after: usize,
     /// Starts (byte offsets) of consecutive lines, the first of which is line
     /// number `base_line`; covers every line whose start lies in
     /// `[line_starts[0], frontier]`. Empty until the first query seeds it.
@@ -279,66 +397,28 @@ pub(crate) struct SpanScanner<'a> {
 }
 
 #[cfg(feature = "fancy-base")]
-impl<'a> SpanScanner<'a> {
-    pub(crate) fn new(
-        input: &'a [u8],
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Self {
-        Self {
-            input,
-            context_lines_before,
-            context_lines_after,
-            line_starts: Vec::new(),
-            base_line: 0,
-            frontier: 0,
-        }
+impl<'a> LineIndex<'a> {
+    fn new(input: &'a [u8]) -> Self {
+        Self { input, line_starts: Vec::new(), base_line: 0, frontier: 0 }
     }
 
-    /// Equivalent to `context_info(input, span, context_lines_before,
-    /// context_lines_after)`, but scanning only source bytes no earlier query
-    /// has scanned.
-    pub(crate) fn read_span(
-        &mut self,
-        span: &SourceSpan,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
-        let span_offset = span.offset() as usize;
-        // The same bulk/detail boundary as `context_info`, adjusted the same
-        // way so a CRLF pair is never split.
-        let mut cut = span_offset.saturating_sub(1).min(self.input.len());
-        if cut > 0 && self.input[cut - 1] == b'\r' {
-            cut -= 1;
-        }
-        let before = self.context_lines_before;
-        if self.line_starts.is_empty() {
-            self.init(cut);
-        } else {
-            if cut < self.line_starts[0] {
-                return context_info(self.input, span, before, self.context_lines_after);
-            }
-            self.cover(cut);
-            // The query's leading context must not reach lines above the
-            // index origin (only possible for spans out of sorted order).
-            let cut_line = self.line_index_of(cut);
-            if cut_line - before.min(cut_line) < self.base_line {
-                return context_info(self.input, span, before, self.context_lines_after);
-            }
-        }
-        self.replay(span, cut)
+    fn is_empty(&self) -> bool {
+        self.line_starts.is_empty()
     }
 
-    /// First query: scan `[0, cut)` in bulk exactly like [`context_info`],
-    /// keeping the running line number and the last `context_lines_before`
-    /// line starts, then seed the index with those retained starts — the
-    /// first context window's lines.
-    fn init(&mut self, cut: usize) {
-        let before = self.context_lines_before;
-        let PrefixInfo { line_count, start_line, line_starts: ring, current_line_start } =
-            scan_prefix(self.input, cut, before);
-        debug_assert_eq!(start_line + ring.len(), line_count);
-        self.base_line = start_line;
-        self.line_starts.reserve(ring.len() + 8);
-        self.line_starts.extend(ring);
+    fn origin(&self) -> Option<usize> {
+        self.line_starts.first().copied()
+    }
+
+    /// First query: retain the line starts in its leading context window and
+    /// use them as the origin of the reusable index.
+    fn init(&mut self, cut: usize, context_lines_before: usize) {
+        let PrefixScan { line_count, leading, current_line_start } =
+            PrefixScan::new(self.input, cut, context_lines_before);
+        debug_assert_eq!(leading.start_line + leading.line_starts.len(), line_count);
+        self.base_line = leading.start_line;
+        self.line_starts.reserve(leading.line_starts.len() + 8);
+        self.line_starts.extend(leading.line_starts);
         self.line_starts.push(current_line_start);
         self.frontier = cut;
     }
@@ -356,37 +436,22 @@ impl<'a> SpanScanner<'a> {
         if target <= self.frontier {
             return;
         }
-        for rel in memchr::memchr2_iter(b'\r', b'\n', &self.input[self.frontier..target]) {
-            let pos = self.frontier + rel;
-            if self.input[pos] == b'\n' && pos > 0 && self.input[pos - 1] == b'\r' {
-                continue;
-            }
-            let line_end = if self.input[pos] == b'\r' && self.input.get(pos + 1) == Some(&b'\n') {
-                pos + 1
-            } else {
-                pos
-            };
-            self.line_starts.push(line_end + 1);
+        for line_break in LineBreaks::new(&self.input[self.frontier..target]) {
+            self.line_starts.push(line_break.shifted(self.frontier).next_line_start());
         }
         self.frontier = target;
     }
 
     /// Scan forward from `frontier` to the next line break, recording the
     /// line start after it. `None` at end of input (with `frontier` advanced
-    /// there so the probe isn't repeated). Returns the terminator as
-    /// `(start, end)` byte positions — equal except for `\r\n`.
-    fn extend(&mut self) -> Option<(usize, usize)> {
-        match memchr::memchr2(b'\r', b'\n', &self.input[self.frontier..]) {
-            Some(rel) => {
-                let pos = self.frontier + rel;
-                let end = if self.input[pos] == b'\r' && self.input.get(pos + 1) == Some(&b'\n') {
-                    pos + 1
-                } else {
-                    pos
-                };
-                self.line_starts.push(end + 1);
-                self.frontier = end + 1;
-                Some((pos, end))
+    /// there so the probe isn't repeated).
+    fn extend(&mut self) -> Option<LineBreak> {
+        match LineBreaks::new(&self.input[self.frontier..]).next() {
+            Some(line_break) => {
+                let line_break = line_break.shifted(self.frontier);
+                self.line_starts.push(line_break.next_line_start());
+                self.frontier = line_break.next_line_start();
+                Some(line_break)
             }
             None => {
                 self.frontier = self.input.len();
@@ -407,140 +472,211 @@ impl<'a> SpanScanner<'a> {
         self.line_starts[line - self.base_line]
     }
 
-    /// The break terminating line number `line` (which contains `pos`), as
-    /// `(terminator_start, terminator_end)`, extending the scan on demand.
+    /// The break terminating line number `line` (which contains `pos`),
+    /// extending the scan on demand.
     /// `None` when the line runs to end of input.
-    fn break_ending_line(&mut self, line: usize, pos: usize) -> Option<(usize, usize)> {
+    fn break_ending_line(&mut self, line: usize, pos: usize) -> Option<LineBreak> {
         if let Some(&next_start) = self.line_starts.get(line + 1 - self.base_line) {
-            let end = next_start - 1;
-            let start = if end > 0 && self.input[end] == b'\n' && self.input[end - 1] == b'\r' {
-                end - 1
-            } else {
-                end
-            };
-            debug_assert!(start >= pos);
-            return Some((start, end));
+            let line_break = LineBreak::ending_at(self.input, next_start - 1);
+            debug_assert!(line_break.start >= pos);
+            return Some(line_break);
         }
         // `pos` is on the last indexed line; its terminator (if any) is at or
         // past the frontier.
         debug_assert!(pos <= self.frontier);
         self.extend()
     }
+}
 
-    /// Compute `context_info`'s exact result for `span` from the index,
-    /// jumping break to break instead of walking byte by byte. Mirrors that
-    /// function's branches one for one — including its quirks: `line_count`
-    /// counts breaks from byte 0 up to where the scan stops, a zero-length
-    /// span enters its post-span phase one byte early, and a `context_lines_before`
-    /// of 0 reports a column that later breaks may have reset — so the two
-    /// stay interchangeable.
-    fn replay(
-        &mut self,
-        span: &SourceSpan,
-        cut: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
-        let input = self.input;
-        let before = self.context_lines_before;
-        let after = self.context_lines_after;
-        let span_offset = span.offset() as usize;
-        let span_len = span.len() as usize;
-        // `context_info` compares against both of these; they differ for
-        // zero-length spans.
-        let post_threshold = (span_offset + span_len).saturating_sub(1);
-        let break_threshold = span_offset + span_len.saturating_sub(1);
+/// Leading-context state reconstructed from a [`LineIndex`].
+#[cfg(feature = "fancy-base")]
+struct IndexedLeadingContext {
+    limit: usize,
+    start_line: usize,
+    len: usize,
+}
 
-        // State at `cut`, reconstructed from the index instead of a scan.
-        let cut_line = self.line_index_of(cut);
-        let mut line_count = cut_line;
-        // `context_info`'s `before_lines_starts` ring holds the starts of the
-        // last `min(before, lines so far)` lines — always consecutive lines —
-        // so it is tracked as (first line, length) against the index, and
-        // `ring_line` doubles as its `start_line` counter.
-        let mut ring_line = cut_line - before.min(cut_line);
-        let mut ring_len = cut_line - ring_line;
-        let mut start_column = cut - self.line_start_of(cut_line);
-        let mut end_lines = 0usize;
-        let mut post_span = false;
-        let mut post_span_got_newline = false;
+#[cfg(feature = "fancy-base")]
+impl IndexedLeadingContext {
+    fn new(current_line: usize, limit: usize) -> Self {
+        let start_line = current_line - limit.min(current_line);
+        Self { limit, start_line, len: current_line - start_line }
+    }
 
-        let mut pos = cut;
-        // Exclusive end of the context window (`context_info`'s final
-        // `offset`).
+    fn push(&mut self) {
+        self.len += 1;
+        if self.len > self.limit {
+            self.start_line += 1;
+            self.len -= 1;
+        }
+    }
+
+    fn starting_offset(&self, index: &LineIndex<'_>, span_offset: usize) -> usize {
+        if self.len > 0 {
+            index.line_start_of(self.start_line)
+        } else if self.limit == 0 {
+            span_offset
+        } else {
+            0
+        }
+    }
+}
+
+/// One span query replayed against a reusable [`LineIndex`].
+#[cfg(feature = "fancy-base")]
+struct IndexedReader<'index, 'source> {
+    index: &'index mut LineIndex<'source>,
+    request: SpanRequest,
+    context: ContextLines,
+    leading: IndexedLeadingContext,
+    trailing: TrailingContext,
+    line_count: usize,
+    start_column: usize,
+    position: usize,
+}
+
+#[cfg(feature = "fancy-base")]
+impl<'index, 'source> IndexedReader<'index, 'source> {
+    fn new(
+        index: &'index mut LineIndex<'source>,
+        request: SpanRequest,
+        context: ContextLines,
+        position: usize,
+    ) -> Self {
+        let line_count = index.line_index_of(position);
+        Self {
+            start_column: position - index.line_start_of(line_count),
+            index,
+            request,
+            context,
+            leading: IndexedLeadingContext::new(line_count, context.before),
+            trailing: TrailingContext::default(),
+            line_count,
+            position,
+        }
+    }
+
+    /// Jump line break to line break while preserving [`SpanReader`]'s exact
+    /// edge-case behavior.
+    fn read(mut self) -> Result<MietteSpanContents<'source>, MietteError> {
+        let input = self.index.input;
         let window_end = loop {
-            let brk = self.break_ending_line(line_count, pos);
-            let run_end = brk.map_or(input.len(), |(start, _)| start);
-            // The break-free run `[pos, run_end)`. All `context_info` does
-            // per byte here is advance the column while before the span, and
-            // check whether the post-span phase begins — stopping just past
-            // the first such byte once no more trailing context is wanted.
-            if pos < span_offset {
-                start_column += span_offset.min(run_end) - pos;
+            let line_break = self.index.break_ending_line(self.line_count, self.position);
+            let run_end = line_break.map_or(input.len(), |line_break| line_break.start);
+            if self.position < self.request.offset {
+                self.start_column += self.request.offset.min(run_end) - self.position;
             }
-            if run_end > post_threshold && run_end > pos {
-                post_span = true;
-                if end_lines >= after {
-                    break post_threshold.max(pos) + 1;
+            if run_end > self.request.end_threshold() && run_end > self.position {
+                self.trailing.activate();
+                if self.trailing.is_complete(self.context.after) {
+                    break self.request.end_threshold().max(self.position) + 1;
                 }
             }
-            let Some((_, end)) = brk else {
+            let Some(line_break) = line_break else {
                 // No more breaks: the scan runs off the end of the input.
                 break input.len();
             };
-            // The break itself.
-            line_count += 1;
-            if end < span_offset {
-                // Before the span: the terminated line becomes (potential)
-                // leading context.
-                start_column = 0;
-                ring_len += 1;
-                if ring_len > before {
-                    ring_line += 1;
-                    ring_len -= 1;
-                }
-            } else if end >= break_threshold && post_span {
-                // Past the span: collect trailing context lines.
-                start_column = 0;
-                if post_span_got_newline {
-                    end_lines += 1;
-                } else {
-                    post_span_got_newline = true;
-                }
-                if end_lines >= after {
-                    break end + 1;
-                }
+            if self.consume_line_break(line_break.end) {
+                break line_break.next_line_start();
             }
-            if end >= post_threshold {
-                post_span = true;
-                if end_lines >= after {
-                    break end + 1;
-                }
-            }
-            pos = end + 1;
+            self.position = line_break.next_line_start();
         };
+        self.finish(window_end)
+    }
 
-        if window_end >= post_threshold {
-            let starting_offset = if ring_len > 0 {
-                self.line_start_of(ring_line)
-            } else if before == 0 {
-                span_offset
-            } else {
-                0
-            };
-            // A zero-length span starting just past the end of the input
-            // passes the check above but has no content to slice.
-            if starting_offset > window_end {
-                return Err(MietteError::OutOfBounds);
+    fn consume_line_break(&mut self, end: usize) -> bool {
+        self.line_count += 1;
+        if end < self.request.offset {
+            self.start_column = 0;
+            self.leading.push();
+        } else if end >= self.request.trailing_break_threshold() && self.trailing.active {
+            self.start_column = 0;
+            self.trailing.record_break();
+            if self.trailing.is_complete(self.context.after) {
+                return true;
             }
-            Ok(MietteSpanContents::new(
-                &input[starting_offset..window_end],
-                (starting_offset as u32, (window_end - starting_offset) as u32).into(),
-                ring_line,
-                if before == 0 { start_column } else { 0 },
-                line_count,
-            ))
-        } else {
-            Err(MietteError::OutOfBounds)
         }
+        if end >= self.request.end_threshold() {
+            self.trailing.activate();
+            return self.trailing.is_complete(self.context.after);
+        }
+        false
+    }
+
+    fn finish(self, window_end: usize) -> Result<MietteSpanContents<'source>, MietteError> {
+        if window_end < self.request.end_threshold() {
+            return Err(MietteError::OutOfBounds);
+        }
+        let start = self.leading.starting_offset(self.index, self.request.offset);
+        let Some(data) = self.index.input.get(start..window_end) else {
+            return Err(MietteError::OutOfBounds);
+        };
+        Ok(MietteSpanContents::new(
+            data,
+            (start as u32, (window_end - start) as u32).into(),
+            self.leading.start_line,
+            if self.context.before == 0 { self.start_column } else { 0 },
+            self.line_count,
+        ))
+    }
+}
+
+/// A line-break index over a contiguous source buffer, built with a single
+/// forward scan and able to answer repeated [`read_span`]-shaped queries
+/// without re-reading the source.
+///
+/// [`GraphicalReportHandler`] needs one span lookup per label plus one per
+/// attempted snippet merge. A `SpanScanner` scans each source byte at most
+/// once and records line starts for reuse. Queries that precede the index's
+/// origin fall back to a standalone [`SpanReader`].
+///
+/// [`read_span`]: crate::SourceCode::read_span
+/// [`GraphicalReportHandler`]: crate::handlers::GraphicalReportHandler
+#[cfg(feature = "fancy-base")]
+pub(crate) struct SpanScanner<'a> {
+    context: ContextLines,
+    index: LineIndex<'a>,
+}
+
+#[cfg(feature = "fancy-base")]
+impl<'a> SpanScanner<'a> {
+    pub(crate) fn new(
+        input: &'a [u8],
+        context_lines_before: usize,
+        context_lines_after: usize,
+    ) -> Self {
+        Self {
+            context: ContextLines::new(context_lines_before, context_lines_after),
+            index: LineIndex::new(input),
+        }
+    }
+
+    /// Read a span while scanning only source bytes no earlier query scanned.
+    pub(crate) fn read_span(
+        &mut self,
+        span: &SourceSpan,
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
+        let request = SpanRequest::new(span);
+        let cut = request.prefix_end(self.index.input);
+        if self.index.is_empty() {
+            self.index.init(cut, self.context.before);
+        } else {
+            if cut < self.index.origin().expect("a non-empty index has an origin") {
+                return self.read_unindexed(request);
+            }
+            self.index.cover(cut);
+            // The query's leading context must not reach lines above the
+            // index origin (only possible for spans out of sorted order).
+            let cut_line = self.index.line_index_of(cut);
+            if cut_line - self.context.before.min(cut_line) < self.index.base_line {
+                return self.read_unindexed(request);
+            }
+        }
+        IndexedReader::new(&mut self.index, request, self.context, cut).read()
+    }
+
+    fn read_unindexed(&self, request: SpanRequest) -> Result<MietteSpanContents<'a>, MietteError> {
+        SpanReader::new(self.index.input, request, self.context).read()
     }
 }
 
@@ -551,8 +687,12 @@ impl SourceCode for [u8] {
         context_lines_before: usize,
         context_lines_after: usize,
     ) -> Result<MietteSpanContents<'a>, MietteError> {
-        let contents = context_info(self, span, context_lines_before, context_lines_after)?;
-        Ok(contents)
+        SpanReader::new(
+            self,
+            SpanRequest::new(span),
+            ContextLines::new(context_lines_before, context_lines_after),
+        )
+        .read()
     }
 
     fn contiguous_bytes(&self) -> Option<&[u8]> {
@@ -696,12 +836,16 @@ mod tests {
     fn lf_prefix_fast_path_matches_generic_path() {
         let input = b"zero\none\n\ntwo\nthree\n";
         for cut in 0..=input.len() {
-            let fast = scan_prefix(input, cut, 1);
-            let generic = scan_prefix(input, cut, 2);
+            let fast = PrefixScan::new(input, cut, 1);
+            let generic = PrefixScan::new(input, cut, 2);
             assert_eq!(fast.line_count, generic.line_count, "cut={cut}");
             assert_eq!(fast.current_line_start, generic.current_line_start, "cut={cut}");
-            assert_eq!(fast.line_starts.front(), generic.line_starts.back(), "cut={cut}");
-            assert_eq!(fast.start_line, fast.line_count.saturating_sub(1), "cut={cut}");
+            assert_eq!(
+                fast.leading.line_starts.front(),
+                generic.leading.line_starts.back(),
+                "cut={cut}"
+            );
+            assert_eq!(fast.leading.start_line, fast.line_count.saturating_sub(1), "cut={cut}");
         }
     }
 
@@ -915,7 +1059,7 @@ mod scanner_tests {
     }
 
     /// Run one query against a (stateful) scanner and assert the result is
-    /// identical to a fresh `context_info` — data, span, line, column, and
+    /// identical to a fresh `SpanReader` — data, span, line, column, and
     /// `line_count` on success, `OutOfBounds` on failure. `history` is the
     /// queries already issued to this scanner, which its state (and therefore
     /// any failure) depends on.
@@ -928,7 +1072,12 @@ mod scanner_tests {
         history: &[(usize, usize)],
     ) {
         let source_span: SourceSpan = (span.0 as u32, span.1 as u32).into();
-        let expected = context_info(input, &source_span, before, after);
+        let expected = SpanReader::new(
+            input,
+            SpanRequest::new(&source_span),
+            ContextLines::new(before, after),
+        )
+        .read();
         let got = scanner.read_span(&source_span);
         let src = String::from_utf8_lossy(input);
         match (&expected, &got) {
@@ -950,7 +1099,7 @@ mod scanner_tests {
         }
     }
 
-    /// Differentially fuzz `SpanScanner` against `context_info` with query
+    /// Differentially fuzz `SpanScanner` against `SpanReader` with query
     /// *sequences* — the scanner's whole point is state carried between
     /// queries, so single-shot checks would miss its interesting bugs. Covers
     /// LF / CRLF / lone-CR and multibyte sources; spans of any alignment
@@ -964,7 +1113,7 @@ mod scanner_tests {
                   and interprets it orders of magnitude slower; the scanner path is still \
                   exercised under Miri by the normal snapshot tests"
     )]
-    fn scanner_matches_context_info_exhaustively() {
+    fn scanner_matches_span_reader_exhaustively() {
         let alphabets: &[&[&str]] = &[
             &["a", "\n"],
             &["a", "b", "c", "\n"],
@@ -1013,7 +1162,7 @@ mod scanner_tests {
         assert!(checked > 100_000, "expected a broad sweep, only checked {checked}");
     }
 
-    /// The empty-source and just-past-EOF edge cases `context_info` special
+    /// The empty-source and just-past-EOF edge cases `SpanReader` special
     /// cases, issued through one scanner.
     #[test]
     fn zero_length_spans_at_eof() {
