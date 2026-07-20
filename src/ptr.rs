@@ -1,3 +1,7 @@
+//! Thin owning/borrowing pointer wrappers (`Own`, `Ref`, `Mut`) that
+//! [`Report`](crate::Report)'s type-erased storage is built on. Vendored from
+//! [anyhow](https://docs.rs/anyhow)'s `ptr.rs`.
+
 use std::{marker::PhantomData, ptr::NonNull};
 
 #[repr(transparent)]

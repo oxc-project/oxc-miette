@@ -4,6 +4,11 @@
     clippy::new_ret_no_self,
     clippy::wrong_self_convention
 )]
+//! Autoref-specialization dispatch for `miette!(expr)`: picks up the argument's
+//! [`std::error::Error`] impl when it has one, otherwise falls back to
+//! `Display + Debug`. Vendored from [eyre](https://docs.rs/eyre) / anyhow; the
+//! comment below explains the mechanism in detail.
+
 // Tagged dispatch mechanism for resolving the behavior of `miette!($expr)`.
 //
 // When miette! is given a single expr argument to turn into miette::Report, we

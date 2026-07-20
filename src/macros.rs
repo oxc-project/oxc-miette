@@ -1,4 +1,6 @@
 #![allow(clippy::needless_doctest_main)]
+//! The `bail!`, `ensure!`, and `miette!` macros for building and returning
+//! [`Report`](crate::Report)s. Vendored from [eyre](https://docs.rs/eyre) / anyhow.
 
 /// Return early with an error.
 ///
