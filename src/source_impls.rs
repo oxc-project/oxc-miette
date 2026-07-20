@@ -7,6 +7,68 @@ use std::{borrow::Cow, collections::VecDeque, fmt::Debug, sync::Arc};
 
 use crate::{MietteError, MietteSpanContents, SourceCode, SourceSpan, SpanContents};
 
+struct PrefixInfo {
+    line_count: usize,
+    start_line: usize,
+    line_starts: VecDeque<usize>,
+    current_line_start: usize,
+}
+
+/// Scan the prefix before a span, retaining only its leading context lines.
+#[inline]
+fn scan_prefix(input: &[u8], cut: usize, context_lines_before: usize) -> PrefixInfo {
+    let mut line_count = 0usize;
+    let mut start_line = 0usize;
+    let mut line_starts = VecDeque::new();
+    let mut current_line_start = 0usize;
+
+    if context_lines_before == 1 {
+        // The graphical handler's default. Keep only the one value we need in
+        // a scalar instead of pushing and popping a VecDeque for every line in
+        // the source prefix.
+        let mut previous_line_start = None;
+        for pos in memchr::memchr2_iter(b'\r', b'\n', &input[..cut]) {
+            // Skip the `\n` of a CRLF pair already counted at its `\r`.
+            if input[pos] == b'\n' && pos > 0 && input[pos - 1] == b'\r' {
+                continue;
+            }
+            // A CRLF pair counts as a single line break, ending at the `\n`.
+            let line_end = if input[pos] == b'\r' && pos + 1 < cut && input[pos + 1] == b'\n' {
+                pos + 1
+            } else {
+                pos
+            };
+            line_count += 1;
+            previous_line_start = Some(current_line_start);
+            current_line_start = line_end + 1;
+        }
+        start_line = line_count.saturating_sub(1);
+        line_starts.extend(previous_line_start);
+    } else {
+        for pos in memchr::memchr2_iter(b'\r', b'\n', &input[..cut]) {
+            // Skip the `\n` of a CRLF pair already counted at its `\r`.
+            if input[pos] == b'\n' && pos > 0 && input[pos - 1] == b'\r' {
+                continue;
+            }
+            // A CRLF pair counts as a single line break, ending at the `\n`.
+            let line_end = if input[pos] == b'\r' && pos + 1 < cut && input[pos + 1] == b'\n' {
+                pos + 1
+            } else {
+                pos
+            };
+            line_count += 1;
+            line_starts.push_back(current_line_start);
+            if line_starts.len() > context_lines_before {
+                start_line += 1;
+                line_starts.pop_front();
+            }
+            current_line_start = line_end + 1;
+        }
+    }
+
+    PrefixInfo { line_count, start_line, line_starts, current_line_start }
+}
+
 fn context_info<'a>(
     input: &'a [u8],
     span: &SourceSpan,
@@ -15,10 +77,6 @@ fn context_info<'a>(
 ) -> Result<MietteSpanContents<'a>, MietteError> {
     let span_offset = span.offset() as usize;
     let span_len = span.len() as usize;
-    let mut line_count = 0usize;
-    let mut start_line = 0usize;
-    let mut before_lines_starts = VecDeque::new();
-    let mut current_line_start = 0usize;
     let mut end_lines = 0usize;
     let mut post_span = false;
     let mut post_span_got_newline = false;
@@ -32,25 +90,12 @@ fn context_info<'a>(
     if cut > 0 && input[cut - 1] == b'\r' {
         cut -= 1;
     }
-    for pos in memchr::memchr2_iter(b'\r', b'\n', &input[..cut]) {
-        // Skip the `\n` of a CRLF pair already counted at its `\r`.
-        if input[pos] == b'\n' && pos > 0 && input[pos - 1] == b'\r' {
-            continue;
-        }
-        // A CRLF pair counts as a single line break, ending at the `\n`.
-        let line_end = if input[pos] == b'\r' && pos + 1 < cut && input[pos + 1] == b'\n' {
-            pos + 1
-        } else {
-            pos
-        };
-        line_count += 1;
-        before_lines_starts.push_back(current_line_start);
-        if before_lines_starts.len() > context_lines_before {
-            start_line += 1;
-            before_lines_starts.pop_front();
-        }
-        current_line_start = line_end + 1;
-    }
+    let PrefixInfo {
+        mut line_count,
+        mut start_line,
+        line_starts: mut before_lines_starts,
+        mut current_line_start,
+    } = scan_prefix(input, cut, context_lines_before);
     // `current_line_start..cut` contains no line breaks.
     let mut start_column = cut - current_line_start;
     let mut offset = cut;
@@ -277,30 +322,8 @@ impl<'a> SpanScanner<'a> {
     /// first context window's lines.
     fn init(&mut self, cut: usize) {
         let before = self.context_lines_before;
-        let mut line_count = 0usize;
-        let mut start_line = 0usize;
-        let mut ring = VecDeque::with_capacity(before + 2);
-        let mut current_line_start = 0usize;
-        for pos in memchr::memchr2_iter(b'\r', b'\n', &self.input[..cut]) {
-            // Skip the `\n` of a CRLF pair already counted at its `\r`.
-            if self.input[pos] == b'\n' && pos > 0 && self.input[pos - 1] == b'\r' {
-                continue;
-            }
-            // A CRLF pair counts as a single line break, ending at the `\n`.
-            let line_end =
-                if self.input[pos] == b'\r' && pos + 1 < cut && self.input[pos + 1] == b'\n' {
-                    pos + 1
-                } else {
-                    pos
-                };
-            line_count += 1;
-            ring.push_back(current_line_start);
-            if ring.len() > before {
-                start_line += 1;
-                ring.pop_front();
-            }
-            current_line_start = line_end + 1;
-        }
+        let PrefixInfo { line_count, start_line, line_starts: ring, current_line_start } =
+            scan_prefix(self.input, cut, before);
         debug_assert_eq!(start_line + ring.len(), line_count);
         self.base_line = start_line;
         self.line_starts.reserve(ring.len() + 8);
