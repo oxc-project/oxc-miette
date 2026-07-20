@@ -1,3 +1,5 @@
+#![allow(clippy::needless_doctest_main)]
+
 /// Return early with an error.
 ///
 /// This macro is equivalent to `return Err(From::from($err))`.

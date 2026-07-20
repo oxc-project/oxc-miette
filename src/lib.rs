@@ -755,10 +755,10 @@
 //! [`SourceCode`]: https://docs.rs/miette/latest/miette/trait.SourceCode.html
 //! [`SourceSpan`]: https://docs.rs/miette/latest/miette/struct.SourceSpan.html
 pub use error::*;
-pub use eyreish::*;
 #[cfg(feature = "fancy-base")]
 pub use handler::*;
 pub use handlers::*;
+pub use into_diagnostic::*;
 pub use miette_diagnostic::*;
 pub use named_source::*;
 #[cfg(feature = "derive")]
@@ -766,19 +766,28 @@ pub use oxc_miette_derive::*;
 #[cfg(feature = "fancy")]
 pub use panic::*;
 pub use protocol::*;
+pub use report::*;
+pub use wrap_err::{Context, WrapErr};
 
 mod chain;
 mod diagnostic_chain;
 mod error;
-mod eyreish;
+mod fmt;
 #[cfg(feature = "fancy-base")]
 mod handler;
 mod handlers;
+mod into_diagnostic;
+mod kind;
 #[doc(hidden)]
 pub mod macro_helpers;
+mod macros;
 mod miette_diagnostic;
 mod named_source;
 #[cfg(feature = "fancy")]
 mod panic;
 mod protocol;
+mod ptr;
+mod report;
+mod report_impl;
 mod source_impls;
+mod wrap_err;

@@ -1,5 +1,5 @@
 //! Tests for source-code wrapping on `Report` (`with_source_code`). Moved out
-//! of `src/eyreish/wrapper.rs`.
+//! of `src/wrap_err.rs`.
 
 use thiserror::Error;
 

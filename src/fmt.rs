@@ -1,6 +1,6 @@
 use core::fmt;
 
-use super::{error::ErrorImpl, ptr::Ref};
+use crate::{ptr::Ref, report_impl::ErrorImpl};
 
 impl ErrorImpl<()> {
     pub(crate) unsafe fn display(this: Ref<'_, Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {

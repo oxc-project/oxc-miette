@@ -1,4 +1,9 @@
-#![allow(missing_debug_implementations, missing_docs)]
+#![allow(
+    missing_debug_implementations,
+    missing_docs,
+    clippy::new_ret_no_self,
+    clippy::wrong_self_convention
+)]
 // Tagged dispatch mechanism for resolving the behavior of `miette!($expr)`.
 //
 // When miette! is given a single expr argument to turn into miette::Report, we
@@ -47,8 +52,8 @@
 
 use core::fmt::{Debug, Display};
 
-use super::Report;
 use crate::Diagnostic;
+use crate::Report;
 
 pub struct Adhoc;
 
