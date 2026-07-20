@@ -43,7 +43,6 @@ pub struct GraphicalReportHandler {
     pub(crate) break_words: bool,
     pub(crate) word_separator: Option<textwrap::WordSeparator>,
     pub(crate) word_splitter: Option<textwrap::WordSplitter>,
-    // pub(crate) highlighter: MietteHighlighter,
     pub(crate) link_display_text: Option<String>,
 }
 
@@ -71,7 +70,6 @@ impl GraphicalReportHandler {
             break_words: true,
             word_separator: None,
             word_splitter: None,
-            // highlighter: MietteHighlighter::default(),
             link_display_text: None,
         }
     }
@@ -90,7 +88,6 @@ impl GraphicalReportHandler {
             break_words: true,
             word_separator: None,
             word_splitter: None,
-            // highlighter: MietteHighlighter::default(),
             link_display_text: None,
         }
     }
@@ -181,23 +178,6 @@ impl GraphicalReportHandler {
         self.context_lines = lines;
         self
     }
-
-    // /// Enable syntax highlighting for source code snippets, using the given
-    // /// [`Highlighter`]. See the [crate::highlighters] crate for more details.
-    // pub fn with_syntax_highlighting(
-    // mut self,
-    // highlighter: impl Highlighter + Send + Sync + 'static,
-    // ) -> Self {
-    // self.highlighter = MietteHighlighter::from(highlighter);
-    // self
-    // }
-
-    // /// Disable syntax highlighting. This uses the
-    // /// [`crate::highlighters::BlankHighlighter`] as a no-op highlighter.
-    // pub fn without_syntax_highlighting(mut self) -> Self {
-    // self.highlighter = MietteHighlighter::nocolor();
-    // self
-    // }
 
     /// Sets the display text for links.
     /// Miette displays `(link)` if this option is not set.
