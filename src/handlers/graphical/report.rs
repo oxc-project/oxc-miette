@@ -107,7 +107,7 @@ impl GraphicalReportHandler {
                 format!("{}", diagnostic.to_string().style(severity_style))
             }
         };
-        let title = textwrap::fill(&title, opts);
+        let title = Self::fill(&title, opts);
         writeln!(f, "{title}")?;
 
         Ok(())
@@ -183,7 +183,7 @@ impl GraphicalReportHandler {
 
     fn wrap(&self, text: &str, opts: textwrap::Options<'_>) -> String {
         if self.wrap_lines {
-            textwrap::fill(text, opts)
+            Self::fill(text, opts)
         } else {
             // Format without wrapping, but retain the indentation options
             // Implementation based on `textwrap::indent`
@@ -211,6 +211,56 @@ impl GraphicalReportHandler {
                 result.push('\n');
             }
             result
+        }
+    }
+
+    /// Skip word separation and optimal-fit layout when the text demonstrably
+    /// fits on its first line. `textwrap` only provides this fast path without
+    /// indentation, while every diagnostic block has an initial indent.
+    fn fill(text: &str, opts: textwrap::Options<'_>) -> String {
+        let available =
+            opts.width.saturating_sub(textwrap::core::display_width(opts.initial_indent));
+        if !text.contains('\n') && textwrap::core::display_width(text) <= available {
+            let text = text.trim_end_matches(' ');
+            let mut result = String::with_capacity(opts.initial_indent.len() + text.len());
+            result.push_str(opts.initial_indent);
+            result.push_str(text);
+            result
+        } else {
+            textwrap::fill(text, opts)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fill_fast_path_matches_textwrap() {
+        let texts = [
+            "",
+            "short diagnostic",
+            "trailing spaces   ",
+            "  leading spaces",
+            "two  inner  spaces",
+            "Café 火",
+            "\u{1b}[31mstyled text\u{1b}[0m",
+            "first\nsecond",
+        ];
+        for width in 0..32 {
+            for initial_indent in ["", "  ", "  help: ", "\u{1b}[31m  × \u{1b}[0m"] {
+                for text in texts {
+                    let opts = textwrap::Options::new(width)
+                        .initial_indent(initial_indent)
+                        .subsequent_indent("    ");
+                    assert_eq!(
+                        GraphicalReportHandler::fill(text, opts.clone()),
+                        textwrap::fill(text, opts),
+                        "width={width}, indent={initial_indent:?}, text={text:?}"
+                    );
+                }
+            }
         }
     }
 }
