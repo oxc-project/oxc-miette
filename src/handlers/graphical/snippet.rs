@@ -241,6 +241,11 @@ impl GraphicalReportHandler {
 
     /// Renders a line to the output formatter, replacing tabs with spaces.
     pub(super) fn render_line_text(&self, f: &mut impl fmt::Write, text: &str) -> fmt::Result {
+        if !text.contains('\t') {
+            f.write_str(text)?;
+            return f.write_char('\n');
+        }
+
         for (c, width) in text.chars().zip(self.line_visual_char_width(text)) {
             if c == '\t' {
                 for _ in 0..width {
