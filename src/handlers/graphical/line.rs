@@ -215,62 +215,73 @@ impl GraphicalReportHandler {
     pub(super) fn get_lines<'a>(&self, context_data: &MietteSpanContents<'a>) -> Vec<Line<'a>> {
         let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
         let mut line = context_data.line();
-        let mut column = context_data.column();
-        // Byte offset into the original source.
-        let mut offset = context_data.span().offset() as usize;
-        // Byte offset of `context[0]` into the original source, used to map a
-        // source offset to an index into `context`.
-        let base = offset;
-        let mut line_offset = offset;
-        // Number of bytes of visible text accumulated for the current line
-        // (i.e. excluding the line terminator).
-        let mut line_len = 0usize;
+        let base = context_data.span().offset() as usize;
+        let bytes = context.as_bytes();
         let mut lines = Vec::with_capacity(1);
-        let mut iter = context.chars().peekable();
-        while let Some(char) = iter.next() {
-            offset += char.len_utf8();
-            let mut at_end_of_file = false;
-            match char {
-                '\r' => {
-                    if iter.next_if_eq(&'\n').is_some() {
-                        offset += 1;
-                        line += 1;
-                        column = 0;
-                    } else {
-                        line_len += char.len_utf8();
-                        column += 1;
-                    }
-                    at_end_of_file = iter.peek().is_none();
-                }
-                '\n' => {
-                    at_end_of_file = iter.peek().is_none();
-                    line += 1;
-                    column = 0;
-                }
-                _ => {
-                    line_len += char.len_utf8();
-                    column += 1;
-                }
-            }
-
-            if iter.peek().is_none() && !at_end_of_file {
+        let mut start = 0;
+        for newline in memchr::memchr_iter(b'\n', bytes) {
+            let end = newline + 1;
+            let text_end =
+                if newline > start && bytes[newline - 1] == b'\r' { newline - 1 } else { newline };
+            line += 1;
+            lines.push(Line {
+                line_number: line,
+                offset: base + start,
+                length: end - start,
+                text: &context[start..text_end],
+            });
+            start = end;
+        }
+        if start < bytes.len() {
+            // Preserve the historical line number for a payload ending in a
+            // lone carriage return, which is rendered as visible text.
+            if bytes.last() != Some(&b'\r') {
                 line += 1;
             }
-
-            if column == 0 || iter.peek().is_none() {
-                // The visible text is a contiguous slice of `context`, starting
-                // at the line's offset and excluding the line terminator.
-                let text_start = line_offset - base;
-                lines.push(Line {
-                    line_number: line,
-                    offset: line_offset,
-                    length: offset - line_offset,
-                    text: &context[text_start..text_start + line_len],
-                });
-                line_len = 0;
-                line_offset = offset;
-            }
+            lines.push(Line {
+                line_number: line,
+                offset: base + start,
+                length: bytes.len() - start,
+                text: &context[start..],
+            });
         }
         lines
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_lines_preserves_line_geometry() {
+        const BASE: usize = 10;
+        let cases: &[(&str, &[(usize, usize, usize, &str)])] = &[
+            ("", &[]),
+            ("abc", &[(5, BASE, 3, "abc")]),
+            ("a\nb", &[(5, BASE, 2, "a"), (6, BASE + 2, 1, "b")]),
+            ("a\n", &[(5, BASE, 2, "a")]),
+            ("\n", &[(5, BASE, 1, "")]),
+            ("a\r\nb", &[(5, BASE, 3, "a"), (6, BASE + 3, 1, "b")]),
+            ("a\rb", &[(5, BASE, 3, "a\rb")]),
+            ("a\r", &[(4, BASE, 2, "a\r")]),
+            ("é\n火", &[(5, BASE, 3, "é"), (6, BASE + 3, 3, "火")]),
+        ];
+        let handler = GraphicalReportHandler::new();
+        for &(text, expected) in cases {
+            let contents = MietteSpanContents::new(
+                text.as_bytes(),
+                (BASE as u32, text.len() as u32).into(),
+                4,
+                2,
+                expected.len(),
+            );
+            let actual = handler
+                .get_lines(&contents)
+                .iter()
+                .map(|line| (line.line_number, line.offset, line.length, line.text))
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "text={text:?}");
+        }
     }
 }
