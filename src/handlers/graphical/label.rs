@@ -21,6 +21,51 @@ use super::{
 };
 use crate::ThemeCharacters;
 
+struct Underline {
+    padding: usize,
+    left: usize,
+    marker: char,
+    right: usize,
+    underline: char,
+}
+
+impl fmt::Display for Underline {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for _ in 0..self.padding {
+            f.write_char(' ')?;
+        }
+        for _ in 0..self.left {
+            f.write_char(self.underline)?;
+        }
+        f.write_char(self.marker)?;
+        for _ in 0..self.right {
+            f.write_char(self.underline)?;
+        }
+        Ok(())
+    }
+}
+
+struct LabelText<'a> {
+    chars: &'a ThemeCharacters,
+    label: &'a str,
+    render_mode: LabelRenderMode,
+}
+
+impl fmt::Display for LabelText<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let chars = self.chars;
+        match self.render_mode {
+            LabelRenderMode::SingleLine => {
+                write!(f, "{}{}{} {}", chars.lbot, chars.hbar, chars.hbar, self.label)
+            }
+            LabelRenderMode::BlockFirst => {
+                write!(f, "{}{}{} {}", chars.lbot, chars.hbar, chars.rcross, self.label)
+            }
+            LabelRenderMode::BlockRest => write!(f, "  {} {}", chars.vbar, self.label),
+        }
+    }
+}
+
 impl GraphicalReportHandler {
     pub(super) fn render_single_line_highlights(
         &self,
@@ -31,51 +76,48 @@ impl GraphicalReportHandler {
         single_liners: &[&FancySpan],
         all_highlights: &[FancySpan],
     ) -> fmt::Result {
-        let mut underlines = String::new();
         let mut highest = 0;
 
         let chars = &self.theme.characters;
-        let vbar_offsets: Vec<_> = single_liners
-            .iter()
-            .map(|hl| {
-                let byte_start = hl.offset();
-                let byte_end = hl.offset() + hl.len();
-                let start = self.visual_offset(line, byte_start, true).max(highest);
-                let end = if hl.len() == 0 {
-                    start + 1
-                } else {
-                    self.visual_offset(line, byte_end, false).max(start + 1)
-                };
+        let mut vbar_offsets = Vec::with_capacity(single_liners.len());
+        for hl in single_liners {
+            let byte_start = hl.offset();
+            let byte_end = hl.offset() + hl.len();
+            let start = self.visual_offset(line, byte_start, true).max(highest);
+            let end = if hl.len() == 0 {
+                start + 1
+            } else {
+                self.visual_offset(line, byte_end, false).max(start + 1)
+            };
 
-                let vbar_offset = (start + end) / 2;
-                let num_left = vbar_offset - start;
-                let num_right = end - vbar_offset - 1;
-                // Throws `Formatting argument out of range` when width is above u16::MAX.
-                let width = start.saturating_sub(highest).min(u16::MAX as usize);
-                let _ = write!(
-                    underlines,
-                    "{}",
-                    format!(
-                        "{:width$}{}{}{}",
-                        "",
-                        chars.underline.to_string().repeat(num_left),
-                        if hl.len() == 0 {
-                            chars.uarrow
-                        } else if hl.has_label() {
-                            chars.underbar
-                        } else {
-                            chars.underline
-                        },
-                        chars.underline.to_string().repeat(num_right),
-                    )
-                    .style(hl.style)
-                );
-                highest = max(highest, end);
-
-                (hl, vbar_offset)
-            })
-            .collect();
-        writeln!(f, "{underlines}")?;
+            let vbar_offset = (start + end) / 2;
+            let num_left = vbar_offset - start;
+            let num_right = end - vbar_offset - 1;
+            // Throws `Formatting argument out of range` when width is above u16::MAX.
+            let width = start.saturating_sub(highest).min(u16::MAX as usize);
+            let marker = if hl.len() == 0 {
+                chars.uarrow
+            } else if hl.has_label() {
+                chars.underbar
+            } else {
+                chars.underline
+            };
+            write!(
+                f,
+                "{}",
+                Underline {
+                    padding: width,
+                    left: num_left,
+                    marker,
+                    right: num_right,
+                    underline: chars.underline,
+                }
+                .style(hl.style)
+            )?;
+            highest = max(highest, end);
+            vbar_offsets.push((hl, vbar_offset));
+        }
+        f.write_char('\n')?;
 
         for hl in single_liners.iter().rev() {
             if let Some(label) = hl.label_parts() {
@@ -146,25 +188,15 @@ impl GraphicalReportHandler {
         let mut curr_offset = 1usize;
         for (offset_hl, vbar_offset) in vbar_offsets {
             while curr_offset < *vbar_offset + 1 {
-                write!(f, " ")?;
+                f.write_char(' ')?;
                 curr_offset += 1;
             }
             if *offset_hl != hl {
-                write!(f, "{}", chars.vbar.to_string().style(offset_hl.style))?;
+                write!(f, "{}", chars.vbar.style(offset_hl.style))?;
                 curr_offset += 1;
             } else {
-                let lines = match render_mode {
-                    LabelRenderMode::SingleLine => {
-                        format!("{}{} {}", chars.lbot, chars.hbar.to_string().repeat(2), label,)
-                    }
-                    LabelRenderMode::BlockFirst => {
-                        format!("{}{}{} {}", chars.lbot, chars.hbar, chars.rcross, label,)
-                    }
-                    LabelRenderMode::BlockRest => {
-                        format!("  {} {}", chars.vbar, label,)
-                    }
-                };
-                writeln!(f, "{}", lines.style(hl.style))?;
+                let line = LabelText { chars, label, render_mode };
+                writeln!(f, "{}", line.style(hl.style))?;
                 break;
             }
         }
