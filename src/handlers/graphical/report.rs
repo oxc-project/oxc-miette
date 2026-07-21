@@ -35,7 +35,8 @@ impl GraphicalReportHandler {
             writeln!(f)?;
             let width = self.termwidth.saturating_sub(4);
             let opts = self.wrap_options(width, "  ", "  ");
-            writeln!(f, "{}", self.wrap(footer, opts))?;
+            self.write_wrap(f, footer, opts)?;
+            f.write_char('\n')?;
         }
         Ok(())
     }
@@ -95,20 +96,16 @@ impl GraphicalReportHandler {
                 const CTL: &str = "\u{1b}]8;;";
                 const END: &str = "\u{1b}]8;;\u{1b}\\";
                 let code = code.style(severity_style);
-                let message = diagnostic.to_string();
-                let title = message.style(severity_style);
+                let title = diagnostic.style(severity_style);
                 format!("{CTL}{url}\u{1b}\\{code}{END}: {title}",)
             }
             (_, _, Some(code)) => {
-                let title = format!("{code}: {diagnostic}");
-                format!("{}", title.style(severity_style))
+                format!("{}", format_args!("{code}: {diagnostic}").style(severity_style))
             }
-            _ => {
-                format!("{}", diagnostic.to_string().style(severity_style))
-            }
+            _ => format!("{}", diagnostic.style(severity_style)),
         };
-        let title = Self::fill(&title, opts);
-        writeln!(f, "{title}")?;
+        Self::write_fill(f, &title, opts)?;
+        f.write_char('\n')?;
 
         Ok(())
     }
@@ -118,7 +115,8 @@ impl GraphicalReportHandler {
             let width = self.termwidth.saturating_sub(4);
             let initial_indent = "  help: ".style(self.theme.styles.help).to_string();
             let opts = self.wrap_options(width, &initial_indent, "        ");
-            writeln!(f, "{}", self.wrap(&help, opts))?;
+            self.write_wrap(f, &help, opts)?;
+            f.write_char('\n')?;
         }
         if let Some(note) = diagnostic.note() {
             // Renders as:
@@ -126,7 +124,8 @@ impl GraphicalReportHandler {
             let width = self.termwidth.saturating_sub(4);
             let initial_indent = "  note: ".style(self.theme.styles.note).to_string();
             let opts = self.wrap_options(width, &initial_indent, "           ");
-            writeln!(f, "{}", self.wrap(&note, opts))?;
+            self.write_wrap(f, &note, opts)?;
+            f.write_char('\n')?;
         }
         Ok(())
     }
@@ -214,21 +213,53 @@ impl GraphicalReportHandler {
         }
     }
 
+    fn write_wrap(
+        &self,
+        f: &mut impl fmt::Write,
+        text: &str,
+        opts: textwrap::Options<'_>,
+    ) -> fmt::Result {
+        if self.wrap_lines {
+            Self::write_fill(f, text, opts)
+        } else {
+            f.write_str(&self.wrap(text, opts))
+        }
+    }
+
+    fn write_fill(f: &mut impl fmt::Write, text: &str, opts: textwrap::Options<'_>) -> fmt::Result {
+        if Self::fits_on_line(text, &opts) {
+            f.write_str(opts.initial_indent)?;
+            f.write_str(text.trim_end_matches(' '))
+        } else {
+            f.write_str(&textwrap::fill(text, opts))
+        }
+    }
+
     /// Skip word separation and optimal-fit layout when the text demonstrably
     /// fits on its first line. `textwrap` only provides this fast path without
     /// indentation, while every diagnostic block has an initial indent.
     fn fill(text: &str, opts: textwrap::Options<'_>) -> String {
-        let available = opts.width.saturating_sub(Self::display_width(opts.initial_indent));
-        if memchr::memchr(b'\n', text.as_bytes()).is_none()
-            && Self::display_width(text) <= available
-        {
+        if Self::fits_on_line(text, &opts) {
             let text = text.trim_end_matches(' ');
             let mut result = String::with_capacity(opts.initial_indent.len() + text.len());
             result.push_str(opts.initial_indent);
             result.push_str(text);
-            result
-        } else {
-            textwrap::fill(text, opts)
+            return result;
+        }
+        textwrap::fill(text, opts)
+    }
+
+    fn fits_on_line(text: &str, opts: &textwrap::Options<'_>) -> bool {
+        if memchr::memchr(b'\n', text.as_bytes()).is_some() {
+            return false;
+        }
+
+        // UTF-8 byte length is an upper bound on terminal display width,
+        // including for ANSI escape sequences. Avoid both width scans when
+        // even that conservative bound fits.
+        opts.initial_indent.len().saturating_add(text.len()) <= opts.width || {
+            let available = opts.width.saturating_sub(Self::display_width(opts.initial_indent));
+            Self::display_width(text) <= available
         }
     }
 
@@ -296,6 +327,8 @@ mod tests {
             "  leading spaces",
             "two  inner  spaces",
             "Café 火",
+            "combining e\u{301}",
+            "emoji 🐂",
             "\u{1b}[31mstyled text\u{1b}[0m",
             "\u{1b}]8;;https://example.com\u{1b}\\linked\u{1b}]8;;\u{1b}\\",
             "\u{1b}]0;title\u{7}visible",
@@ -311,8 +344,15 @@ mod tests {
                         .subsequent_indent("    ");
                     assert_eq!(
                         GraphicalReportHandler::fill(text, opts.clone()),
-                        textwrap::fill(text, opts),
+                        textwrap::fill(text, opts.clone()),
                         "width={width}, indent={initial_indent:?}, text={text:?}"
+                    );
+                    let mut output = String::new();
+                    GraphicalReportHandler::write_fill(&mut output, text, opts.clone()).unwrap();
+                    assert_eq!(
+                        output,
+                        textwrap::fill(text, opts),
+                        "streaming: width={width}, indent={initial_indent:?}, text={text:?}"
                     );
                 }
             }
