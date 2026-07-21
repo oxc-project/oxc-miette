@@ -185,7 +185,13 @@ impl GraphicalReportHandler {
             }
         }
         let text = &line.text[..text_index.min(line.text.len())];
-        let text_width = self.line_visual_char_width(text).sum();
+        // Plain ASCII is exactly one terminal column per byte.
+        let text_width =
+            if text.is_ascii() && memchr::memchr2(b'\t', b'\x1b', text.as_bytes()).is_none() {
+                text.len()
+            } else {
+                self.line_visual_char_width(text).sum()
+            };
         if text_index > line.text.len() {
             // Spans extending past the end of the line are always rendered as
             // one column past the end of the visible line.
