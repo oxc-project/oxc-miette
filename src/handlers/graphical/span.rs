@@ -1,10 +1,10 @@
 //! The span model used while drawing a snippet.
 //!
 //! A [`FancySpan`] is one of the diagnostic's labels paired with the [`Style`]
-//! it will be drawn in. Its label text is pre-split into display lines up front
-//! so the drawing code can lay out multi-line labels without re-splitting.
+//! it will be drawn in. Label text stays borrowed and is split into display
+//! lines only when it is drawn.
 
-use owo_colors::{OwoColorize, Style};
+use owo_colors::Style;
 
 use crate::SourceSpan;
 
@@ -23,36 +23,29 @@ pub(super) enum LabelRenderMode {
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct FancySpan {
-    /// this is deliberately an option of a vec because I wanted to be very explicit
-    /// that there can also be *no* label. If there is a label, it can have multiple
-    /// lines which is what the vec is for.
-    label: Option<Vec<String>>,
+pub(super) struct FancySpan<'a> {
+    label: Option<&'a str>,
     span: SourceSpan,
     pub(super) style: Style,
 }
 
-impl PartialEq for FancySpan {
+impl PartialEq for FancySpan<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.label == other.label && self.span == other.span
     }
 }
 
-fn split_label(v: &str, style: Style) -> Vec<String> {
-    v.split('\n').map(|i| i.style(style).to_string()).collect()
-}
-
-impl FancySpan {
-    pub(super) fn new(label: Option<&str>, span: SourceSpan, style: Style) -> Self {
-        FancySpan { label: label.map(|l| split_label(l, style)), span, style }
+impl<'a> FancySpan<'a> {
+    pub(super) fn new(label: Option<&'a str>, span: SourceSpan, style: Style) -> Self {
+        FancySpan { label, span, style }
     }
 
     pub(super) fn has_label(&self) -> bool {
         self.label.is_some()
     }
 
-    pub(super) fn label_parts(&self) -> Option<&[String]> {
-        self.label.as_deref()
+    pub(super) fn label(&self) -> Option<&str> {
+        self.label
     }
 
     pub(super) fn offset(&self) -> usize {
