@@ -218,9 +218,10 @@ impl GraphicalReportHandler {
     /// fits on its first line. `textwrap` only provides this fast path without
     /// indentation, while every diagnostic block has an initial indent.
     fn fill(text: &str, opts: textwrap::Options<'_>) -> String {
-        let available =
-            opts.width.saturating_sub(textwrap::core::display_width(opts.initial_indent));
-        if !text.contains('\n') && textwrap::core::display_width(text) <= available {
+        let available = opts.width.saturating_sub(Self::display_width(opts.initial_indent));
+        if memchr::memchr(b'\n', text.as_bytes()).is_none()
+            && Self::display_width(text) <= available
+        {
             let text = text.trim_end_matches(' ');
             let mut result = String::with_capacity(opts.initial_indent.len() + text.len());
             result.push_str(opts.initial_indent);
@@ -229,6 +230,56 @@ impl GraphicalReportHandler {
         } else {
             textwrap::fill(text, opts)
         }
+    }
+
+    /// Compute terminal width bytewise for ASCII, including the CSI and OSC
+    /// escape sequences recognized by `textwrap`. Unicode retains its full
+    /// width calculation.
+    fn display_width(text: &str) -> usize {
+        if !text.is_ascii() {
+            return textwrap::core::display_width(text);
+        }
+
+        let bytes = text.as_bytes();
+        let mut width = 0;
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] != b'\x1b' {
+                width += usize::from((b' '..=b'~').contains(&bytes[i]));
+                i += 1;
+                continue;
+            }
+
+            i += 1;
+            let Some(&kind) = bytes.get(i) else { break };
+            i += 1;
+            match kind {
+                b'[' => {
+                    while i < bytes.len() {
+                        let byte = bytes[i];
+                        i += 1;
+                        if (b'@'..=b'~').contains(&byte) {
+                            break;
+                        }
+                    }
+                }
+                b']' => {
+                    while i < bytes.len() {
+                        if bytes[i] == b'\x07' {
+                            i += 1;
+                            break;
+                        }
+                        if bytes[i] == b'\x1b' && bytes.get(i + 1) == Some(&b'\\') {
+                            i += 2;
+                            break;
+                        }
+                        i += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+        width
     }
 }
 
@@ -246,6 +297,10 @@ mod tests {
             "two  inner  spaces",
             "Café 火",
             "\u{1b}[31mstyled text\u{1b}[0m",
+            "\u{1b}]8;;https://example.com\u{1b}\\linked\u{1b}]8;;\u{1b}\\",
+            "\u{1b}]0;title\u{7}visible",
+            "control\tcharacters\u{7}",
+            "incomplete \u{1b}[31",
             "first\nsecond",
         ];
         for width in 0..32 {
