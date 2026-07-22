@@ -217,7 +217,12 @@ impl GraphicalReportHandler {
         let mut line = context_data.line();
         let base = context_data.span().offset() as usize;
         let bytes = context.as_bytes();
-        let mut lines = Vec::with_capacity(1);
+        // The built-in readers advance `line_count` from the payload's first
+        // line, which gives the number of newline-terminated `Line`s here.
+        // Cap the hint by byte length because custom sources own this metadata.
+        let capacity =
+            context_data.line_count().saturating_sub(context_data.line()).max(1).min(bytes.len());
+        let mut lines = Vec::with_capacity(capacity);
         let mut start = 0;
         for newline in memchr::memchr_iter(b'\n', bytes) {
             let end = newline + 1;
@@ -252,6 +257,7 @@ impl GraphicalReportHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SourceCode;
 
     #[test]
     fn get_lines_preserves_line_geometry() {
@@ -283,5 +289,15 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(actual, expected, "text={text:?}");
         }
+    }
+
+    #[test]
+    fn get_lines_preallocates_the_source_window() {
+        let source = "before\ntarget\nafter\nrest";
+        let contents = source.read_span(&(7u32, 6u32).into(), 1, 1).unwrap();
+        let lines = GraphicalReportHandler::new().get_lines(&contents);
+
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines.capacity(), 3);
     }
 }
