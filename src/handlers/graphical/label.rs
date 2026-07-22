@@ -29,19 +29,39 @@ struct Underline {
     underline: char,
 }
 
+fn write_repeated_char(f: &mut impl fmt::Write, c: char, mut count: usize) -> fmt::Result {
+    const CHUNK_CHARS: usize = 32;
+    const SPACES: &str = "                                ";
+    const UNICODE_BARS: &str = "────────────────────────────────";
+    const ASCII_CARETS: &str = "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^";
+
+    // Built-in themes repeat these characters frequently, so emit them in chunks.
+    // Preserve the general character loop for custom themes.
+    let chunk = match c {
+        ' ' => SPACES,
+        '─' => UNICODE_BARS,
+        '^' => ASCII_CARETS,
+        _ => {
+            for _ in 0..count {
+                f.write_char(c)?;
+            }
+            return Ok(());
+        }
+    };
+
+    while count >= CHUNK_CHARS {
+        f.write_str(chunk)?;
+        count -= CHUNK_CHARS;
+    }
+    f.write_str(&chunk[..count * c.len_utf8()])
+}
+
 impl fmt::Display for Underline {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for _ in 0..self.padding {
-            f.write_char(' ')?;
-        }
-        for _ in 0..self.left {
-            f.write_char(self.underline)?;
-        }
+        write_repeated_char(f, ' ', self.padding)?;
+        write_repeated_char(f, self.underline, self.left)?;
         f.write_char(self.marker)?;
-        for _ in 0..self.right {
-            f.write_char(self.underline)?;
-        }
-        Ok(())
+        write_repeated_char(f, self.underline, self.right)
     }
 }
 
@@ -326,5 +346,21 @@ impl GraphicalReportHandler {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repeated_chars_match_standard_output() {
+        for c in [' ', '─', '^', 'x', '🐂'] {
+            for count in [0, 1, 31, 32, 33, 64, 65] {
+                let mut output = String::new();
+                write_repeated_char(&mut output, c, count).unwrap();
+                assert_eq!(output, c.to_string().repeat(count));
+            }
+        }
     }
 }
