@@ -48,20 +48,22 @@ impl fmt::Display for Underline {
 struct LabelText<'a> {
     chars: &'a ThemeCharacters,
     label: &'a str,
+    style: Style,
     render_mode: LabelRenderMode,
 }
 
 impl fmt::Display for LabelText<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let chars = self.chars;
+        let label = self.label.style(self.style);
         match self.render_mode {
             LabelRenderMode::SingleLine => {
-                write!(f, "{}{}{} {}", chars.lbot, chars.hbar, chars.hbar, self.label)
+                write!(f, "{}{}{} {label}", chars.lbot, chars.hbar, chars.hbar)
             }
             LabelRenderMode::BlockFirst => {
-                write!(f, "{}{}{} {}", chars.lbot, chars.hbar, chars.rcross, self.label)
+                write!(f, "{}{}{} {label}", chars.lbot, chars.hbar, chars.rcross)
             }
-            LabelRenderMode::BlockRest => write!(f, "  {} {}", chars.vbar, self.label),
+            LabelRenderMode::BlockRest => write!(f, "  {} {label}", chars.vbar),
         }
     }
 }
@@ -120,8 +122,10 @@ impl GraphicalReportHandler {
         f.write_char('\n')?;
 
         for hl in single_liners.iter().rev() {
-            if let Some(label) = hl.label_parts() {
-                if label.len() == 1 {
+            if let Some(label) = hl.label() {
+                let mut lines = label.split('\n');
+                let first = lines.next().expect("split always yields at least one item");
+                if let Some(second) = lines.next() {
                     self.write_label_text(
                         f,
                         line,
@@ -131,12 +135,22 @@ impl GraphicalReportHandler {
                         chars,
                         &vbar_offsets,
                         hl,
-                        &label[0],
-                        LabelRenderMode::SingleLine,
+                        first,
+                        LabelRenderMode::BlockFirst,
                     )?;
-                } else {
-                    let mut first = true;
-                    for label_line in label {
+                    self.write_label_text(
+                        f,
+                        line,
+                        linum_width,
+                        max_gutter,
+                        all_highlights,
+                        chars,
+                        &vbar_offsets,
+                        hl,
+                        second,
+                        LabelRenderMode::BlockRest,
+                    )?;
+                    for label_line in lines {
                         self.write_label_text(
                             f,
                             line,
@@ -147,14 +161,22 @@ impl GraphicalReportHandler {
                             &vbar_offsets,
                             hl,
                             label_line,
-                            if first {
-                                LabelRenderMode::BlockFirst
-                            } else {
-                                LabelRenderMode::BlockRest
-                            },
+                            LabelRenderMode::BlockRest,
                         )?;
-                        first = false;
                     }
+                } else {
+                    self.write_label_text(
+                        f,
+                        line,
+                        linum_width,
+                        max_gutter,
+                        all_highlights,
+                        chars,
+                        &vbar_offsets,
+                        hl,
+                        first,
+                        LabelRenderMode::SingleLine,
+                    )?;
                 }
             }
         }
@@ -195,7 +217,7 @@ impl GraphicalReportHandler {
                 write!(f, "{}", chars.vbar.style(offset_hl.style))?;
                 curr_offset += 1;
             } else {
-                let line = LabelText { chars, label, render_mode };
+                let line = LabelText { chars, label, style: hl.style, render_mode };
                 writeln!(f, "{}", line.style(hl.style))?;
                 break;
             }
@@ -215,29 +237,11 @@ impl GraphicalReportHandler {
         // no line number!
         self.write_no_linum(f, linum_width)?;
 
-        if let Some(label_parts) = label.label_parts() {
-            // if it has a label, how long is it?
-            let (first, rest) = label_parts
-                .split_first()
-                .expect("cannot crash because rest would have been None, see docs on the `label` field of FancySpan");
+        if let Some(label_text) = label.label() {
+            let mut lines = label_text.split('\n');
+            let first = lines.next().expect("split always yields at least one item");
 
-            if rest.is_empty() {
-                // gutter _again_
-                self.render_highlight_gutter(
-                    f,
-                    max_gutter,
-                    line,
-                    labels,
-                    LabelRenderMode::SingleLine,
-                )?;
-
-                self.render_multi_line_end_single(
-                    f,
-                    first,
-                    label.style,
-                    LabelRenderMode::SingleLine,
-                )?;
-            } else {
+            if let Some(second) = lines.next() {
                 // gutter _again_
                 self.render_highlight_gutter(
                     f,
@@ -253,7 +257,7 @@ impl GraphicalReportHandler {
                     label.style,
                     LabelRenderMode::BlockFirst,
                 )?;
-                for label_line in rest {
+                for label_line in std::iter::once(second).chain(lines) {
                     // no line number!
                     self.write_no_linum(f, linum_width)?;
                     // gutter _again_
@@ -271,6 +275,21 @@ impl GraphicalReportHandler {
                         LabelRenderMode::BlockRest,
                     )?;
                 }
+            } else {
+                // gutter _again_
+                self.render_highlight_gutter(
+                    f,
+                    max_gutter,
+                    line,
+                    labels,
+                    LabelRenderMode::SingleLine,
+                )?;
+                self.render_multi_line_end_single(
+                    f,
+                    first,
+                    label.style,
+                    LabelRenderMode::SingleLine,
+                )?;
             }
         } else {
             // gutter _again_
@@ -291,13 +310,18 @@ impl GraphicalReportHandler {
     ) -> fmt::Result {
         match render_mode {
             LabelRenderMode::SingleLine => {
-                writeln!(f, "{} {}", self.theme.characters.hbar.style(style), label)?;
+                writeln!(f, "{} {}", self.theme.characters.hbar.style(style), label.style(style))?;
             }
             LabelRenderMode::BlockFirst => {
-                writeln!(f, "{} {}", self.theme.characters.rcross.style(style), label)?;
+                writeln!(
+                    f,
+                    "{} {}",
+                    self.theme.characters.rcross.style(style),
+                    label.style(style)
+                )?;
             }
             LabelRenderMode::BlockRest => {
-                writeln!(f, "{} {}", self.theme.characters.vbar.style(style), label)?;
+                writeln!(f, "{} {}", self.theme.characters.vbar.style(style), label.style(style))?;
             }
         }
 
