@@ -85,8 +85,15 @@ impl GraphicalReportHandler {
             Some(Severity::Advice) => (self.theme.styles.advice, &self.theme.characters.advice),
         };
 
-        let initial_indent = format!("  {} ", severity_icon.style(severity_style));
-        let rest_indent = format!("  {} ", self.theme.characters.vbar.style(severity_style));
+        // No-color themes can bypass owo-colors' formatting machinery entirely.
+        let (initial_indent, rest_indent) = if severity_style.is_plain() {
+            (format!("  {severity_icon} "), format!("  {} ", self.theme.characters.vbar))
+        } else {
+            (
+                format!("  {} ", severity_icon.style(severity_style)),
+                format!("  {} ", self.theme.characters.vbar.style(severity_style)),
+            )
+        };
         let width = self.termwidth.saturating_sub(2);
         let opts = self.wrap_options(width, &initial_indent, &rest_indent);
 
@@ -99,9 +106,11 @@ impl GraphicalReportHandler {
                 let title = diagnostic.style(severity_style);
                 format!("{CTL}{url}\u{1b}\\{code}{END}: {title}",)
             }
+            (_, _, Some(code)) if severity_style.is_plain() => format!("{code}: {diagnostic}"),
             (_, _, Some(code)) => {
                 format!("{}", format_args!("{code}: {diagnostic}").style(severity_style))
             }
+            _ if severity_style.is_plain() => diagnostic.to_string(),
             _ => format!("{}", diagnostic.style(severity_style)),
         };
         Self::write_fill(f, &title, opts)?;
