@@ -319,6 +319,11 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "exhaustive equivalence check over safe text wrapping code; interpreting every \
+                  textwrap case under Miri takes more than 16 minutes"
+    )]
     fn fill_fast_path_matches_textwrap() {
         let texts = [
             "",
