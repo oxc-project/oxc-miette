@@ -341,6 +341,7 @@ mod tests {
             "incomplete \u{1b}[31",
             "first\nsecond",
         ];
+        let mut checked = 0;
         for width in 0..32 {
             for initial_indent in ["", "  ", "  help: ", "\u{1b}[31m  × \u{1b}[0m"] {
                 for text in texts {
@@ -359,8 +360,10 @@ mod tests {
                         textwrap::fill(text, opts),
                         "streaming: width={width}, indent={initial_indent:?}, text={text:?}"
                     );
+                    checked += 1;
                 }
             }
         }
+        insta::assert_snapshot!(format!("{checked} fill cases matched textwrap"), @"1792 fill cases matched textwrap");
     }
 }

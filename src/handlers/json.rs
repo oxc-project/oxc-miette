@@ -189,6 +189,11 @@ impl ReportHandler for JSONReportHandler {
 
 #[test]
 fn test_escape() {
-    assert_eq!(escape("a\nb").to_string(), r"a\nb");
-    assert_eq!(escape("C:\\Miette").to_string(), r"C:\\Miette");
+    insta::assert_snapshot!(
+        format!("newline: {}\nwindows path: {}", escape("a\nb"), escape("C:\\Miette")),
+        @r"
+    newline: a\nb
+    windows path: C:\\Miette
+    "
+    );
 }

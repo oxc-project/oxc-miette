@@ -369,6 +369,7 @@ mod tests {
 
     #[test]
     fn repeated_chars_match_standard_output() {
+        let mut snapshot = String::new();
         for c in [' ', '─', '^', 'x', '🐂'] {
             for count in [0, 1, 31, 32, 33, 64, 65] {
                 let mut output = String::new();
@@ -382,8 +383,45 @@ mod tests {
                 } else {
                     write_repeated_char(&mut output, c, count).unwrap();
                 }
-                assert_eq!(output, c.to_string().repeat(count));
+                snapshot.push_str(&format!("{c:?} x {count}: {output:?}\n"));
             }
         }
+        insta::assert_snapshot!(snapshot, @r#"
+        ' ' x 0: ""
+        ' ' x 1: " "
+        ' ' x 31: "                               "
+        ' ' x 32: "                                "
+        ' ' x 33: "                                 "
+        ' ' x 64: "                                                                "
+        ' ' x 65: "                                                                 "
+        '─' x 0: ""
+        '─' x 1: "─"
+        '─' x 31: "───────────────────────────────"
+        '─' x 32: "────────────────────────────────"
+        '─' x 33: "─────────────────────────────────"
+        '─' x 64: "────────────────────────────────────────────────────────────────"
+        '─' x 65: "─────────────────────────────────────────────────────────────────"
+        '^' x 0: ""
+        '^' x 1: "^"
+        '^' x 31: "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+        '^' x 32: "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+        '^' x 33: "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+        '^' x 64: "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+        '^' x 65: "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+        'x' x 0: ""
+        'x' x 1: "x"
+        'x' x 31: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        'x' x 32: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        'x' x 33: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        'x' x 64: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        'x' x 65: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        '🐂' x 0: ""
+        '🐂' x 1: "🐂"
+        '🐂' x 31: "🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂"
+        '🐂' x 32: "🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂"
+        '🐂' x 33: "🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂"
+        '🐂' x 64: "🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂"
+        '🐂' x 65: "🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂🐂"
+        "#);
     }
 }

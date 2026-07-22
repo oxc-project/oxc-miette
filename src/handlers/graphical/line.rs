@@ -251,37 +251,55 @@ impl GraphicalReportHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write;
+
     use super::*;
 
     #[test]
     fn get_lines_preserves_line_geometry() {
         const BASE: usize = 10;
-        let cases: &[(&str, &[(usize, usize, usize, &str)])] = &[
-            ("", &[]),
-            ("abc", &[(5, BASE, 3, "abc")]),
-            ("a\nb", &[(5, BASE, 2, "a"), (6, BASE + 2, 1, "b")]),
-            ("a\n", &[(5, BASE, 2, "a")]),
-            ("\n", &[(5, BASE, 1, "")]),
-            ("a\r\nb", &[(5, BASE, 3, "a"), (6, BASE + 3, 1, "b")]),
-            ("a\rb", &[(5, BASE, 3, "a\rb")]),
-            ("a\r", &[(4, BASE, 2, "a\r")]),
-            ("é\n火", &[(5, BASE, 3, "é"), (6, BASE + 3, 3, "火")]),
+        let cases = [
+            ("", 0),
+            ("abc", 1),
+            ("a\nb", 2),
+            ("a\n", 1),
+            ("\n", 1),
+            ("a\r\nb", 2),
+            ("a\rb", 1),
+            ("a\r", 1),
+            ("é\n火", 2),
         ];
         let handler = GraphicalReportHandler::new();
-        for &(text, expected) in cases {
+        let mut snapshot = String::new();
+        for (text, line_count) in cases {
             let contents = MietteSpanContents::new(
                 text.as_bytes(),
                 (BASE as u32, text.len() as u32).into(),
                 4,
                 2,
-                expected.len(),
+                line_count,
             );
-            let actual = handler
-                .get_lines(&contents)
-                .iter()
-                .map(|line| (line.line_number, line.offset, line.length, line.text))
-                .collect::<Vec<_>>();
-            assert_eq!(actual, expected, "text={text:?}");
+            write!(snapshot, "{text:?}:").unwrap();
+            for line in handler.get_lines(&contents) {
+                write!(
+                    snapshot,
+                    " (line {}, offset {}, length {}, text {:?})",
+                    line.line_number, line.offset, line.length, line.text
+                )
+                .unwrap();
+            }
+            snapshot.push('\n');
         }
+        insta::assert_snapshot!(snapshot, @r#"
+        "":
+        "abc": (line 5, offset 10, length 3, text "abc")
+        "a\nb": (line 5, offset 10, length 2, text "a") (line 6, offset 12, length 1, text "b")
+        "a\n": (line 5, offset 10, length 2, text "a")
+        "\n": (line 5, offset 10, length 1, text "")
+        "a\r\nb": (line 5, offset 10, length 3, text "a") (line 6, offset 13, length 1, text "b")
+        "a\rb": (line 5, offset 10, length 3, text "a\rb")
+        "a\r": (line 4, offset 10, length 2, text "a\r")
+        "é\n火": (line 5, offset 10, length 3, text "é") (line 6, offset 13, length 3, text "火")
+        "#);
     }
 }
