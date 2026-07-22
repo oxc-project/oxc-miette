@@ -364,6 +364,6 @@ mod tests {
                 }
             }
         }
-        insta::assert_snapshot!(format!("{checked} fill cases matched textwrap"), @"1792 fill cases matched textwrap");
+        insta::assert_snapshot!(format!("{checked} fill cases matched textwrap"));
     }
 }

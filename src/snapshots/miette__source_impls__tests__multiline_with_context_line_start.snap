@@ -1,0 +1,9 @@
+---
+source: src/source_impls.rs
+expression: snapshot_contents(&contents)
+---
+data: "one\ntwo\n\n"
+span: SourceSpan { offset: SourceOffset(0), length: 9 }
+line: 0
+column: 0
+line count: 3

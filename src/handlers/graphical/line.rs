@@ -290,16 +290,6 @@ mod tests {
             }
             snapshot.push('\n');
         }
-        insta::assert_snapshot!(snapshot, @r#"
-        "":
-        "abc": (line 5, offset 10, length 3, text "abc")
-        "a\nb": (line 5, offset 10, length 2, text "a") (line 6, offset 12, length 1, text "b")
-        "a\n": (line 5, offset 10, length 2, text "a")
-        "\n": (line 5, offset 10, length 1, text "")
-        "a\r\nb": (line 5, offset 10, length 3, text "a") (line 6, offset 13, length 1, text "b")
-        "a\rb": (line 5, offset 10, length 3, text "a\rb")
-        "a\r": (line 4, offset 10, length 2, text "a\r")
-        "é\n火": (line 5, offset 10, length 3, text "é") (line 6, offset 13, length 3, text "火")
-        "#);
+        insta::assert_snapshot!(snapshot);
     }
 }

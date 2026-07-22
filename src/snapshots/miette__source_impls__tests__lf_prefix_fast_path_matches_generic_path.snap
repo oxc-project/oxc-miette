@@ -1,0 +1,5 @@
+---
+source: src/source_impls.rs
+expression: "format!(\"{checked} LF prefix cuts matched the generic path\")"
+---
+21 LF prefix cuts matched the generic path

@@ -189,11 +189,9 @@ impl ReportHandler for JSONReportHandler {
 
 #[test]
 fn test_escape() {
-    insta::assert_snapshot!(
-        format!("newline: {}\nwindows path: {}", escape("a\nb"), escape("C:\\Miette")),
-        @r"
-    newline: a\nb
-    windows path: C:\\Miette
-    "
-    );
+    insta::assert_snapshot!(format!(
+        "newline: {}\nwindows path: {}",
+        escape("a\nb"),
+        escape("C:\\Miette")
+    ));
 }

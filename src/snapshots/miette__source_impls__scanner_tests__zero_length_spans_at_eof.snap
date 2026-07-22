@@ -1,0 +1,5 @@
+---
+source: src/source_impls.rs
+expression: "\"4 zero-length EOF scanner cases matched SpanReader\""
+---
+4 zero-length EOF scanner cases matched SpanReader

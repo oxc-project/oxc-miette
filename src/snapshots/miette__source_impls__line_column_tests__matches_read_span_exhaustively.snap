@@ -1,0 +1,5 @@
+---
+source: src/source_impls.rs
+expression: "format!(\"{checked} line/column cases matched read_span\")"
+---
+1060509 line/column cases matched read_span

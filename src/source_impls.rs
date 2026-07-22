@@ -910,20 +910,14 @@ mod tests {
             assert_eq!(fast.leading.start_line, fast.line_count.saturating_sub(1), "cut={cut}");
             checked += 1;
         }
-        insta::assert_snapshot!(format!("{checked} LF prefix cuts matched the generic path"), @"21 LF prefix cuts matched the generic path");
+        insta::assert_snapshot!(format!("{checked} LF prefix cuts matched the generic path"));
     }
 
     #[test]
     fn basic() -> Result<(), MietteError> {
         let src = String::from("foo\n");
         let contents = src.read_span(&(0, 4).into(), 0, 0)?;
-        insta::assert_snapshot!(snapshot_contents(&contents), @r#"
-        data: "foo\n"
-        span: SourceSpan { offset: SourceOffset(0), length: 4 }
-        line: 0
-        column: 0
-        line count: 1
-        "#);
+        insta::assert_snapshot!(snapshot_contents(&contents));
         Ok(())
     }
 
@@ -931,13 +925,7 @@ mod tests {
     fn shifted() -> Result<(), MietteError> {
         let src = String::from("foobar");
         let contents = src.read_span(&(3, 3).into(), 1, 1)?;
-        insta::assert_snapshot!(snapshot_contents(&contents), @r#"
-        data: "foobar"
-        span: SourceSpan { offset: SourceOffset(0), length: 6 }
-        line: 0
-        column: 0
-        line count: 0
-        "#);
+        insta::assert_snapshot!(snapshot_contents(&contents));
         Ok(())
     }
 
@@ -945,13 +933,7 @@ mod tests {
     fn middle() -> Result<(), MietteError> {
         let src = String::from("foo\nbar\nbaz\n");
         let contents = src.read_span(&(4, 4).into(), 0, 0)?;
-        insta::assert_snapshot!(snapshot_contents(&contents), @r#"
-        data: "bar\n"
-        span: SourceSpan { offset: SourceOffset(4), length: 4 }
-        line: 1
-        column: 0
-        line count: 2
-        "#);
+        insta::assert_snapshot!(snapshot_contents(&contents));
         Ok(())
     }
 
@@ -959,13 +941,7 @@ mod tests {
     fn middle_of_line() -> Result<(), MietteError> {
         let src = String::from("foo\nbarbar\nbaz\n");
         let contents = src.read_span(&(7, 4).into(), 0, 0)?;
-        insta::assert_snapshot!(snapshot_contents(&contents), @r#"
-        data: "bar\n"
-        span: SourceSpan { offset: SourceOffset(7), length: 4 }
-        line: 1
-        column: 3
-        line count: 2
-        "#);
+        insta::assert_snapshot!(snapshot_contents(&contents));
         Ok(())
     }
 
@@ -973,13 +949,7 @@ mod tests {
     fn with_crlf() -> Result<(), MietteError> {
         let src = String::from("foo\r\nbar\r\nbaz\r\n");
         let contents = src.read_span(&(5, 5).into(), 0, 0)?;
-        insta::assert_snapshot!(snapshot_contents(&contents), @r#"
-        data: "bar\r\n"
-        span: SourceSpan { offset: SourceOffset(5), length: 5 }
-        line: 1
-        column: 0
-        line count: 2
-        "#);
+        insta::assert_snapshot!(snapshot_contents(&contents));
         Ok(())
     }
 
@@ -987,13 +957,7 @@ mod tests {
     fn with_context() -> Result<(), MietteError> {
         let src = String::from("xxx\nfoo\nbar\nbaz\n\nyyy\n");
         let contents = src.read_span(&(8, 3).into(), 1, 1)?;
-        insta::assert_snapshot!(snapshot_contents(&contents), @r#"
-        data: "foo\nbar\nbaz\n"
-        span: SourceSpan { offset: SourceOffset(4), length: 12 }
-        line: 1
-        column: 0
-        line count: 4
-        "#);
+        insta::assert_snapshot!(snapshot_contents(&contents));
         Ok(())
     }
 
@@ -1001,13 +965,7 @@ mod tests {
     fn multiline_with_context() -> Result<(), MietteError> {
         let src = String::from("aaa\nxxx\n\nfoo\nbar\nbaz\n\nyyy\nbbb\n");
         let contents = src.read_span(&(9, 11).into(), 1, 1)?;
-        insta::assert_snapshot!(snapshot_contents(&contents), @r#"
-        data: "\nfoo\nbar\nbaz\n\n"
-        span: SourceSpan { offset: SourceOffset(8), length: 14 }
-        line: 2
-        column: 0
-        line count: 7
-        "#);
+        insta::assert_snapshot!(snapshot_contents(&contents));
         Ok(())
     }
 
@@ -1018,25 +976,14 @@ mod tests {
         let src = String::from("a");
         let nonempty = src.read_span(&(2, 0).into(), 0, 0).unwrap_err();
         let empty = String::new().read_span(&(1, 0).into(), 0, 0).unwrap_err();
-        insta::assert_debug_snapshot!((nonempty, empty), @"
-        (
-            OutOfBounds,
-            OutOfBounds,
-        )
-        ");
+        insta::assert_debug_snapshot!((nonempty, empty));
     }
 
     #[test]
     fn multiline_with_context_line_start() -> Result<(), MietteError> {
         let src = String::from("one\ntwo\n\nthree\nfour\nfive\n\nsix\nseven\n");
         let contents = src.read_span(&(2, 0).into(), 2, 2)?;
-        insta::assert_snapshot!(snapshot_contents(&contents), @r#"
-        data: "one\ntwo\n\n"
-        span: SourceSpan { offset: SourceOffset(0), length: 9 }
-        line: 0
-        column: 0
-        line count: 3
-        "#);
+        insta::assert_snapshot!(snapshot_contents(&contents));
         Ok(())
     }
 }
@@ -1131,7 +1078,7 @@ mod line_column_tests {
                 }
             }
         }
-        insta::assert_snapshot!(format!("{checked} line/column cases matched read_span"), @"1060509 line/column cases matched read_span");
+        insta::assert_snapshot!(format!("{checked} line/column cases matched read_span"));
     }
 }
 
@@ -1256,7 +1203,7 @@ mod scanner_tests {
                 }
             }
         }
-        insta::assert_snapshot!(format!("{checked} scanner cases matched SpanReader"), @"227500 scanner cases matched SpanReader");
+        insta::assert_snapshot!(format!("{checked} scanner cases matched SpanReader"));
     }
 
     /// The empty-source and just-past-EOF edge cases `SpanReader` special
@@ -1269,6 +1216,6 @@ mod scanner_tests {
         let mut scanner = SpanScanner::new(b"a", 1, 1);
         check(&mut scanner, b"a", (1, 0), 1, 1, &[]);
         check(&mut scanner, b"a", (2, 0), 1, 1, &[(1, 0)]);
-        insta::assert_snapshot!("4 zero-length EOF scanner cases matched SpanReader", @"4 zero-length EOF scanner cases matched SpanReader");
+        insta::assert_snapshot!("4 zero-length EOF scanner cases matched SpanReader");
     }
 }

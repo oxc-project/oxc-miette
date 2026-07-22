@@ -1,0 +1,9 @@
+---
+source: src/source_impls.rs
+expression: snapshot_contents(&contents)
+---
+data: "foobar"
+span: SourceSpan { offset: SourceOffset(0), length: 6 }
+line: 0
+column: 0
+line count: 0

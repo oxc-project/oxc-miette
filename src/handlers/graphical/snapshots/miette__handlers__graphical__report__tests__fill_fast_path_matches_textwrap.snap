@@ -1,0 +1,5 @@
+---
+source: src/handlers/graphical/report.rs
+expression: "format!(\"{checked} fill cases matched textwrap\")"
+---
+1792 fill cases matched textwrap
