@@ -740,6 +740,25 @@ mod json_report_handler {
     }
 
     #[test]
+    fn url_is_escaped() {
+        const URL: &str = concat!(r#"https://example.com/"\"#, "\u{1f}");
+
+        #[derive(Debug, Error)]
+        #[error("oops!")]
+        struct MyBad;
+
+        impl Diagnostic for MyBad {
+            fn url(&self) -> Option<std::borrow::Cow<'_, str>> {
+                Some(URL.into())
+            }
+        }
+
+        let out = fmt_report(MyBad.into());
+        let json: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(json["url"], URL);
+    }
+
+    #[test]
     fn related() -> Result<(), MietteError> {
         #[derive(Debug, Diagnostic, Error)]
         #[error("oops!")]
