@@ -1,4 +1,4 @@
-#![cfg(feature = "fancy-no-backtrace")]
+#![cfg(all(feature = "fancy-no-backtrace", not(feature = "fancy-no-syscall")))]
 
 use std::{
     ffi::OsString,

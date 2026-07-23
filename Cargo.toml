@@ -35,6 +35,46 @@ harness = false
 test = false
 required-features = ["fancy"]
 
+[[test]]
+name = "color_format"
+required-features = ["derive", "fancy-no-backtrace"]
+
+[[test]]
+name = "derive"
+required-features = ["derive"]
+
+[[test]]
+name = "graphical"
+required-features = ["derive", "fancy-no-backtrace"]
+
+[[test]]
+name = "narrated"
+required-features = ["derive", "fancy-no-backtrace"]
+
+[[test]]
+name = "test_derive_attr"
+required-features = ["derive"]
+
+[[test]]
+name = "test_derive_collection"
+required-features = ["derive"]
+
+[[test]]
+name = "test_derive_source_chain"
+required-features = ["derive"]
+
+[[test]]
+name = "test_diagnostic_source_macro"
+required-features = ["derive"]
+
+[[test]]
+name = "test_emoji_underline"
+required-features = ["derive", "fancy-no-backtrace"]
+
+[[test]]
+name = "test_json"
+required-features = ["derive"]
+
 [lints.rust]
 absolute_paths_not_starting_with_crate = "warn"
 non_ascii_idents = "warn"

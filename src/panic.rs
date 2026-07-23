@@ -1,4 +1,4 @@
-use std::{env, fmt::Write, mem::size_of, panic::set_hook};
+use std::{borrow::Cow, env, fmt::Write, mem::size_of, panic::set_hook};
 
 use backtrace::Backtrace;
 use thiserror::Error;
@@ -24,10 +24,17 @@ pub fn set_panic_hook() {
     }));
 }
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Debug, Error)]
 #[error("{0}{trace}", trace = Panic::backtrace())]
-#[diagnostic(help("set the `RUST_BACKTRACE=1` environment variable to display a backtrace."))]
 struct Panic(String);
+
+impl Diagnostic for Panic {
+    fn help(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed(
+            "set the `RUST_BACKTRACE=1` environment variable to display a backtrace.",
+        ))
+    }
+}
 
 impl Panic {
     fn backtrace() -> String {
