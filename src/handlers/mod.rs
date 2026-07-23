@@ -20,5 +20,6 @@ mod debug;
 mod graphical;
 mod json;
 mod narratable;
+mod snippets;
 #[cfg(feature = "fancy-base")]
 mod theme;
