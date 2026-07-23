@@ -143,6 +143,30 @@ impl Report {
     }
 
     #[track_caller]
+    pub(crate) fn from_std_error<E>(error: E) -> Self
+    where
+        E: StdError + Send + Sync + 'static,
+    {
+        use crate::wrapper::StdErrorWrapper;
+        let error = StdErrorWrapper(error);
+        let vtable = &ErrorVTable {
+            object_drop: object_drop::<StdErrorWrapper<E>>,
+            object_ref: object_ref::<StdErrorWrapper<E>>,
+            object_ref_stderr: object_ref_stderr::<E>,
+            object_boxed: object_boxed::<StdErrorWrapper<E>>,
+            object_boxed_stderr: object_boxed_stderr::<StdErrorWrapper<E>>,
+            object_downcast: object_downcast::<E>,
+            object_drop_rest: object_drop_front::<E>,
+        };
+
+        // Safety: StdErrorWrapper is repr(transparent) so it is okay for the
+        // vtable to allow casting the StdErrorWrapper<E> to E.
+        let handler = Some(crate::report::capture_handler(&error));
+
+        unsafe { Report::construct(error, vtable, handler) }
+    }
+
+    #[track_caller]
     pub(crate) fn from_boxed(error: Box<dyn Diagnostic + Send + Sync>) -> Self {
         use crate::wrapper::BoxedError;
         let error = BoxedError(error);

@@ -51,9 +51,18 @@ fn test_fmt_source() {
 }
 
 #[test]
-#[ignore = "Again with the io::Error source issue?"]
 fn test_io_source() {
     let io = io::Error::other("oh no!");
     let error: Report = miette!(TestError::Io(io));
     assert_eq!("oh no!", error.source().unwrap().to_string());
+    assert!(error.is::<TestError>());
+    assert!(matches!(error.downcast::<TestError>(), Ok(TestError::Io(_))));
+}
+
+#[test]
+fn test_std_error_identity() {
+    let error: Report = miette!(io::Error::other("oh no!"));
+
+    assert!(error.chain().next().unwrap().is::<io::Error>());
+    assert!(error.root_cause().is::<io::Error>());
 }
