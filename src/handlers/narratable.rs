@@ -1,4 +1,4 @@
-use std::{fmt, str::from_utf8};
+use std::{cmp::max, fmt, str::from_utf8};
 
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -192,30 +192,30 @@ impl NarratableReportHandler {
                         }
 
                         let (left, left_conts) = contexts.last().unwrap();
-                        if left_conts.line() + left_conts.line_count() >= right_conts.line() {
+                        if left_conts.line().saturating_add(left_conts.line_count())
+                            >= right_conts.line()
+                        {
                             // The snippets will overlap, so we create one Big Chunky Boi
-                            let left_end = left.offset() + left.len();
-                            let right_end = right.offset() + right.len();
-                            let new_span = LabeledSpan::new(
-                                left.label().map(String::from),
-                                left.offset(),
-                                if right_end >= left_end {
-                                    // Right end goes past left end
-                                    right_end - left.offset()
-                                } else {
-                                    // right is contained inside left
-                                    left.len()
-                                },
-                            );
-                            // Check that the two contexts can be combined
-                            if let Ok(new_conts) = source.read_span(
-                                new_span.inner(),
-                                self.context_lines,
-                                self.context_lines,
-                            ) {
-                                contexts.pop();
-                                contexts.push((new_span, new_conts));
-                                continue;
+                            let new_end = max(left.end(), right.end());
+                            if let Some(new_len) = new_end
+                                .checked_sub(left.offset() as usize)
+                                .and_then(|len| u32::try_from(len).ok())
+                            {
+                                let new_span = LabeledSpan::new(
+                                    left.label().map(String::from),
+                                    left.offset(),
+                                    new_len,
+                                );
+                                // Check that the two contexts can be combined
+                                if let Ok(new_conts) = source.read_span(
+                                    new_span.inner(),
+                                    self.context_lines,
+                                    self.context_lines,
+                                ) {
+                                    contexts.pop();
+                                    contexts.push((new_span, new_conts));
+                                    continue;
+                                }
                             }
                         }
 
@@ -396,8 +396,8 @@ fn safe_get_column(text: &str, offset: usize, start: bool) -> usize {
 impl Line<'_> {
     fn span_attach(&self, span: &SourceSpan) -> Option<SpanAttach> {
         let span_offset = span.offset() as usize;
-        let span_end = span_offset + span.len() as usize;
-        let line_end = self.offset + self.text.len();
+        let span_end = span.end();
+        let line_end = self.offset.saturating_add(self.text.len());
 
         let start_after = span_offset >= self.offset;
         let end_before = self.at_end_of_file || span_end <= line_end;
