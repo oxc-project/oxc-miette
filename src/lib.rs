@@ -736,6 +736,8 @@
 //! [`Result`]: https://docs.rs/miette/latest/miette/type.Result.html
 //! [`SourceCode`]: https://docs.rs/miette/latest/miette/trait.SourceCode.html
 //! [`SourceSpan`]: https://docs.rs/miette/latest/miette/struct.SourceSpan.html
+extern crate self as miette;
+
 pub use error::*;
 #[cfg(feature = "fancy-base")]
 pub use handler::*;

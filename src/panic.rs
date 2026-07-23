@@ -3,7 +3,7 @@ use std::{env, fmt::Write, mem::size_of, panic::set_hook};
 use backtrace::Backtrace;
 use thiserror::Error;
 
-use crate::{self as miette, Diagnostic, Report};
+use crate::{Diagnostic, Report};
 
 /// Tells miette to render panics using its rendering engine.
 pub fn set_panic_hook() {
