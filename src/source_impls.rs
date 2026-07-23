@@ -52,6 +52,13 @@ impl SpanRequest {
     }
 }
 
+fn source_span(start: usize, end: usize) -> Result<SourceSpan, MietteError> {
+    let offset = u32::try_from(start).map_err(|_| MietteError::OutOfBounds)?;
+    let len = end.checked_sub(start).ok_or(MietteError::OutOfBounds)?;
+    let len = u32::try_from(len).map_err(|_| MietteError::OutOfBounds)?;
+    Ok((offset, len).into())
+}
+
 /// A logical line break. `start == end` for LF or CR and differs by one for
 /// CRLF, allowing all scanners to share the same newline handling.
 #[derive(Clone, Copy)]
@@ -376,7 +383,7 @@ impl<'a> SpanReader<'a> {
         };
         Ok(MietteSpanContents::new(
             data,
-            (start as u32, (self.offset - start) as u32).into(),
+            source_span(start, self.offset)?,
             self.leading.start_line,
             if self.context.before == 0 { self.start_column } else { 0 },
             self.line_count,
@@ -667,7 +674,7 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
         };
         Ok(MietteSpanContents::new(
             data,
-            (start as u32, (window_end - start) as u32).into(),
+            source_span(start, window_end)?,
             self.leading.start_line,
             if self.context.before == 0 { self.start_column } else { 0 },
             self.line_count,

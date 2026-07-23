@@ -118,7 +118,7 @@ impl GraphicalReportHandler {
         let mut vbar_offsets = Vec::with_capacity(single_liners.len());
         for hl in single_liners {
             let byte_start = hl.offset();
-            let byte_end = hl.offset() + hl.len();
+            let byte_end = hl.end();
             let start = self.visual_offset(line, byte_start, true).max(highest);
             let end = if hl.len() == 0 {
                 start + 1
@@ -126,7 +126,7 @@ impl GraphicalReportHandler {
                 self.visual_offset(line, byte_end, false).max(start + 1)
             };
 
-            let vbar_offset = (start + end) / 2;
+            let vbar_offset = start + (end - start) / 2;
             let num_left = vbar_offset - start;
             let num_right = end - vbar_offset - 1;
             // Throws `Formatting argument out of range` when width is above u16::MAX.

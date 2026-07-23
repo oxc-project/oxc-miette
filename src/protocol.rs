@@ -478,6 +478,10 @@ impl LabeledSpan {
         self.span.len()
     }
 
+    pub(crate) const fn end(&self) -> usize {
+        self.span.end()
+    }
+
     /// True if this `LabeledSpan` is empty.
     pub const fn is_empty(&self) -> bool {
         self.span.is_empty()
@@ -639,6 +643,10 @@ impl SourceSpan {
         self.length
     }
 
+    pub(crate) const fn end(&self) -> usize {
+        (self.offset() as usize).saturating_add(self.length as usize)
+    }
+
     /// Whether this [`SourceSpan`] has a length of zero. It may still be useful
     /// to point to a specific point.
     pub const fn is_empty(&self) -> bool {
@@ -660,9 +668,7 @@ impl From<(SourceOffset, u32)> for SourceSpan {
 
 impl From<Range<ByteOffset>> for SourceSpan {
     fn from(range: Range<ByteOffset>) -> Self {
-        // `Range::len` returns `0` for empty/reversed ranges, matching the
-        // previous behavior and avoiding underflow.
-        Self { offset: range.start.into(), length: range.len() as u32 }
+        Self { offset: range.start.into(), length: range.end.saturating_sub(range.start) }
     }
 }
 
@@ -718,7 +724,7 @@ impl SourceOffset {
             offset += char.len_utf8();
         }
 
-        SourceOffset(offset as u32)
+        SourceOffset(u32::try_from(offset).unwrap_or(u32::MAX))
     }
 
     /// Returns an offset for the _file_ location of wherever this function is
@@ -746,5 +752,22 @@ impl SourceOffset {
 impl From<ByteOffset> for SourceOffset {
     fn from(bytes: ByteOffset) -> Self {
         SourceOffset(bytes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SourceSpan;
+
+    #[test]
+    fn span_end_preserves_representable_geometry() {
+        let span = SourceSpan::from((u32::MAX - 1, 10));
+        assert_eq!(span.end(), (u32::MAX as usize).saturating_add(9));
+    }
+
+    #[test]
+    fn range_conversion_does_not_truncate_or_underflow() {
+        assert_eq!(SourceSpan::from(0..u32::MAX).len(), u32::MAX);
+        assert_eq!(SourceSpan::from(10..5).len(), 0);
     }
 }

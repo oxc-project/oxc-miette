@@ -55,4 +55,12 @@ impl<'a> FancySpan<'a> {
     pub(super) fn len(&self) -> usize {
         self.span.len() as usize
     }
+
+    pub(super) fn end(&self) -> usize {
+        self.span.end()
+    }
+
+    pub(super) fn nonempty_end(&self) -> usize {
+        self.offset().saturating_add(self.len().max(1))
+    }
 }

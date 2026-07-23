@@ -27,34 +27,39 @@ pub(super) struct Line<'a> {
 }
 
 impl Line<'_> {
+    fn end(&self) -> usize {
+        self.offset.saturating_add(self.length)
+    }
+
     pub(super) fn span_line_only(&self, span: &FancySpan) -> bool {
-        span.offset() >= self.offset && span.offset() + span.len() <= self.offset + self.length
+        span.offset() >= self.offset && span.end() <= self.end()
     }
 
     /// Returns whether `span` should be visible on this line, either in the gutter or under the
     /// text on this line
     pub(super) fn span_applies(&self, span: &FancySpan) -> bool {
-        let spanlen = if span.len() == 0 { 1 } else { span.len() };
+        let span_end = span.nonempty_end();
+        let line_end = self.end();
         // Span starts in this line
 
-        (span.offset() >= self.offset && span.offset() < self.offset + self.length)
+        (span.offset() >= self.offset && span.offset() < line_end)
             // Span passes through this line
-            || (span.offset() < self.offset && span.offset() + spanlen > self.offset + self.length) //todo
+            || (span.offset() < self.offset && span_end > line_end) //todo
             // Span ends on this line
-            || (span.offset() + spanlen > self.offset && span.offset() + spanlen <= self.offset + self.length)
+            || (span_end > self.offset && span_end <= line_end)
     }
 
     /// Returns whether `span` should be visible on this line in the gutter (so this excludes spans
     /// that are only visible on this line and do not span multiple lines)
     pub(super) fn span_applies_gutter(&self, span: &FancySpan) -> bool {
-        let spanlen = if span.len() == 0 { 1 } else { span.len() };
+        let span_end = span.nonempty_end();
+        let line_end = self.end();
         // Span starts in this line
         self.span_applies(span)
             && !(
                 // as long as it doesn't start *and* end on this line
-                (span.offset() >= self.offset && span.offset() < self.offset + self.length)
-                    && (span.offset() + spanlen > self.offset
-                        && span.offset() + spanlen <= self.offset + self.length)
+                (span.offset() >= self.offset && span.offset() < line_end)
+                    && (span_end > self.offset && span_end <= line_end)
             )
     }
 
@@ -66,7 +71,7 @@ impl Line<'_> {
         // prev line).
         span.offset() < self.offset
             // ...and it stops after this line's end.
-            && span.offset() + span.len() > self.offset + self.length
+            && span.end() > self.end()
     }
 
     // Does this line contain the *beginning* of this multiline span?
@@ -78,8 +83,7 @@ impl Line<'_> {
     // Does this line contain the *end* of this multiline span?
     // This assumes self.span_applies() is true already.
     pub(super) fn span_ends(&self, span: &FancySpan) -> bool {
-        span.offset() + span.len() >= self.offset
-            && span.offset() + span.len() <= self.offset + self.length
+        span.end() >= self.offset && span.end() <= self.end()
     }
 }
 
@@ -173,7 +177,7 @@ impl GraphicalReportHandler {
     /// corresponds to that character's first column in `start` is true, or its
     /// last column if `start` is false.
     pub(super) fn visual_offset(&self, line: &Line<'_>, offset: usize, start: bool) -> usize {
-        let line_range = line.offset..=(line.offset + line.length);
+        let line_range = line.offset..=line.end();
         assert!(line_range.contains(&offset));
 
         let mut text_index = offset - line.offset;

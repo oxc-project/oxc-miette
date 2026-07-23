@@ -85,22 +85,24 @@ impl GraphicalReportHandler {
             }
 
             let (left, left_conts) = contexts.last().unwrap();
-            if left_conts.line() + left_conts.line_count() >= right_conts.line() {
+            if left_conts.line().saturating_add(left_conts.line_count()) >= right_conts.line() {
                 // The snippets will overlap, so we create one Big Chunky Boi
-                let left_end = left.offset() + left.len();
-                let right_end = right.offset() + right.len();
+                let left_end = left.end();
+                let right_end = right.end();
                 let new_end = max(left_end, right_end);
 
-                let new_span = LabeledSpan::new(
-                    left.label().map(String::from),
-                    left.offset(),
-                    new_end - left.offset(),
-                );
-                // Check that the two contexts can be combined
-                if let Ok(new_conts) = read(new_span.inner()) {
-                    contexts.pop();
-                    contexts.push((Cow::Owned(new_span), new_conts));
-                    continue;
+                if let Some(new_len) = new_end
+                    .checked_sub(left.offset() as usize)
+                    .and_then(|len| u32::try_from(len).ok())
+                {
+                    let new_span =
+                        LabeledSpan::new(left.label().map(String::from), left.offset(), new_len);
+                    // Check that the two contexts can be combined
+                    if let Ok(new_conts) = read(new_span.inner()) {
+                        contexts.pop();
+                        contexts.push((Cow::Owned(new_span), new_conts));
+                        continue;
+                    }
                 }
             }
 
@@ -124,9 +126,8 @@ impl GraphicalReportHandler {
 
         // only consider labels from the context as primary label
         let ctx_labels = labels.iter().filter(|l| {
-            context.inner().offset() <= l.inner().offset()
-                && l.inner().offset() + l.inner().len()
-                    <= context.inner().offset() + context.inner().len()
+            context.inner().offset() as usize <= l.inner().offset() as usize
+                && l.inner().end() <= context.inner().end()
         });
         let primary_label =
             ctx_labels.clone().find(|label| label.primary()).or_else(|| ctx_labels.clone().next());
