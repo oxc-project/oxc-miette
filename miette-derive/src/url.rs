@@ -98,11 +98,7 @@ impl Url {
         )
     }
 
-    pub(crate) fn gen_struct(
-        &self,
-        struct_name: &syn::Ident,
-        fields: &Fields,
-    ) -> Option<TokenStream> {
+    pub(crate) fn gen_struct(&self, struct_name: &syn::Ident, fields: &Fields) -> TokenStream {
         let (pat, fmt, args) = match self {
             Url::Display(display) => {
                 let (display_pat, display_members) = display_pat_members(fields);
@@ -124,12 +120,12 @@ impl Url {
                 (pat, fmt, args)
             }
         };
-        Some(quote! {
+        quote! {
             fn url(&self) -> std::option::Option<std::borrow::Cow<'_, str>> {
                 #[allow(unused_variables, deprecated)]
                 let Self #pat = self;
                 std::option::Option::Some(std::borrow::Cow::Owned(format!(#fmt #args)))
             }
-        })
+        }
     }
 }

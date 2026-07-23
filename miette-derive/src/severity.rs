@@ -74,12 +74,12 @@ impl Severity {
         )
     }
 
-    pub(crate) fn gen_struct(&self) -> Option<TokenStream> {
+    pub(crate) fn gen_struct(&self) -> TokenStream {
         let sev = &self.0;
-        Some(quote! {
+        quote! {
             fn severity(&self) -> std::option::Option<miette::Severity> {
                 Some(miette::Severity::#sev)
             }
-        })
+        }
     }
 }

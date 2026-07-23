@@ -1,37 +1,18 @@
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
-use syn::spanned::Spanned;
-
 use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
     forward::WhichFn,
-    utils::{display_pat_members, gen_all_variants_with},
+    utils::{display_pat_members, field_member, gen_all_variants_with},
 };
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
 
 pub struct Related(syn::Member);
 
 impl Related {
     pub(crate) fn from_fields(fields: &syn::Fields) -> syn::Result<Option<Self>> {
-        match fields {
-            syn::Fields::Named(named) => Self::from_fields_vec(named.named.iter().collect()),
-            syn::Fields::Unnamed(unnamed) => {
-                Self::from_fields_vec(unnamed.unnamed.iter().collect())
-            }
-            syn::Fields::Unit => Ok(None),
-        }
-    }
-
-    fn from_fields_vec(fields: Vec<&syn::Field>) -> syn::Result<Option<Self>> {
-        for (i, field) in fields.iter().enumerate() {
-            for attr in &field.attrs {
-                if attr.path().is_ident("related") {
-                    let related = if let Some(ident) = field.ident.clone() {
-                        syn::Member::Named(ident)
-                    } else {
-                        syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
-                    };
-                    return Ok(Some(Related(related)));
-                }
+        for (index, field) in fields.iter().enumerate() {
+            if field.attrs.iter().any(|attr| attr.path().is_ident("related")) {
+                return Ok(Some(Related(field_member(index, field))));
             }
         }
         Ok(None)
@@ -60,13 +41,13 @@ impl Related {
         )
     }
 
-    pub(crate) fn gen_struct(&self) -> Option<TokenStream> {
+    pub(crate) fn gen_struct(&self) -> TokenStream {
         let rel = &self.0;
-        Some(quote! {
+        quote! {
             fn related(&self) -> miette::Related<'_> {
                 use ::core::borrow::Borrow;
                 self.#rel.iter().map(|x| -> &(dyn miette::Diagnostic) { &*x.borrow() }).collect()
             }
-        })
+        }
     }
 }

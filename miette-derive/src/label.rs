@@ -10,7 +10,7 @@ use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
     fmt::{self, Display},
     forward::WhichFn,
-    utils::{display_pat_members, gen_all_variants_with},
+    utils::{display_pat_members, field_member, gen_all_variants_with},
 };
 
 pub struct Labels(Vec<Label>);
@@ -108,25 +108,11 @@ impl Parse for LabelAttr {
 
 impl Labels {
     pub fn from_fields(fields: &syn::Fields) -> syn::Result<Option<Self>> {
-        match fields {
-            syn::Fields::Named(named) => Self::from_fields_vec(named.named.iter().collect()),
-            syn::Fields::Unnamed(unnamed) => {
-                Self::from_fields_vec(unnamed.unnamed.iter().collect())
-            }
-            syn::Fields::Unit => Ok(None),
-        }
-    }
-
-    fn from_fields_vec(fields: Vec<&syn::Field>) -> syn::Result<Option<Self>> {
         let mut labels = Vec::new();
-        for (i, field) in fields.iter().enumerate() {
+        for (index, field) in fields.iter().enumerate() {
             for attr in &field.attrs {
                 if attr.path().is_ident("label") {
-                    let span = if let Some(ident) = field.ident.clone() {
-                        syn::Member::Named(ident)
-                    } else {
-                        syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
-                    };
+                    let span = field_member(index, field);
                     use quote::ToTokens;
                     let LabelAttr { label, lbl_ty } =
                         syn::parse2::<LabelAttr>(attr.meta.to_token_stream())?;
@@ -147,7 +133,7 @@ impl Labels {
         if labels.is_empty() { Ok(None) } else { Ok(Some(Labels(labels))) }
     }
 
-    pub(crate) fn gen_struct(&self, fields: &syn::Fields) -> Option<TokenStream> {
+    pub(crate) fn gen_struct(&self, fields: &syn::Fields) -> TokenStream {
         let (display_pat, display_members) = display_pat_members(fields);
         let labels = self.0.iter().filter_map(|highlight| {
             let Label { span, label, ty, lbl_ty } = highlight;
@@ -201,7 +187,7 @@ impl Labels {
             })
         });
 
-        Some(quote! {
+        quote! {
             #[allow(unused_variables)]
             fn labels(&self) -> miette::Labels {
                 use miette::macro_helpers::ToOption;
@@ -215,7 +201,7 @@ impl Labels {
 
                 labels_iter.filter(Option::is_some).map(Option::unwrap).collect()
             }
-        })
+        }
     }
 
     pub(crate) fn gen_enum(variants: &[DiagnosticDef]) -> Option<TokenStream> {
