@@ -32,9 +32,6 @@ pub struct Report {
     pub(crate) inner: Own<ErrorImpl<()>>,
 }
 
-unsafe impl Sync for Report {}
-unsafe impl Send for Report {}
-
 /// `ErrorHook`
 pub type ErrorHook =
     Box<dyn Fn(&(dyn Diagnostic + 'static)) -> Box<dyn ReportHandler> + Sync + Send + 'static>;
@@ -91,6 +88,7 @@ impl dyn ReportHandler {
     /// `downcast_ref`
     pub fn downcast_ref<T: ReportHandler>(&self) -> Option<&T> {
         if self.is::<T>() {
+            // SAFETY: the TypeId check proves the trait object's concrete type is `T`.
             unsafe { Some(&*(self as *const dyn ReportHandler as *const T)) }
         } else {
             None
@@ -100,6 +98,8 @@ impl dyn ReportHandler {
     /// `downcast_mut`
     pub fn downcast_mut<T: ReportHandler>(&mut self) -> Option<&mut T> {
         if self.is::<T>() {
+            // SAFETY: the TypeId check proves the trait object's concrete type is `T`, and
+            // `&mut self` guarantees unique access.
             unsafe { Some(&mut *(self as *mut dyn ReportHandler as *mut T)) }
         } else {
             None
