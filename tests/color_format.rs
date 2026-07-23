@@ -1,12 +1,10 @@
-#![cfg(all(feature = "fancy-no-backtrace", not(feature = "fancy-no-syscall")))]
+#![cfg(all(feature = "fancy-no-backtrace", not(feature = "fancy-no-syscall"), not(miri),))]
 
 use std::{
-    ffi::OsString,
     fmt::{self, Debug},
-    sync::Mutex,
+    process::Command,
 };
 
-use lazy_static::lazy_static;
 use miette::{Diagnostic, MietteHandler, MietteHandlerOpts, ReportHandler, RgbColors};
 use regex::Regex;
 use thiserror::Error;
@@ -16,6 +14,54 @@ enum ColorFormat {
     NoColor,
     Ansi,
     Rgb,
+}
+
+#[derive(Clone, Copy)]
+enum HandlerOptions {
+    Default,
+    ColorNever,
+    ColorAlways,
+    RgbPreferred,
+    RgbAlways,
+    ColorAlwaysRgbAlways,
+}
+
+impl HandlerOptions {
+    fn apply(self, options: MietteHandlerOpts) -> MietteHandlerOpts {
+        match self {
+            HandlerOptions::Default => options,
+            HandlerOptions::ColorNever => options.color(false),
+            HandlerOptions::ColorAlways => options.color(true),
+            HandlerOptions::RgbPreferred => options.rgb_colors(RgbColors::Preferred),
+            HandlerOptions::RgbAlways => options.rgb_colors(RgbColors::Always),
+            HandlerOptions::ColorAlwaysRgbAlways => {
+                options.color(true).rgb_colors(RgbColors::Always)
+            }
+        }
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            HandlerOptions::Default => "default",
+            HandlerOptions::ColorNever => "color-never",
+            HandlerOptions::ColorAlways => "color-always",
+            HandlerOptions::RgbPreferred => "rgb-preferred",
+            HandlerOptions::RgbAlways => "rgb-always",
+            HandlerOptions::ColorAlwaysRgbAlways => "color-always-rgb-always",
+        }
+    }
+
+    fn from_name(name: &str) -> Self {
+        match name {
+            "default" => Self::Default,
+            "color-never" => Self::ColorNever,
+            "color-always" => Self::ColorAlways,
+            "rgb-preferred" => Self::RgbPreferred,
+            "rgb-always" => Self::RgbAlways,
+            "color-always-rgb-always" => Self::ColorAlwaysRgbAlways,
+            _ => panic!("unknown handler options: {name}"),
+        }
+    }
 }
 
 #[derive(Debug, Diagnostic, Error)]
@@ -46,114 +92,100 @@ fn color_format(handler: MietteHandler) -> ColorFormat {
     }
 }
 
-/// Store the current value of an environment variable on construction, and then
-/// restore that value when the guard is dropped.
-struct EnvVarGuard<'a> {
-    var: &'a str,
-    old_value: Option<OsString>,
-}
+const CHILD_OPTIONS: &str = "MIETTE_TEST_HANDLER_OPTIONS";
+const CHILD_RESULT: &str = "MIETTE_TEST_COLOR_FORMAT=";
 
-impl EnvVarGuard<'_> {
-    fn new(var: &str) -> EnvVarGuard<'_> {
-        EnvVarGuard { var, old_value: std::env::var_os(var) }
+fn color_format_in_child(
+    options: HandlerOptions,
+    no_color: Option<&str>,
+    force_color: Option<&str>,
+) -> ColorFormat {
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command
+        .args(["--exact", "report_color_format", "--nocapture"])
+        .env(CHILD_OPTIONS, options.name())
+        .env_remove("NO_COLOR")
+        .env_remove("FORCE_COLOR");
+    if let Some(value) = no_color {
+        command.env("NO_COLOR", value);
+    }
+    if let Some(value) = force_color {
+        command.env("FORCE_COLOR", value);
+    }
+
+    let output = command.output().unwrap();
+    assert!(
+        output.status.success(),
+        "child failed:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    if stdout.contains(&format!("{CHILD_RESULT}Rgb")) {
+        ColorFormat::Rgb
+    } else if stdout.contains(&format!("{CHILD_RESULT}Ansi")) {
+        ColorFormat::Ansi
+    } else if stdout.contains(&format!("{CHILD_RESULT}NoColor")) {
+        ColorFormat::NoColor
+    } else {
+        panic!("child did not report a color format:\n{stdout}")
     }
 }
 
-impl Drop for EnvVarGuard<'_> {
-    fn drop(&mut self) {
-        if let Some(old_value) = &self.old_value {
-            // TODO: Audit that the environment access only happens in single-threaded code.
-            unsafe { std::env::set_var(self.var, old_value) };
-        } else {
-            // TODO: Audit that the environment access only happens in single-threaded code.
-            unsafe { std::env::remove_var(self.var) };
-        }
-    }
-}
-
-lazy_static! {
-    static ref COLOR_ENV_VARS: Mutex<()> = Mutex::new(());
+#[test]
+fn report_color_format() {
+    let Ok(options) = std::env::var(CHILD_OPTIONS) else {
+        return;
+    };
+    let handler = HandlerOptions::from_name(&options).apply(MietteHandlerOpts::new()).build();
+    println!("{CHILD_RESULT}{:?}", color_format(handler));
 }
 
 /// Assert the color format used by a handler with different levels of terminal
 /// support.
-fn check_colors<F: Fn(MietteHandlerOpts) -> MietteHandlerOpts>(
-    make_handler: F,
+fn check_colors(
+    options: HandlerOptions,
     no_support: ColorFormat,
     ansi_support: ColorFormat,
     rgb_support: ColorFormat,
 ) {
-    // To simulate different levels of terminal support we're using specific
-    // environment variables that are handled by the supports_color crate.
-    //
-    // Since environment variables are shared for the entire process, we need
-    // to ensure that only one test that modifies these env vars runs at a time.
-    let lock = COLOR_ENV_VARS.lock().unwrap();
-
-    let guards = (EnvVarGuard::new("NO_COLOR"), EnvVarGuard::new("FORCE_COLOR"));
-    // Clear color environment variables that may be set outside of 'cargo test'
-    // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::remove_var("NO_COLOR") };
-    // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::remove_var("FORCE_COLOR") };
-
-    // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::set_var("NO_COLOR", "1") };
-    let handler = make_handler(MietteHandlerOpts::new()).build();
-    assert_eq!(color_format(handler), no_support);
-    // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::remove_var("NO_COLOR") };
-
-    // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::set_var("FORCE_COLOR", "1") };
-    let handler = make_handler(MietteHandlerOpts::new()).build();
-    assert_eq!(color_format(handler), ansi_support);
-    // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::remove_var("FORCE_COLOR") };
-
-    // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::set_var("FORCE_COLOR", "3") };
-    let handler = make_handler(MietteHandlerOpts::new()).build();
-    assert_eq!(color_format(handler), rgb_support);
-    // TODO: Audit that the environment access only happens in single-threaded code.
-    unsafe { std::env::remove_var("FORCE_COLOR") };
-
-    drop(guards);
-    drop(lock);
+    assert_eq!(color_format_in_child(options, Some("1"), None), no_support);
+    assert_eq!(color_format_in_child(options, None, Some("1")), ansi_support);
+    assert_eq!(color_format_in_child(options, None, Some("3")), rgb_support);
 }
 
 #[test]
 fn no_color_preference() {
     use ColorFormat::*;
-    check_colors(|opts| opts, NoColor, Ansi, Ansi);
+    check_colors(HandlerOptions::Default, NoColor, Ansi, Ansi);
 }
 
 #[test]
 fn color_never() {
     use ColorFormat::*;
-    check_colors(|opts| opts.color(false), NoColor, NoColor, NoColor);
+    check_colors(HandlerOptions::ColorNever, NoColor, NoColor, NoColor);
 }
 
 #[test]
 fn color_always() {
     use ColorFormat::*;
-    check_colors(|opts| opts.color(true), Ansi, Ansi, Ansi);
+    check_colors(HandlerOptions::ColorAlways, Ansi, Ansi, Ansi);
 }
 
 #[test]
 fn rgb_preferred() {
     use ColorFormat::*;
-    check_colors(|opts| opts.rgb_colors(RgbColors::Preferred), NoColor, Ansi, Rgb);
+    check_colors(HandlerOptions::RgbPreferred, NoColor, Ansi, Rgb);
 }
 
 #[test]
 fn rgb_always() {
     use ColorFormat::*;
-    check_colors(|opts| opts.rgb_colors(RgbColors::Always), NoColor, Rgb, Rgb);
+    check_colors(HandlerOptions::RgbAlways, NoColor, Rgb, Rgb);
 }
 
 #[test]
 fn color_always_rgb_always() {
     use ColorFormat::*;
-    check_colors(|opts| opts.color(true).rgb_colors(RgbColors::Always), Rgb, Rgb, Rgb);
+    check_colors(HandlerOptions::ColorAlwaysRgbAlways, Rgb, Rgb, Rgb);
 }

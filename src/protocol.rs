@@ -772,6 +772,8 @@ impl From<ByteOffset> for SourceOffset {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Range;
+
     use super::SourceSpan;
 
     #[test]
@@ -783,6 +785,6 @@ mod tests {
     #[test]
     fn range_conversion_does_not_truncate_or_underflow() {
         assert_eq!(SourceSpan::from(0..u32::MAX).len(), u32::MAX);
-        assert_eq!(SourceSpan::from(10..5).len(), 0);
+        assert_eq!(SourceSpan::from(Range { start: 10, end: 5 }).len(), 0);
     }
 }
