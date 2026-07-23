@@ -693,7 +693,7 @@
 //!
 //! ## MSRV
 //!
-//! This crate requires rustc 1.70.0 or later.
+//! This crate requires rustc 1.85.0 or later.
 //!
 //! ## Acknowledgements
 //!
