@@ -259,10 +259,12 @@ mod tests {
     use super::*;
     use crate::SourceCode;
 
+    type ExpectedLine<'a> = (usize, usize, usize, &'a str);
+
     #[test]
     fn get_lines_preserves_line_geometry() {
         const BASE: usize = 10;
-        let cases: &[(&str, &[(usize, usize, usize, &str)])] = &[
+        let cases: &[(&str, &[ExpectedLine<'_>])] = &[
             ("", &[]),
             ("abc", &[(5, BASE, 3, "abc")]),
             ("a\nb", &[(5, BASE, 2, "a"), (6, BASE + 2, 1, "b")]),
