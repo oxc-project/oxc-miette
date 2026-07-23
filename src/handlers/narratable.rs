@@ -166,10 +166,25 @@ impl NarratableReportHandler {
                 if !labels.is_empty() {
                     let mut contexts: Vec<(LabeledSpan, MietteSpanContents<'_>)> =
                         Vec::with_capacity(labels.len());
-                    for right in labels.iter() {
-                        let right_conts = source
-                            .read_span(right.inner(), self.context_lines, self.context_lines)
-                            .map_err(|_| fmt::Error)?;
+                    for right in &labels {
+                        let right_conts = match source.read_span(
+                            right.inner(),
+                            self.context_lines,
+                            self.context_lines,
+                        ) {
+                            Ok(contents) => contents,
+                            Err(error) => {
+                                writeln!(
+                                    f,
+                                    "[Failed to read contents for label `{}` (offset: {}, length: \
+                                     {}): {error}]",
+                                    right.label().unwrap_or("<none>"),
+                                    right.offset(),
+                                    right.len(),
+                                )?;
+                                return Ok(());
+                            }
+                        };
 
                         if contexts.is_empty() {
                             contexts.push((right.clone(), right_conts));
@@ -273,7 +288,7 @@ impl NarratableReportHandler {
     /// span doesn't have to be re-read (each read is a scan of the source up
     /// to the span).
     fn get_lines<'a>(&self, context_data: &MietteSpanContents<'a>) -> Vec<Line<'a>> {
-        let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
+        let context = from_utf8(context_data.data()).expect("source code must be valid UTF-8");
         let mut line = context_data.line();
         let mut column = context_data.column();
         let mut offset = context_data.span().offset() as usize;

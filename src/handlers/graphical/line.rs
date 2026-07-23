@@ -213,7 +213,7 @@ impl GraphicalReportHandler {
     /// doesn't have to be re-read (each read is a scan of the source up to the
     /// span).
     pub(super) fn get_lines<'a>(&self, context_data: &MietteSpanContents<'a>) -> Vec<Line<'a>> {
-        let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
+        let context = from_utf8(context_data.data()).expect("source code must be valid UTF-8");
         let mut line = context_data.line();
         let base = context_data.span().offset() as usize;
         let bytes = context.as_bytes();
@@ -299,5 +299,15 @@ mod tests {
 
         assert_eq!(lines.len(), 3);
         assert_eq!(lines.capacity(), 3);
+    }
+
+    #[test]
+    fn zero_tab_width_is_normalized() {
+        let widths = GraphicalReportHandler::new()
+            .tab_width(0)
+            .line_visual_char_width("\t")
+            .collect::<Vec<_>>();
+
+        assert_eq!(widths, [1]);
     }
 }
