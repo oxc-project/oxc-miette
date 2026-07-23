@@ -1,25 +1,32 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::spanned::Spanned;
 
 use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
     forward::WhichFn,
 };
 
+pub(crate) fn field_member(index: usize, field: &syn::Field) -> syn::Member {
+    field
+        .ident
+        .as_ref()
+        .cloned()
+        .map_or_else(|| syn::Member::Unnamed(index.into()), syn::Member::Named)
+}
+
 pub(crate) fn gen_all_variants_with(
     variants: &[DiagnosticDef],
     which_fn: WhichFn,
     mut f: impl FnMut(&syn::Ident, &syn::Fields, &DiagnosticConcreteArgs) -> Option<TokenStream>,
 ) -> Option<TokenStream> {
-    let pairs = variants
+    let pairs: TokenStream = variants
         .iter()
         .filter_map(|def| {
             def.args.forward_or_override_enum(&def.ident, which_fn, |concrete| {
                 f(&def.ident, &def.fields, concrete)
             })
         })
-        .collect::<Vec<_>>();
+        .collect();
     if pairs.is_empty() {
         return None;
     }
@@ -29,7 +36,7 @@ pub(crate) fn gen_all_variants_with(
         #signature {
             #[allow(unused_variables, deprecated)]
             match self {
-                #(#pairs)*
+                #pairs
                 #catchall
             }
         }
@@ -71,17 +78,8 @@ fn gen_fields_pat(fields: &syn::Fields) -> TokenStream {
 /// `Display::expand_shorthand[_cloned]`.
 pub(crate) fn display_pat_members(fields: &syn::Fields) -> (TokenStream, HashSet<syn::Member>) {
     let pat = gen_fields_pat(fields);
-    let members: HashSet<syn::Member> = fields
-        .iter()
-        .enumerate()
-        .map(|(i, field)| {
-            if let Some(ident) = field.ident.as_ref().cloned() {
-                syn::Member::Named(ident)
-            } else {
-                syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
-            }
-        })
-        .collect();
+    let members: HashSet<syn::Member> =
+        fields.iter().enumerate().map(|(i, field)| field_member(i, field)).collect();
     (pat, members)
 }
 

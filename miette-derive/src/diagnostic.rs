@@ -291,42 +291,42 @@ impl Diagnostic {
                         let code_body = concrete
                             .code
                             .as_ref()
-                            .and_then(|x| x.gen_struct())
+                            .map(|x| x.gen_struct())
                             .or_else(|| forward(WhichFn::Code));
                         let help_body = concrete
                             .help
                             .as_ref()
-                            .and_then(|x| x.gen_struct(fields))
+                            .map(|x| x.gen_struct(fields))
                             .or_else(|| forward(WhichFn::Help));
                         let sev_body = concrete
                             .severity
                             .as_ref()
-                            .and_then(|x| x.gen_struct())
+                            .map(|x| x.gen_struct())
                             .or_else(|| forward(WhichFn::Severity));
                         let rel_body = concrete
                             .related
                             .as_ref()
-                            .and_then(|x| x.gen_struct())
+                            .map(|x| x.gen_struct())
                             .or_else(|| forward(WhichFn::Related));
                         let url_body = concrete
                             .url
                             .as_ref()
-                            .and_then(|x| x.gen_struct(ident, fields))
+                            .map(|x| x.gen_struct(ident, fields))
                             .or_else(|| forward(WhichFn::Url));
                         let labels_body = concrete
                             .labels
                             .as_ref()
-                            .and_then(|x| x.gen_struct(fields))
+                            .map(|x| x.gen_struct(fields))
                             .or_else(|| forward(WhichFn::Labels));
                         let src_body = concrete
                             .source_code
                             .as_ref()
-                            .and_then(|x| x.gen_struct(fields))
+                            .map(|x| x.gen_struct(fields))
                             .or_else(|| forward(WhichFn::SourceCode));
                         let diagnostic_source = concrete
                             .diagnostic_source
                             .as_ref()
-                            .and_then(|x| x.gen_struct())
+                            .map(|x| x.gen_struct())
                             .or_else(|| forward(WhichFn::DiagnosticSource));
                         quote! {
                             impl #impl_generics miette::Diagnostic for #ident #ty_generics #where_clause {
