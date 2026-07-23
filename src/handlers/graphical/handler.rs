@@ -53,6 +53,7 @@ pub(crate) enum LinkStyle {
 impl GraphicalReportHandler {
     /// Create a new `GraphicalReportHandler` with the default
     /// [`GraphicalTheme`]. This will use both unicode characters and colors.
+    #[must_use]
     pub fn new() -> Self {
         let is_terminal = io::stdout().is_terminal() && io::stderr().is_terminal();
         Self {
@@ -71,6 +72,7 @@ impl GraphicalReportHandler {
     }
 
     /// Create a new `GraphicalReportHandler` with a given [`GraphicalTheme`].
+    #[must_use]
     pub fn new_themed(theme: GraphicalTheme) -> Self {
         Self {
             links: LinkStyle::Link,
@@ -97,54 +99,63 @@ impl GraphicalReportHandler {
     }
 
     /// Whether to enable error code linkification using [`Diagnostic::url()`](crate::Diagnostic::url).
+    #[must_use]
     pub fn with_links(mut self, links: bool) -> Self {
         self.links = if links { LinkStyle::Link } else { LinkStyle::Text };
         self
     }
 
     /// Set a theme for this handler.
+    #[must_use]
     pub fn with_theme(mut self, theme: GraphicalTheme) -> Self {
         self.theme = theme;
         self
     }
 
     /// Sets the width to wrap the report at.
+    #[must_use]
     pub fn with_width(mut self, width: usize) -> Self {
         self.termwidth = width;
         self
     }
 
     /// Enables or disables wrapping of lines to fit the width.
+    #[must_use]
     pub fn with_wrap_lines(mut self, wrap_lines: bool) -> Self {
         self.wrap_lines = wrap_lines;
         self
     }
 
     /// Enables or disables breaking of words during wrapping.
+    #[must_use]
     pub fn with_break_words(mut self, break_words: bool) -> Self {
         self.break_words = break_words;
         self
     }
 
     /// Sets the word separator to use when wrapping.
+    #[must_use]
     pub fn with_word_separator(mut self, word_separator: textwrap::WordSeparator) -> Self {
         self.word_separator = Some(word_separator);
         self
     }
 
-    /// Sets the word splitter to usewhen wrapping.
+    /// Sets the word splitter to use when wrapping.
+    #[must_use]
     pub fn with_word_splitter(mut self, word_splitter: textwrap::WordSplitter) -> Self {
         self.word_splitter = Some(word_splitter);
         self
     }
 
     /// Sets the 'global' footer for this handler.
+    #[must_use]
     pub fn with_footer(mut self, footer: String) -> Self {
         self.footer = Some(footer);
         self
     }
 
     /// Sets the number of lines of context to show around each error.
+    #[must_use]
     pub fn with_context_lines(mut self, lines: usize) -> Self {
         self.context_lines = lines;
         self
@@ -152,6 +163,7 @@ impl GraphicalReportHandler {
 
     /// Sets the display text for links.
     /// Miette displays `(link)` if this option is not set.
+    #[must_use]
     pub fn with_link_display_text(mut self, text: impl Into<String>) -> Self {
         self.link_display_text = Some(text.into());
         self

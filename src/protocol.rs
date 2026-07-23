@@ -439,6 +439,7 @@ impl LabeledSpan {
     ///     LabeledSpan::new(Some("expected a closing parenthesis".to_string()), 4, 0)
     /// )
     /// ```
+    #[must_use]
     pub fn at_offset(offset: ByteOffset, label: impl Into<String>) -> Self {
         Self::new(Some(label.into()), offset, 0)
     }
@@ -459,21 +460,25 @@ impl LabeledSpan {
     }
 
     /// Gets the (optional) label string for this `LabeledSpan`.
+    #[must_use]
     pub fn label(&self) -> Option<&str> {
         self.label.as_deref()
     }
 
     /// Returns a reference to the inner [`SourceSpan`].
+    #[must_use]
     pub const fn inner(&self) -> &SourceSpan {
         &self.span
     }
 
     /// Returns the 0-based starting byte offset.
+    #[must_use]
     pub const fn offset(&self) -> ByteOffset {
         self.span.offset()
     }
 
     /// Returns the number of bytes this `LabeledSpan` spans.
+    #[must_use]
     pub const fn len(&self) -> u32 {
         self.span.len()
     }
@@ -483,11 +488,13 @@ impl LabeledSpan {
     }
 
     /// True if this `LabeledSpan` is empty.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.span.is_empty()
     }
 
     /// True if this `LabeledSpan` is a primary span.
+    #[must_use]
     pub const fn primary(&self) -> bool {
         self.primary
     }
@@ -549,6 +556,7 @@ pub struct MietteSpanContents<'a> {
 
 impl<'a> MietteSpanContents<'a> {
     /// Make a new [`MietteSpanContents`] object.
+    #[must_use]
     pub const fn new(
         data: &'a [u8],
         span: SourceSpan,
@@ -560,6 +568,7 @@ impl<'a> MietteSpanContents<'a> {
     }
 
     /// Make a new [`MietteSpanContents`] object, with a name for its 'file'.
+    #[must_use]
     pub const fn new_named(
         name: Cow<'a, str>,
         data: &'a [u8],
@@ -629,16 +638,19 @@ pub struct SourceSpan {
 
 impl SourceSpan {
     /// Create a new [`SourceSpan`].
+    #[must_use]
     pub const fn new(start: SourceOffset, length: u32) -> Self {
         Self { offset: start, length }
     }
 
     /// The absolute offset, in bytes, from the beginning of a [`SourceCode`].
+    #[must_use]
     pub const fn offset(&self) -> ByteOffset {
         self.offset.offset()
     }
 
     /// Total length of the [`SourceSpan`], in bytes.
+    #[must_use]
     pub const fn len(&self) -> u32 {
         self.length
     }
@@ -649,6 +661,7 @@ impl SourceSpan {
 
     /// Whether this [`SourceSpan`] has a length of zero. It may still be useful
     /// to point to a specific point.
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.length == 0
     }
@@ -698,6 +711,7 @@ pub struct SourceOffset(ByteOffset);
 
 impl SourceOffset {
     /// Actual byte offset.
+    #[must_use]
     pub const fn offset(&self) -> ByteOffset {
         self.0
     }
@@ -707,6 +721,7 @@ impl SourceOffset {
     ///
     /// This function is infallible: Giving an out-of-range line/column pair
     /// will return the offset of the last byte in the source.
+    #[must_use]
     pub fn from_location(source: impl AsRef<str>, loc_line: usize, loc_col: usize) -> Self {
         let mut line = 0usize;
         let mut col = 0usize;
@@ -734,7 +749,7 @@ impl SourceOffset {
     /// Returns both the filename that was given and the offset of the caller
     /// as a [`SourceOffset`].
     ///
-    /// Keep in mind that this fill only work if the file your Rust source
+    /// Keep in mind that this will only work if the file your Rust source
     /// file was compiled from is actually available at that location. If
     /// you're shipping binaries for your application, you'll want to ignore
     /// the Err case or otherwise report it.

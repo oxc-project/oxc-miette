@@ -14,6 +14,7 @@ impl<T> IsOption for Option<T> {}
 pub struct OptionalWrapper<T>(pub PhantomData<T>);
 
 impl<T> OptionalWrapper<T> {
+    #[must_use]
     pub fn new() -> Self {
         Self(PhantomData)
     }

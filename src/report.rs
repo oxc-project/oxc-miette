@@ -232,6 +232,7 @@ pub mod private {
         pub use crate::kind::{AdhocKind, BoxedKind, StdErrorKind, TraitKind, dispatch};
     }
 
+    #[must_use]
     #[track_caller]
     pub fn new_adhoc<M>(message: M) -> Report
     where

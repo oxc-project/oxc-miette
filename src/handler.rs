@@ -55,6 +55,7 @@ pub struct MietteHandlerOpts {
 
 impl MietteHandlerOpts {
     /// Create a new `MietteHandlerOpts`.
+    #[must_use]
     pub fn new() -> Self {
         Default::default()
     }
@@ -62,6 +63,7 @@ impl MietteHandlerOpts {
     /// If true, specify whether the graphical handler will make codes be
     /// clickable links in supported terminals. Defaults to auto-detection
     /// based on known supported terminals.
+    #[must_use]
     pub fn terminal_links(mut self, linkify: bool) -> Self {
         self.linkify = Some(linkify);
         self
@@ -71,12 +73,14 @@ impl MietteHandlerOpts {
     /// Use [`force_graphical()`](`MietteHandlerOpts::force_graphical) to force
     /// graphical mode. This option overrides
     /// [`color()`](`MietteHandlerOpts::color).
+    #[must_use]
     pub fn graphical_theme(mut self, theme: GraphicalTheme) -> Self {
         self.theme = Some(theme);
         self
     }
 
     /// Sets the width to wrap the report at. Defaults to 80.
+    #[must_use]
     pub fn width(mut self, width: usize) -> Self {
         self.width = Some(width);
         self
@@ -87,6 +91,7 @@ impl MietteHandlerOpts {
     /// If false, long lines will not be broken when they exceed the width.
     ///
     /// Defaults to true.
+    #[must_use]
     pub fn wrap_lines(mut self, wrap_lines: bool) -> Self {
         self.wrap_lines = Some(wrap_lines);
         self
@@ -97,30 +102,35 @@ impl MietteHandlerOpts {
     /// If false, long words will not be broken when they exceed the width.
     ///
     /// Defaults to true.
+    #[must_use]
     pub fn break_words(mut self, break_words: bool) -> Self {
         self.break_words = Some(break_words);
         self
     }
 
     /// Sets the `textwrap::WordSeparator` to use when determining wrap points.
+    #[must_use]
     pub fn word_separator(mut self, word_separator: textwrap::WordSeparator) -> Self {
         self.word_separator = Some(word_separator);
         self
     }
 
     /// Sets the `textwrap::WordSplitter` to use when determining wrap points.
+    #[must_use]
     pub fn word_splitter(mut self, word_splitter: textwrap::WordSplitter) -> Self {
         self.word_splitter = Some(word_splitter);
         self
     }
 
     /// Include the cause chain of the top-level error in the report.
+    #[must_use]
     pub fn with_cause_chain(mut self) -> Self {
         self.with_cause_chain = Some(true);
         self
     }
 
     /// Do not include the cause chain of the top-level error in the report.
+    #[must_use]
     pub fn without_cause_chain(mut self) -> Self {
         self.with_cause_chain = Some(false);
         self
@@ -135,6 +145,7 @@ impl MietteHandlerOpts {
     ///
     /// The actual format depends on the value of
     /// [`MietteHandlerOpts::rgb_colors`].
+    #[must_use]
     pub fn color(mut self, color: bool) -> Self {
         self.color = Some(color);
         self
@@ -149,6 +160,7 @@ impl MietteHandlerOpts {
     /// first place. That is handled by the [`MietteHandlerOpts::color`]
     /// setting. If colors are not being used, the value of `rgb_colors` has
     /// no effect.
+    #[must_use]
     pub fn rgb_colors(mut self, color: RgbColors) -> Self {
         self.rgb_colors = color;
         self
@@ -156,6 +168,7 @@ impl MietteHandlerOpts {
 
     /// If true, forces unicode display for graphical output. If set to false,
     /// forces ASCII art display.
+    #[must_use]
     pub fn unicode(mut self, unicode: bool) -> Self {
         self.unicode = Some(unicode);
         self
@@ -163,36 +176,42 @@ impl MietteHandlerOpts {
 
     /// If true, graphical rendering will be used regardless of terminal
     /// detection.
+    #[must_use]
     pub fn force_graphical(mut self, force: bool) -> Self {
         self.force_graphical = Some(force);
         self
     }
 
     /// If true, forces use of the narrated renderer.
+    #[must_use]
     pub fn force_narrated(mut self, force: bool) -> Self {
         self.force_narrated = Some(force);
         self
     }
 
     /// Set a footer to be displayed at the bottom of the report.
+    #[must_use]
     pub fn footer(mut self, footer: String) -> Self {
         self.footer = Some(footer);
         self
     }
 
     /// Sets the number of context lines before and after a span to display.
+    #[must_use]
     pub fn context_lines(mut self, context_lines: usize) -> Self {
         self.context_lines = Some(context_lines);
         self
     }
 
     /// Set the displayed tab width in spaces.
+    #[must_use]
     pub fn tab_width(mut self, width: usize) -> Self {
         self.tab_width = Some(width);
         self
     }
 
     /// Builds a [`MietteHandler`] from this builder.
+    #[must_use]
     pub fn build(self) -> MietteHandler {
         let graphical = self.is_graphical();
         let width = self.get_width();
@@ -309,6 +328,7 @@ pub struct MietteHandler {
 
 impl MietteHandler {
     /// Creates a new [`MietteHandler`] with default settings.
+    #[must_use]
     pub fn new() -> Self {
         Default::default()
     }

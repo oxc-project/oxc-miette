@@ -33,6 +33,7 @@ impl Report {
     /// If the error type does not provide a backtrace, a backtrace will be
     /// created here to ensure that a backtrace exists.
     #[track_caller]
+    #[must_use]
     pub fn new<E>(error: E) -> Self
     where
         E: Diagnostic + Send + Sync + 'static,
@@ -78,6 +79,7 @@ impl Report {
     /// }
     /// ```
     #[track_caller]
+    #[must_use]
     pub fn msg<M>(message: M) -> Self
     where
         M: Display + Debug + Send + Sync + 'static,
@@ -93,6 +95,7 @@ impl Report {
     /// Boxed `Diagnostic`s don't implement `Diagnostic` themselves due to trait coherence issues.
     /// This method allows you to create a `Report` from a boxed `Diagnostic`.
     #[track_caller]
+    #[must_use]
     pub fn new_boxed(error: Box<dyn Diagnostic + Send + Sync + 'static>) -> Self {
         Report::from_boxed(error)
     }
@@ -235,6 +238,7 @@ impl Report {
     ///     None
     /// }
     /// ```
+    #[must_use]
     pub fn chain(&self) -> Chain<'_> {
         ErrorImpl::chain(self.inner.by_ref())
     }
@@ -244,6 +248,7 @@ impl Report {
     ///
     /// The root cause is the last error in the iterator produced by
     /// [`chain()`](Report::chain).
+    #[must_use]
     pub fn root_cause(&self) -> &(dyn StdError + 'static) {
         self.chain().next_back().unwrap()
     }
@@ -256,6 +261,7 @@ impl Report {
     /// interaction between message and downcasting, [see here].
     ///
     /// [see here]: trait.WrapErr.html#effect-on-downcasting
+    #[must_use]
     pub fn is<E>(&self) -> bool
     where
         E: Display + Debug + Send + Sync + 'static,
@@ -335,6 +341,7 @@ impl Report {
     /// }
     /// # ;
     /// ```
+    #[must_use]
     pub fn downcast_ref<E>(&self) -> Option<&E>
     where
         E: Display + Debug + Send + Sync + 'static,
@@ -369,6 +376,7 @@ impl Report {
     }
 
     /// Get a reference to the Handler for this Report.
+    #[must_use]
     pub fn handler(&self) -> &dyn ReportHandler {
         self.inner.by_ref().deref().handler.as_ref().unwrap().as_ref()
     }
@@ -379,6 +387,7 @@ impl Report {
     }
 
     /// Provide source code for this error
+    #[must_use]
     pub fn with_source_code(self, source_code: impl SourceCode + 'static) -> Report {
         WithSourceCode { source_code, error: self }.into()
     }
