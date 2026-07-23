@@ -5,7 +5,7 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use crate::{
     LabeledSpan, MietteSpanContents, ReportHandler, SourceCode, SourceSpan, SpanContents,
     diagnostic_chain::DiagnosticChain,
-    handlers::snippets::{SnippetContext, merge_contexts},
+    handlers::snippets::{SnippetContext, merge_contexts, write_read_error},
     protocol::{Diagnostic, Severity},
 };
 
@@ -169,10 +169,7 @@ impl NarratableReportHandler {
                         source.read_span(span, self.context_lines, self.context_lines)
                     }) {
                         Ok(contexts) => contexts,
-                        Err(error) => {
-                            writeln!(f, "[{error}]")?;
-                            return Ok(());
-                        }
+                        Err(error) => return write_read_error(f, &error),
                     };
                     for SnippetContext { contents, .. } in contexts {
                         self.render_context(f, contents, &labels[..])?;

@@ -18,7 +18,7 @@ use super::{
 };
 use crate::{
     Diagnostic, LabeledSpan, MietteSpanContents, SourceCode, SourceSpan, SpanContents,
-    handlers::snippets::{SnippetContext, merge_contexts},
+    handlers::snippets::{SnippetContext, merge_contexts, write_read_error},
     source_impls::SpanScanner,
 };
 
@@ -65,10 +65,7 @@ impl GraphicalReportHandler {
 
         let contexts = match merge_contexts(&labels, read) {
             Ok(contexts) => contexts,
-            Err(error) => {
-                writeln!(f, "[{error}]")?;
-                return Ok(());
-            }
+            Err(error) => return write_read_error(f, &error),
         };
         for SnippetContext { span, contents } in contexts {
             self.render_context(f, &span, contents, &labels[..])?;
