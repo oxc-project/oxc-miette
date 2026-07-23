@@ -25,6 +25,7 @@ impl<S: SourceCode> fmt::Debug for NamedSource<S> {
 impl<S: SourceCode + 'static> NamedSource<S> {
     /// Create a new `NamedSource` using a regular [`SourceCode`] and giving
     /// its returned [`SpanContents`] a name.
+    #[must_use]
     pub fn new(name: impl AsRef<str>, source: S) -> Self
     where
         S: Send + Sync,
@@ -33,12 +34,14 @@ impl<S: SourceCode + 'static> NamedSource<S> {
     }
 
     /// Gets the name of this `NamedSource`.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Returns a reference the inner [`SourceCode`] type for this
     /// `NamedSource`.
+    #[must_use]
     pub fn inner(&self) -> &S {
         &self.source
     }
