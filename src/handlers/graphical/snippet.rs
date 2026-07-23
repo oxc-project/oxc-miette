@@ -18,6 +18,7 @@ use super::{
 };
 use crate::{
     Diagnostic, LabeledSpan, MietteSpanContents, SourceCode, SourceSpan, SpanContents,
+    handlers::snippets::{SnippetContext, merge_contexts},
     source_impls::SpanScanner,
 };
 
@@ -47,7 +48,7 @@ impl GraphicalReportHandler {
             .contiguous_bytes()
             .map(|bytes| SpanScanner::new(bytes, self.context_lines, self.context_lines));
         let source_name = source.name();
-        let mut read = |span: &SourceSpan| match scanner.as_mut() {
+        let read = |span: &SourceSpan| match scanner.as_mut() {
             Some(scanner) => scanner.read_span(span).map(|contents| match source_name {
                 Some(name) => MietteSpanContents::new_named(
                     Cow::Borrowed(name),
@@ -62,54 +63,15 @@ impl GraphicalReportHandler {
             None => source.read_span(span, self.context_lines, self.context_lines),
         };
 
-        let mut contexts: Vec<(Cow<'_, LabeledSpan>, _)> = Vec::with_capacity(labels.len());
-        for right in &labels {
-            let right_conts = match read(right.inner()) {
-                Ok(contents) => contents,
-                Err(error) => {
-                    writeln!(
-                        f,
-                        "[Failed to read contents for label `{}` (offset: {}, length: {}): \
-                         {error}]",
-                        right.label().unwrap_or("<none>"),
-                        right.offset(),
-                        right.len(),
-                    )?;
-                    return Ok(());
-                }
-            };
-
-            if contexts.is_empty() {
-                contexts.push((Cow::Borrowed(right), right_conts));
-                continue;
+        let contexts = match merge_contexts(&labels, read) {
+            Ok(contexts) => contexts,
+            Err(error) => {
+                writeln!(f, "[{error}]")?;
+                return Ok(());
             }
-
-            let (left, left_conts) = contexts.last().unwrap();
-            if left_conts.line().saturating_add(left_conts.line_count()) >= right_conts.line() {
-                // The snippets will overlap, so we create one Big Chunky Boi
-                let left_end = left.end();
-                let right_end = right.end();
-                let new_end = max(left_end, right_end);
-
-                if let Some(new_len) = new_end
-                    .checked_sub(left.offset() as usize)
-                    .and_then(|len| u32::try_from(len).ok())
-                {
-                    let new_span =
-                        LabeledSpan::new(left.label().map(String::from), left.offset(), new_len);
-                    // Check that the two contexts can be combined
-                    if let Ok(new_conts) = read(new_span.inner()) {
-                        contexts.pop();
-                        contexts.push((Cow::Owned(new_span), new_conts));
-                        continue;
-                    }
-                }
-            }
-
-            contexts.push((Cow::Borrowed(right), right_conts));
-        }
-        for (ctx, conts) in contexts {
-            self.render_context(f, &ctx, conts, &labels[..])?;
+        };
+        for SnippetContext { span, contents } in contexts {
+            self.render_context(f, &span, contents, &labels[..])?;
         }
 
         Ok(())

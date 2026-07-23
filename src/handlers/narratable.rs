@@ -1,10 +1,11 @@
-use std::{cmp::max, fmt, str::from_utf8};
+use std::{fmt, str::from_utf8};
 
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
     LabeledSpan, MietteSpanContents, ReportHandler, SourceCode, SourceSpan, SpanContents,
     diagnostic_chain::DiagnosticChain,
+    handlers::snippets::{SnippetContext, merge_contexts},
     protocol::{Diagnostic, Severity},
 };
 
@@ -164,65 +165,17 @@ impl NarratableReportHandler {
                 let mut labels = diagnostic.labels();
                 labels.sort_unstable_by_key(|l| l.inner().offset());
                 if !labels.is_empty() {
-                    let mut contexts: Vec<(LabeledSpan, MietteSpanContents<'_>)> =
-                        Vec::with_capacity(labels.len());
-                    for right in &labels {
-                        let right_conts = match source.read_span(
-                            right.inner(),
-                            self.context_lines,
-                            self.context_lines,
-                        ) {
-                            Ok(contents) => contents,
-                            Err(error) => {
-                                writeln!(
-                                    f,
-                                    "[Failed to read contents for label `{}` (offset: {}, length: \
-                                     {}): {error}]",
-                                    right.label().unwrap_or("<none>"),
-                                    right.offset(),
-                                    right.len(),
-                                )?;
-                                return Ok(());
-                            }
-                        };
-
-                        if contexts.is_empty() {
-                            contexts.push((right.clone(), right_conts));
-                            continue;
+                    let contexts = match merge_contexts(&labels, |span| {
+                        source.read_span(span, self.context_lines, self.context_lines)
+                    }) {
+                        Ok(contexts) => contexts,
+                        Err(error) => {
+                            writeln!(f, "[{error}]")?;
+                            return Ok(());
                         }
-
-                        let (left, left_conts) = contexts.last().unwrap();
-                        if left_conts.line().saturating_add(left_conts.line_count())
-                            >= right_conts.line()
-                        {
-                            // The snippets will overlap, so we create one Big Chunky Boi
-                            let new_end = max(left.end(), right.end());
-                            if let Some(new_len) = new_end
-                                .checked_sub(left.offset() as usize)
-                                .and_then(|len| u32::try_from(len).ok())
-                            {
-                                let new_span = LabeledSpan::new(
-                                    left.label().map(String::from),
-                                    left.offset(),
-                                    new_len,
-                                );
-                                // Check that the two contexts can be combined
-                                if let Ok(new_conts) = source.read_span(
-                                    new_span.inner(),
-                                    self.context_lines,
-                                    self.context_lines,
-                                ) {
-                                    contexts.pop();
-                                    contexts.push((new_span, new_conts));
-                                    continue;
-                                }
-                            }
-                        }
-
-                        contexts.push((right.clone(), right_conts));
-                    }
-                    for (_, conts) in contexts {
-                        self.render_context(f, conts, &labels[..])?;
+                    };
+                    for SnippetContext { contents, .. } in contexts {
+                        self.render_context(f, contents, &labels[..])?;
                     }
                 }
             }
