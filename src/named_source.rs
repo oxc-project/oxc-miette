@@ -17,8 +17,8 @@ impl<S: SourceCode> fmt::Debug for NamedSource<S> {
         f.debug_struct("NamedSource")
             .field("name", &self.name)
             .field("source", &"<redacted>")
-            .field("language", &self.language);
-        Ok(())
+            .field("language", &self.language)
+            .finish()
     }
 }
 
@@ -83,5 +83,20 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
 
     fn contiguous_bytes(&self) -> Option<&[u8]> {
         self.inner().contiguous_bytes()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NamedSource;
+
+    #[test]
+    fn debug_redacts_source_and_finishes_the_struct() {
+        let source = NamedSource::new("input.rs", "secret").with_language("Rust");
+
+        assert_eq!(
+            format!("{source:?}"),
+            r#"NamedSource { name: "input.rs", source: "<redacted>", language: Some("Rust") }"#
+        );
     }
 }
