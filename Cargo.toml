@@ -41,6 +41,10 @@ non_ascii_idents = "warn"
 unit-bindings = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }
 
+[lints.clippy]
+must_use_candidate = "warn"
+return_self_not_must_use = "warn"
+
 [dependencies]
 oxc-miette-derive = { path = "miette-derive", version = "=3.0.1", optional = true }
 

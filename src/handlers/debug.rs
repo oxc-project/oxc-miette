@@ -13,6 +13,7 @@ pub struct DebugReportHandler;
 impl DebugReportHandler {
     /// Create a new [`NarratableReportHandler`](crate::NarratableReportHandler)
     /// There are no customization options.
+    #[must_use]
     pub const fn new() -> Self {
         Self
     }

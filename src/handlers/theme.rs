@@ -43,6 +43,8 @@ impl Default for GraphicalTheme {
 }
 
 impl GraphicalTheme {
+    /// Chooses a graphical theme based on terminal and environment support.
+    #[must_use]
     pub fn new(is_terminal: bool) -> Self {
         if force_color() {
             return Self::unicode();
@@ -55,6 +57,7 @@ impl GraphicalTheme {
     }
 
     /// ASCII-art-based graphical drawing, with ANSI styling.
+    #[must_use]
     pub fn ascii() -> Self {
         Self { characters: ThemeCharacters::ascii(), styles: ThemeStyles::ansi() }
     }
@@ -67,12 +70,14 @@ impl GraphicalTheme {
     /// that can change the background color and make hardcoded colors illegible.
     /// Such themes typically remap ansi codes properly, treating them more
     /// like CSS classes than specific colors.
+    #[must_use]
     pub fn unicode() -> Self {
         Self { characters: ThemeCharacters::unicode(), styles: ThemeStyles::rgb() }
     }
 
     /// Graphical theme that draws in monochrome, while still using unicode
     /// characters.
+    #[must_use]
     pub fn unicode_nocolor() -> Self {
         Self { characters: ThemeCharacters::unicode(), styles: ThemeStyles::none() }
     }
@@ -82,6 +87,7 @@ impl GraphicalTheme {
     /// rendering of your [`Diagnostic`](crate::Diagnostic)s, check out
     /// [`NarratableReportHandler`](crate::NarratableReportHandler), or write
     /// your own [`ReportHandler`](crate::ReportHandler)
+    #[must_use]
     pub fn none() -> Self {
         Self { characters: ThemeCharacters::ascii(), styles: ThemeStyles::none() }
     }
@@ -119,6 +125,7 @@ fn style() -> Style {
 impl ThemeStyles {
     /// Nice RGB colors.
     /// [Credit](http://terminal.sexy/#FRUV0NDQFRUVrEFCkKlZ9L91ap-1qnWfdbWq0NDQUFBQrEFCkKlZ9L91ap-1qnWfdbWq9fX1).
+    #[must_use]
     pub fn rgb() -> Self {
         Self {
             error: style().fg_rgb::<225, 80, 80>().bold(), // CHANGED: <255, 30, 30>
@@ -137,6 +144,7 @@ impl ThemeStyles {
     }
 
     /// ANSI color-based styles.
+    #[must_use]
     pub fn ansi() -> Self {
         Self {
             error: style().red(),
@@ -155,6 +163,7 @@ impl ThemeStyles {
     }
 
     /// No styling. Just regular ol' monochrome.
+    #[must_use]
     pub fn none() -> Self {
         Self {
             error: style(),
@@ -209,6 +218,7 @@ pub struct ThemeCharacters {
 
 impl ThemeCharacters {
     /// Fancy unicode-based graphical elements.
+    #[must_use]
     pub fn unicode() -> Self {
         Self {
             hbar: '─',
@@ -236,6 +246,7 @@ impl ThemeCharacters {
     }
 
     /// Emoji-heavy unicode characters.
+    #[must_use]
     pub fn emoji() -> Self {
         Self {
             hbar: '─',
@@ -263,6 +274,7 @@ impl ThemeCharacters {
     }
 
     /// ASCII-art-based graphical elements. Works well on older terminals.
+    #[must_use]
     pub fn ascii() -> Self {
         Self {
             hbar: '-',

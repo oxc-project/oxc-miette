@@ -14,6 +14,7 @@ pub struct JSONReportHandler;
 impl JSONReportHandler {
     /// Create a new [`JSONReportHandler`]. There are no customization
     /// options.
+    #[must_use]
     pub const fn new() -> Self {
         Self
     }
