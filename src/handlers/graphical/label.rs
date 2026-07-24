@@ -30,6 +30,7 @@ struct Underline {
 }
 
 const CHUNK_CHARS: usize = 64;
+const MIN_CHUNKED_CHARS: usize = 8;
 const SPACES: &str =
     concat!("                                ", "                                ");
 const UNICODE_BARS: &str =
@@ -55,6 +56,15 @@ fn write_repeated_char(f: &mut impl fmt::Write, c: char, count: usize) -> fmt::R
         f.write_char(c)?;
     }
     Ok(())
+}
+
+#[inline]
+fn write_padding(f: &mut impl fmt::Write, count: usize) -> fmt::Result {
+    if count < MIN_CHUNKED_CHARS {
+        write_repeated_char(f, ' ', count)
+    } else {
+        write_repeated_chunk(f, SPACES, 1, count)
+    }
 }
 
 impl fmt::Display for Underline {
@@ -243,10 +253,9 @@ impl GraphicalReportHandler {
         )?;
         let mut curr_offset = 1usize;
         for (offset_hl, vbar_offset) in vbar_offsets {
-            while curr_offset < *vbar_offset + 1 {
-                f.write_char(' ')?;
-                curr_offset += 1;
-            }
+            let padding = (*vbar_offset + 1).saturating_sub(curr_offset);
+            write_padding(f, padding)?;
+            curr_offset += padding;
             if *offset_hl != hl {
                 write!(f, "{}", chars.vbar.style(offset_hl.style))?;
                 curr_offset += 1;
@@ -384,6 +393,15 @@ mod tests {
                 }
                 assert_eq!(output, c.to_string().repeat(count));
             }
+        }
+    }
+
+    #[test]
+    fn padding_matches_standard_output_across_chunk_threshold() {
+        for count in [0, 1, MIN_CHUNKED_CHARS - 1, MIN_CHUNKED_CHARS, 64, 65] {
+            let mut output = String::new();
+            write_padding(&mut output, count).unwrap();
+            assert_eq!(output, " ".repeat(count));
         }
     }
 }
