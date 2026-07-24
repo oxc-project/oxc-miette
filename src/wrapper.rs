@@ -1,6 +1,7 @@
 //! The wrapper error types [`Report`](crate::Report) builds on: `MessageError`
-//! (an adhoc `Display`/`Debug` message), `BoxedError` (a boxed `Diagnostic`),
-//! and `WithSourceCode` (attaches source code to an error). Vendored from
+//! (an adhoc `Display`/`Debug` message), `StdErrorWrapper` (a standard error
+//! without diagnostic metadata), `BoxedError` (a boxed `Diagnostic`), and
+//! `WithSourceCode` (attaches source code to an error). Vendored from
 //! eyre/anyhow's `wrapper.rs`.
 
 use core::fmt::{self, Debug, Display};
@@ -32,6 +33,29 @@ where
 
 impl<M> StdError for MessageError<M> where M: Display + Debug + 'static {}
 impl<M> Diagnostic for MessageError<M> where M: Display + Debug + 'static {}
+
+#[repr(transparent)]
+pub(crate) struct StdErrorWrapper<E>(pub(crate) E);
+
+impl<E: Debug> Debug for StdErrorWrapper<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Debug::fmt(&self.0, f)
+    }
+}
+
+impl<E: Display> Display for StdErrorWrapper<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
+
+impl<E: StdError + 'static> StdError for StdErrorWrapper<E> {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.0.source()
+    }
+}
+
+impl<E: StdError + 'static> Diagnostic for StdErrorWrapper<E> {}
 
 #[repr(transparent)]
 pub(crate) struct BoxedError(pub(crate) Box<dyn Diagnostic + Send + Sync>);

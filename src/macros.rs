@@ -239,7 +239,7 @@ macro_rules! miette {
     ($err:expr_2021 $(,)?) => ({
         use $crate::private::kind::*;
         let error = $err;
-        (&error).miette_kind().new(error)
+        dispatch(&error).miette_kind().new(error)
     });
 }
 

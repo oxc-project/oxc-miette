@@ -4,10 +4,11 @@
     clippy::new_ret_no_self,
     clippy::wrong_self_convention
 )]
-//! Autoref-specialization dispatch for `miette!(expr)`: picks up the argument's
-//! [`std::error::Error`] impl when it has one, otherwise falls back to
-//! `Display + Debug`. Vendored from [eyre](https://docs.rs/eyre) / anyhow; the
-//! comment below explains the mechanism in detail.
+//! Autoderef-specialization dispatch for `miette!(expr)`: picks up the argument's
+//! [`Diagnostic`] metadata when available, then an [`std::error::Error`]
+//! source chain, and otherwise falls back to `Display + Debug`. Vendored from
+//! [eyre](https://docs.rs/eyre) / anyhow; the comment below explains the
+//! mechanism in detail.
 
 // Tagged dispatch mechanism for resolving the behavior of `miette!($expr)`.
 //
@@ -40,27 +41,56 @@
 //         }
 //     }
 //
-// Since specialization is not stable yet, instead we rely on autoref behavior
-// of method resolution to perform tagged dispatch. Here we have two traits
-// AdhocKind and TraitKind that both have an miette_kind() method. AdhocKind is
-// implemented whether or not the caller's type has a std error impl, while
-// TraitKind is implemented only when a std error impl does exist. The ambiguity
-// is resolved by AdhocKind requiring an extra autoref so that it has lower
-// precedence.
+// Since specialization is not stable yet, instead we rely on autoderef behavior
+// of method resolution to perform tagged dispatch. TraitKind handles values
+// that already convert into Report, StdErrorKind handles other standard errors,
+// and AdhocKind is the fallback. The dispatch wrapper dereferences through these
+// cases in priority order, so method resolution picks the first applicable one.
 //
 // The miette! macro will set up the call in this form:
 //
 //     #[allow(unused_imports)]
-//     use $crate::private::{AdhocKind, TraitKind};
+//     use $crate::private::kind::*;
 //     let error = $msg;
-//     (&error).miette_kind().new(error)
+//     dispatch(&error).miette_kind().new(error)
 
-use core::fmt::{Debug, Display};
+use core::{
+    error::Error as StdError,
+    fmt::{Debug, Display},
+    ops::Deref,
+};
 
 use crate::Diagnostic;
 use crate::Report;
 
 pub struct Adhoc;
+
+pub struct Dispatch<T>(StdErrorDispatch<T>);
+
+pub struct StdErrorDispatch<T>(AdhocDispatch<T>);
+
+pub struct AdhocDispatch<T>(T);
+
+#[inline]
+pub fn dispatch<T>(value: &T) -> Dispatch<&T> {
+    Dispatch(StdErrorDispatch(AdhocDispatch(value)))
+}
+
+impl<T> Deref for Dispatch<T> {
+    type Target = StdErrorDispatch<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> Deref for StdErrorDispatch<T> {
+    type Target = AdhocDispatch<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 pub trait AdhocKind: Sized {
     #[inline]
@@ -69,7 +99,7 @@ pub trait AdhocKind: Sized {
     }
 }
 
-impl<T> AdhocKind for &T where T: ?Sized + Display + Debug + Send + Sync + 'static {}
+impl<T> AdhocKind for AdhocDispatch<&T> where T: Display + Debug + Send + Sync + 'static {}
 
 impl Adhoc {
     #[track_caller]
@@ -90,7 +120,7 @@ pub trait TraitKind: Sized {
     }
 }
 
-impl<E> TraitKind for E where E: Into<Report> {}
+impl<E> TraitKind for Dispatch<&E> where E: Into<Report> {}
 
 impl Trait {
     #[track_caller]
@@ -99,6 +129,27 @@ impl Trait {
         E: Into<Report>,
     {
         error.into()
+    }
+}
+
+pub struct StdErrorTag;
+
+pub trait StdErrorKind: Sized {
+    #[inline]
+    fn miette_kind(&self) -> StdErrorTag {
+        StdErrorTag
+    }
+}
+
+impl<E> StdErrorKind for StdErrorDispatch<&E> where E: StdError + Send + Sync + 'static {}
+
+impl StdErrorTag {
+    #[track_caller]
+    pub fn new<E>(self, error: E) -> Report
+    where
+        E: StdError + Send + Sync + 'static,
+    {
+        Report::from_std_error(error)
     }
 }
 
@@ -111,7 +162,7 @@ pub trait BoxedKind: Sized {
     }
 }
 
-impl BoxedKind for Box<dyn Diagnostic + Send + Sync> {}
+impl BoxedKind for Dispatch<&Box<dyn Diagnostic + Send + Sync>> {}
 
 impl Boxed {
     #[track_caller]

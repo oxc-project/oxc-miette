@@ -229,7 +229,7 @@ pub mod private {
 
     #[doc(hidden)]
     pub mod kind {
-        pub use crate::kind::{AdhocKind, BoxedKind, TraitKind};
+        pub use crate::kind::{AdhocKind, BoxedKind, StdErrorKind, TraitKind, dispatch};
     }
 
     #[must_use]
