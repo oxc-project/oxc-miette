@@ -27,12 +27,9 @@ impl<'a> Iterator for DiagnosticChain<'a> {
     type Item = ErrorKind<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(err) = self.state.take() {
-            self.state = err.get_nested();
-            Some(err)
-        } else {
-            None
-        }
+        let err = self.state.take()?;
+        self.state = err.get_nested();
+        Some(err)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -44,10 +41,7 @@ impl<'a> Iterator for DiagnosticChain<'a> {
 impl ExactSizeIterator for DiagnosticChain<'_> {
     fn len(&self) -> usize {
         fn depth(d: Option<&ErrorKind<'_>>) -> usize {
-            match d {
-                Some(d) => 1 + depth(d.get_nested().as_ref()),
-                None => 0,
-            }
+            d.map_or(0, |d| 1 + depth(d.get_nested().as_ref()))
         }
 
         depth(self.state.as_ref())

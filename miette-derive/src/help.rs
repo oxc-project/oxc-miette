@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::{
     Fields, Token, parenthesized,
     parse::{Parse, ParseStream},
@@ -9,7 +9,7 @@ use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
     fmt::{self, Display},
     forward::WhichFn,
-    utils::{display_pat_members, field_member, gen_all_variants_with},
+    utils::{display_pat_members, field_member, find_attr, gen_all_variants_with, member_ident},
 };
 
 pub enum Help {
@@ -45,14 +45,8 @@ impl Parse for Help {
 
 impl Help {
     pub(crate) fn from_fields(fields: &syn::Fields) -> Option<Self> {
-        for (i, field) in fields.iter().enumerate() {
-            for attr in &field.attrs {
-                if attr.path().is_ident("help") {
-                    return Some(Help::Field(field_member(i, field), Box::new(field.ty.clone())));
-                }
-            }
-        }
-        None
+        let (index, field) = find_attr(fields, "help")?;
+        Some(Self::Field(field_member(index, field), Box::new(field.ty.clone())))
     }
 
     pub(crate) fn gen_enum(variants: &[DiagnosticDef]) -> Option<TokenStream> {
@@ -69,12 +63,7 @@ impl Help {
                         })
                     }
                     Help::Field(member, ty) => {
-                        let help = match &member {
-                            syn::Member::Named(ident) => ident.clone(),
-                            syn::Member::Unnamed(syn::Index { index, .. }) => {
-                                format_ident!("_{}", index)
-                            }
-                        };
+                        let help = member_ident(member);
                         let var = quote! { __miette_internal_var };
                         Some(quote! {
                             Self::#ident #display_pat => {

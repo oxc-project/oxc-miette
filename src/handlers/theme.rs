@@ -31,14 +31,7 @@ fn force_color() -> bool {
 
 impl Default for GraphicalTheme {
     fn default() -> Self {
-        if force_color() {
-            return Self::unicode();
-        }
-        match env::var("NO_COLOR") {
-            _ if !io::stdout().is_terminal() || !io::stderr().is_terminal() => Self::none(),
-            Ok(string) if string != "0" => Self::unicode_nocolor(),
-            _ => Self::unicode(),
-        }
+        Self::detect(|| io::stdout().is_terminal() && io::stderr().is_terminal())
     }
 }
 
@@ -46,11 +39,15 @@ impl GraphicalTheme {
     /// Chooses a graphical theme based on terminal and environment support.
     #[must_use]
     pub fn new(is_terminal: bool) -> Self {
+        Self::detect(|| is_terminal)
+    }
+
+    fn detect(is_terminal: impl FnOnce() -> bool) -> Self {
         if force_color() {
             return Self::unicode();
         }
         match env::var("NO_COLOR") {
-            _ if !is_terminal => Self::none(),
+            _ if !is_terminal() => Self::none(),
             Ok(string) if string != "0" => Self::unicode_nocolor(),
             _ => Self::unicode(),
         }
