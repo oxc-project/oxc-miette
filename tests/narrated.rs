@@ -1,4 +1,11 @@
 #![cfg(feature = "fancy-no-backtrace")]
+#![expect(
+    clippy::cast_possible_truncation,
+    clippy::needless_pass_by_value,
+    clippy::print_stdout,
+    clippy::unnecessary_wraps,
+    reason = "snapshot fixtures use bounded spans and optional debug output"
+)]
 
 use miette::{
     Diagnostic, GraphicalReportHandler, GraphicalTheme, MietteError, NamedSource,
@@ -16,7 +23,7 @@ fn fmt_report(diag: Report) -> String {
             .unwrap();
     } else {
         NarratableReportHandler::new().render_report(&mut out, diag.as_ref()).unwrap();
-    };
+    }
     out
 }
 
@@ -36,7 +43,7 @@ fn single_line_with_wide_char() -> Result<(), MietteError> {
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 6).into() };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -46,7 +53,7 @@ snippet line 2:   👼🏼text
 snippet line 3:     here
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);
@@ -69,7 +76,7 @@ fn single_line_highlight() -> Result<(), MietteError> {
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -79,7 +86,7 @@ snippet line 2:   text
 snippet line 3:     here
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);
@@ -102,7 +109,7 @@ fn single_line_highlight_offset_zero() -> Result<(), MietteError> {
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (0, 0).into() };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -111,7 +118,7 @@ snippet line 1: source
 snippet line 2:   text
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);
@@ -134,7 +141,7 @@ fn single_line_highlight_with_empty_span() -> Result<(), MietteError> {
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 0).into() };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -144,7 +151,7 @@ snippet line 2:   text
 snippet line 3:     here
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);
@@ -167,7 +174,7 @@ fn single_line_highlight_no_label() -> Result<(), MietteError> {
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -177,7 +184,7 @@ snippet line 2:   text
 snippet line 3:     here
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);
@@ -200,7 +207,7 @@ fn single_line_highlight_at_line_start() -> Result<(), MietteError> {
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (7, 4).into() };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -210,7 +217,7 @@ snippet line 2: text
 snippet line 3:   here
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);
@@ -242,7 +249,7 @@ fn multiple_same_line_highlights() -> Result<(), MietteError> {
     };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -254,7 +261,7 @@ snippet line 2:   text text text text text
 snippet line 3:     here
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);
@@ -277,7 +284,7 @@ fn multiline_highlight_adjacent() -> Result<(), MietteError> {
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 11).into() };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -288,7 +295,7 @@ snippet line 3:     here
     label ending at line 3, column 6: these two lines
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);
@@ -309,12 +316,12 @@ fn multiline_highlight_flyby() -> Result<(), MietteError> {
         highlight2: SourceSpan,
     }
 
-    let src = r#"line1
+    let src = r"line1
 line2
 line3
 line4
 line5
-"#
+"
     .to_string();
     let len = src.len() as u32;
     let err = MyBad {
@@ -324,7 +331,7 @@ line5
     };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -339,7 +346,7 @@ snippet line 5: line5
     label ending at line 5, column 5: block 1
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);
@@ -372,12 +379,12 @@ fn multiline_highlight_no_label() -> Result<(), MietteError> {
     #[error("very much went wrong")]
     struct InnerInner;
 
-    let src = r#"line1
+    let src = r"line1
 line2
 line3
 line4
 line5
-"#
+"
     .to_string();
     let len = src.len() as u32;
     let err = MyBad {
@@ -462,7 +469,7 @@ diagnostic code: oops::my::bad
 #[test]
 // TODO: This breaks because those highlights aren't "truly" overlapping (in absolute byte offset),
 // but they ARE overlapping in lines. Need to detect the latter case better
-#[ignore]
+#[ignore = "known overlapping highlight rendering failure"]
 /// Lines are overlapping, but the offsets themselves aren't, so they _look_
 /// disjunct if you only look at offsets.
 fn multiple_multiline_highlights_overlapping_lines() -> Result<(), MietteError> {
@@ -492,7 +499,7 @@ fn multiple_multiline_highlights_overlapping_lines() -> Result<(), MietteError> 
 
 #[test]
 /// Offsets themselves are overlapping, regardless of lines.
-#[ignore]
+#[ignore = "known overlapping highlight rendering failure"]
 fn multiple_multiline_highlights_overlapping_offsets() -> Result<(), MietteError> {
     #[derive(Debug, Diagnostic, Error)]
     #[error("oops!")]
@@ -557,7 +564,7 @@ fn related() -> Result<(), MietteError> {
     };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -578,7 +585,7 @@ snippet line 1: source
 snippet line 2:   text
 diagnostic help: try doing it better next time?
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);
@@ -615,7 +622,7 @@ fn related_source_code_propagation() -> Result<(), MietteError> {
     };
     let out = fmt_report(err.into());
     println!("Error: {out}");
-    let expected = r#"oops!
+    let expected = r"oops!
     Diagnostic severity: error
 Begin snippet for bad_file.rs starting at line 1, column 1
 
@@ -635,7 +642,7 @@ snippet line 1: source
     label at line 1, columns 1 to 6: this bit here
 snippet line 2:   text
 diagnostic code: oops::my::bad
-"#
+"
     .trim_start()
     .to_string();
     assert_eq!(expected, out);

@@ -31,7 +31,11 @@ where
     T: IsOption,
 {
     #[doc(hidden)]
-    #[allow(clippy::wrong_self_convention)]
+    #[expect(
+        clippy::unused_self,
+        clippy::wrong_self_convention,
+        reason = "the receiver enables autoref specialization in generated code"
+    )]
     pub fn to_option(self, value: &T) -> &T {
         value
     }
@@ -45,6 +49,10 @@ impl<T> ToOption for &OptionalWrapper<T> {
 
 #[doc(hidden)]
 #[derive(Debug)]
+#[expect(
+    clippy::empty_structs_with_brackets,
+    reason = "retained for public construction syntax compatibility"
+)]
 pub struct ToLabelSpanWrapper {}
 pub trait ToLabeledSpan<T> {
     #[doc(hidden)]

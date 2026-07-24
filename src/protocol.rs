@@ -336,6 +336,14 @@ gigabytes or larger in size.
 pub trait SourceCode: Send + Sync {
     /// Read the bytes for a specific span from this `SourceCode`, keeping a
     /// certain number of lines before and after the span as context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the requested span cannot be read.
+    #[expect(
+        clippy::trivially_copy_pass_by_ref,
+        reason = "retained for public trait compatibility"
+    )]
     fn read_span<'a>(
         &'a self,
         span: &SourceSpan,
@@ -641,12 +649,14 @@ impl SourceSpan {
 
     /// The absolute offset, in bytes, from the beginning of a [`SourceCode`].
     #[must_use]
+    #[expect(clippy::trivially_copy_pass_by_ref, reason = "retained for public API compatibility")]
     pub const fn offset(&self) -> ByteOffset {
         self.offset.offset()
     }
 
     /// Total length of the [`SourceSpan`], in bytes.
     #[must_use]
+    #[expect(clippy::trivially_copy_pass_by_ref, reason = "retained for public API compatibility")]
     pub const fn len(&self) -> u32 {
         self.length
     }
@@ -654,6 +664,7 @@ impl SourceSpan {
     /// Whether this [`SourceSpan`] has a length of zero. It may still be useful
     /// to point to a specific point.
     #[must_use]
+    #[expect(clippy::trivially_copy_pass_by_ref, reason = "retained for public API compatibility")]
     pub const fn is_empty(&self) -> bool {
         self.length == 0
     }
@@ -675,7 +686,8 @@ impl From<Range<ByteOffset>> for SourceSpan {
     fn from(range: Range<ByteOffset>) -> Self {
         // `Range::len` returns `0` for empty/reversed ranges, matching the
         // previous behavior and avoiding underflow.
-        Self { offset: range.start.into(), length: range.len() as u32 }
+        let length = u32::try_from(range.len()).unwrap_or(u32::MAX);
+        Self { offset: range.start.into(), length }
     }
 }
 
@@ -706,6 +718,7 @@ pub struct SourceOffset(ByteOffset);
 impl SourceOffset {
     /// Actual byte offset.
     #[must_use]
+    #[expect(clippy::trivially_copy_pass_by_ref, reason = "retained for public API compatibility")]
     pub const fn offset(&self) -> ByteOffset {
         self.0
     }
@@ -733,7 +746,7 @@ impl SourceOffset {
             offset += char.len_utf8();
         }
 
-        SourceOffset(offset as u32)
+        SourceOffset(u32::try_from(offset).unwrap_or(u32::MAX))
     }
 
     /// Returns an offset for the _file_ location of wherever this function is
@@ -747,6 +760,10 @@ impl SourceOffset {
     /// file was compiled from is actually available at that location. If
     /// you're shipping binaries for your application, you'll want to ignore
     /// the Err case or otherwise report it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the caller's source file cannot be read.
     #[track_caller]
     pub fn from_current_location() -> Result<(String, Self), MietteError> {
         let loc = Location::caller();

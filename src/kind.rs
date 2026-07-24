@@ -1,8 +1,10 @@
-#![allow(
+#![expect(
     missing_debug_implementations,
     missing_docs,
     clippy::new_ret_no_self,
-    clippy::wrong_self_convention
+    clippy::unused_self,
+    clippy::wrong_self_convention,
+    reason = "receiver types implement autoref specialization dispatch"
 )]
 //! Autoref-specialization dispatch for `miette!(expr)`: picks up the argument's
 //! [`std::error::Error`] impl when it has one, otherwise falls back to

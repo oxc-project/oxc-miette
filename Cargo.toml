@@ -5,16 +5,125 @@ members = ["miette-derive"]
 [workspace.package]
 authors = ["Boshen", "Kat Marchán <kzm@zkat.tech>"]
 categories = ["rust-patterns"]
+keywords = ["diagnostics", "error-reporting", "terminal"]
+readme = "README.md"
 repository = "https://github.com/oxc-project/oxc-miette"
 license = "Apache-2.0"
 edition = "2024"
 rust-version = "1.85.0"
+
+# <https://doc.rust-lang.org/rustc/lints/listing/allowed-by-default.html>
+[workspace.lints.rust]
+absolute_paths_not_starting_with_crate = "warn"
+non_ascii_idents = "warn"
+unit-bindings = "warn"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }
+tail_expr_drop_order = "warn"
+unsafe_op_in_unsafe_fn = "warn"
+unused_unsafe = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+# restriction
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+print_stdout = "warn" # Must be opt-in
+print_stderr = "warn" # Must be opt-in
+allow_attributes = "warn"
+# I like the explicitness of this rule as it removes confusion around `clone`.
+# This increases readability, avoids `clone` mindlessly and heap allocating by accident.
+clone_on_ref_ptr = "warn"
+# These two are mutually exclusive, I like `mod.rs` files for better fuzzy searches on module entries.
+self_named_module_files = "warn" # "-Wclippy::mod_module_files"
+empty_drop = "warn"
+empty_structs_with_brackets = "warn"
+empty_enum_variants_with_brackets = "warn"
+exit = "warn"
+# Performance: avoid the intermediate `String` allocation of `s.push_str(&format!(..))`.
+format_push_string = "warn"
+# Casting a function item/pointer to a number is almost always a mistake (a missing call).
+fn_to_numeric_cast_any = "warn"
+unnecessary_self_imports = "warn"
+# `return Err(x)?` obscures a plain `return Err(x.into())`.
+try_err = "warn"
+# Don't name a type `Error` when it implements `std::error::Error`.
+error_impl_error = "warn"
+filetype_is_file = "warn"
+get_unwrap = "warn"
+rc_buffer = "warn"
+rc_mutex = "warn"
+rest_pat_in_fully_bound_structs = "warn"
+unnecessary_safety_comment = "warn"
+undocumented_unsafe_blocks = "warn"
+infinite_loop = "warn"
+map_with_unused_argument_over_ranges = "warn"
+unused_result_ok = "warn"
+pathbuf_init_then_push = "warn"
+pub_underscore_fields = "warn"
+non_zero_suggestions = "warn"
+precedence_bits = "warn"
+# I want to write the best Rust code so pedantic is enabled.
+# We should only disable rules globally if they are either false positives, chaotic, or does not make sense.
+pedantic = { level = "warn", priority = -1 }
+# Allowed rules
+# pedantic
+# All triggers are mostly ignored in our codebase, so this is ignored globally.
+struct_excessive_bools = "allow"
+too_many_lines = "allow"
+# `#[must_use]` is creating too much noise for this codebase, it does not add much value
+# except nagging the programmer to add a `#[must_use]` after clippy has been run.
+# Having `#[must_use]` everywhere also hinders readability.
+must_use_candidate = "allow"
+# Preserve this repository's existing builder-return lint.
+return_self_not_must_use = "warn"
+# Too annoying, we import by name anyway.
+wildcard_imports = "allow"
+doc_markdown = "allow"
+similar_names = "allow"
+fn_params_excessive_bools = "allow"
+complexity = { level = "warn", priority = -1 }
+too_many_arguments = "allow"
+non_std_lazy_statics = "allow"
+# `OxcDiagnostic` is inlined (~176 bytes) to keep `OxcDiagnostic::error` allocation-free.
+# This is a deliberate trade-off: larger `Result<T, OxcDiagnostic>` for zero malloc on the hot path.
+result_large_err = "allow"
+# nursery
+nursery = { level = "warn", priority = -1 }
+# `const` functions do not make sense for our project because this is not a `const` library.
+# This rule also confuses newcomers and forces them to add `const` blindlessly without any reason.
+missing_const_for_fn = "allow"
+option_if_let_else = "allow"
+or_fun_call = "allow"
+cognitive_complexity = "allow"
+non_send_fields_in_send_ty = "allow"
+use_self = "allow"
+significant_drop_tightening = "allow"
+branches_sharing_code = "allow"
+fallible_impl_from = "allow"
+useless_let_if_seq = "allow"
+impl_trait_in_params = "allow"
+significant_drop_in_scrutinee = "warn"
+iter_on_single_items = "warn"
+unused_peekable = "warn"
+too_long_first_doc_paragraph = "warn"
+suspicious_operation_groupings = "warn"
+redundant_clone = "warn"
+# FIXME: New warnings introduced by Rust 1.97.
+byte_char_slices = "allow"
+question_mark = "allow"
+# cargo
+cargo = { level = "warn", priority = -1 }
+multiple_crate_versions = "allow"
+# Public feature retained for compatibility with existing users.
+negative_feature_names = "allow"
 
 [package]
 name = "oxc-miette"
 description = "Fancy diagnostic reporting library and protocol for us mere mortals who aren't compiler hackers."
 documentation = "https://docs.rs/oxc-miette"
 readme = "README.md"
+keywords.workspace = true
 version = "3.0.1"
 authors.workspace = true
 categories.workspace = true
@@ -35,15 +144,8 @@ harness = false
 test = false
 required-features = ["fancy"]
 
-[lints.rust]
-absolute_paths_not_starting_with_crate = "warn"
-non_ascii_idents = "warn"
-unit-bindings = "warn"
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }
-
-[lints.clippy]
-must_use_candidate = "warn"
-return_self_not_must_use = "warn"
+[lints]
+workspace = true
 
 [dependencies]
 oxc-miette-derive = { path = "miette-derive", version = "=3.0.1", optional = true }

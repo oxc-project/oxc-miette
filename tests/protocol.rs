@@ -1,3 +1,8 @@
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "test fixtures are much smaller than u32::MAX"
+)]
+
 //! Tests for the core protocol types. Moved out of `src/protocol.rs` so the
 //! source module carries only library code.
 

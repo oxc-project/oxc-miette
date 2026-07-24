@@ -1,3 +1,11 @@
+#![expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::print_stderr,
+    reason = "benchmark fixtures are bounded and progress output is intentional"
+)]
+
 //! Benchmarks for miette's diagnostic rendering pipeline.
 //!
 //! These mirror how oxc actually consumes this crate: oxlint and oxfmt build a

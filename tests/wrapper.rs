@@ -24,7 +24,7 @@ impl Diagnostic for Inner {
 
 #[derive(Error, Debug)]
 #[error("outer")]
-#[allow(unused)]
+#[cfg_attr(not(feature = "fancy"), expect(dead_code))]
 struct Outer {
     pub(crate) errors: Vec<Inner>,
 }

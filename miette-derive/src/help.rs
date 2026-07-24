@@ -3,14 +3,13 @@ use quote::{format_ident, quote};
 use syn::{
     Fields, Token, parenthesized,
     parse::{Parse, ParseStream},
-    spanned::Spanned,
 };
 
 use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
     fmt::{self, Display},
     forward::WhichFn,
-    utils::{display_pat_members, gen_all_variants_with},
+    utils::{display_pat_members, field_member, gen_all_variants_with},
 };
 
 pub enum Help {
@@ -32,15 +31,11 @@ impl Parse for Help {
                 } else {
                     fmt::parse_token_expr(&content, false)?
                 };
-                let display = Display { fmt, args, has_bonus_display: false };
+                let display = Display { fmt, args };
                 Ok(Help::Display(display))
             } else {
                 input.parse::<Token![=]>()?;
-                Ok(Help::Display(Display {
-                    fmt: input.parse()?,
-                    args: TokenStream::new(),
-                    has_bonus_display: false,
-                }))
+                Ok(Help::Display(Display { fmt: input.parse()?, args: TokenStream::new() }))
             }
         } else {
             Err(syn::Error::new(ident.span(), "not a help"))
@@ -49,30 +44,15 @@ impl Parse for Help {
 }
 
 impl Help {
-    pub(crate) fn from_fields(fields: &syn::Fields) -> syn::Result<Option<Self>> {
-        match fields {
-            syn::Fields::Named(named) => Self::from_fields_vec(named.named.iter().collect()),
-            syn::Fields::Unnamed(unnamed) => {
-                Self::from_fields_vec(unnamed.unnamed.iter().collect())
-            }
-            syn::Fields::Unit => Ok(None),
-        }
-    }
-
-    fn from_fields_vec(fields: Vec<&syn::Field>) -> syn::Result<Option<Self>> {
+    pub(crate) fn from_fields(fields: &syn::Fields) -> Option<Self> {
         for (i, field) in fields.iter().enumerate() {
             for attr in &field.attrs {
                 if attr.path().is_ident("help") {
-                    let help = if let Some(ident) = field.ident.clone() {
-                        syn::Member::Named(ident)
-                    } else {
-                        syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
-                    };
-                    return Ok(Some(Help::Field(help, Box::new(field.ty.clone()))));
+                    return Some(Help::Field(field_member(i, field), Box::new(field.ty.clone())));
                 }
             }
         }
-        Ok(None)
+        None
     }
 
     pub(crate) fn gen_enum(variants: &[DiagnosticDef]) -> Option<TokenStream> {
@@ -108,29 +88,29 @@ impl Help {
         )
     }
 
-    pub(crate) fn gen_struct(&self, fields: &Fields) -> Option<TokenStream> {
+    pub(crate) fn gen_struct(&self, fields: &Fields) -> TokenStream {
         let (display_pat, display_members) = display_pat_members(fields);
         match self {
             Help::Display(display) => {
                 let (fmt, args) = display.expand_shorthand_cloned(&display_members);
-                Some(quote! {
+                quote! {
                     fn help(&self) -> std::option::Option<std::borrow::Cow<'_, str>> {
                         #[allow(unused_variables, deprecated)]
                         let Self #display_pat = self;
                         std::option::Option::Some(std::borrow::Cow::Owned(format!(#fmt #args)))
                     }
-                })
+                }
             }
             Help::Field(member, ty) => {
                 let var = quote! { __miette_internal_var };
-                Some(quote! {
+                quote! {
                     fn help(&self) -> std::option::Option<std::borrow::Cow<'_, str>> {
                         #[allow(unused_variables, deprecated)]
                         let Self #display_pat = self;
                         use miette::macro_helpers::ToOption;
                         miette::macro_helpers::OptionalWrapper::<#ty>::new().to_option(&self.#member).as_ref().map(|#var| -> std::borrow::Cow<'_, str> { std::borrow::Cow::Owned(format!("{}", #var)) })
                     }
-                })
+                }
             }
         }
     }

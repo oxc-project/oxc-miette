@@ -26,6 +26,10 @@ inaccessible. If you have a type implementing [`Diagnostic`] consider simply ret
 pub trait IntoDiagnostic<T, E> {
     /// Converts [`Result`] types that return regular [`std::error::Error`]s
     /// into a [`Result`] that returns a [`Diagnostic`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the source error wrapped in a [`Report`].
     fn into_diagnostic(self) -> Result<T, Report>;
 }
 

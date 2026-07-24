@@ -12,7 +12,7 @@ use crate::SourceSpan;
 ///
 /// A label can be a single trailing line, or a block that spans several output
 /// lines (the first line drawn differently from the rest).
-#[derive(PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub(super) enum LabelRenderMode {
     /// we're rendering a single line label (or not rendering in any special way)
     SingleLine,

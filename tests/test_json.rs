@@ -1,4 +1,10 @@
-#![allow(clippy::print_stdout, clippy::unnecessary_wraps)]
+#![expect(
+    clippy::cast_possible_truncation,
+    clippy::needless_pass_by_value,
+    clippy::print_stdout,
+    clippy::unnecessary_wraps,
+    reason = "snapshot fixtures use bounded spans and optional debug output"
+)]
 
 mod json_report_handler {
     use miette::{Diagnostic, JSONReportHandler, MietteError, NamedSource, Report, SourceSpan};

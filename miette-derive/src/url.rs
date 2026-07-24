@@ -32,7 +32,7 @@ impl Parse for Url {
                     } else {
                         fmt::parse_token_expr(&content, false)?
                     };
-                    let display = Display { fmt, args, has_bonus_display: false };
+                    let display = Display { fmt, args };
                     Ok(Url::Display(display))
                 } else {
                     let option = content.parse::<syn::Ident>()?;
@@ -47,11 +47,7 @@ impl Parse for Url {
                 }
             } else {
                 input.parse::<Token![=]>()?;
-                Ok(Url::Display(Display {
-                    fmt: input.parse()?,
-                    args: TokenStream::new(),
-                    has_bonus_display: false,
-                }))
+                Ok(Url::Display(Display { fmt: input.parse()?, args: TokenStream::new() }))
             }
         } else {
             Err(syn::Error::new(ident.span(), "not a url"))
@@ -60,6 +56,10 @@ impl Parse for Url {
 }
 
 impl Url {
+    #[expect(
+        clippy::literal_string_with_formatting_args,
+        reason = "this string becomes the format template emitted by the derive macro"
+    )]
     pub(crate) fn gen_enum(
         enum_name: &syn::Ident,
         variants: &[DiagnosticDef],
@@ -98,11 +98,11 @@ impl Url {
         )
     }
 
-    pub(crate) fn gen_struct(
-        &self,
-        struct_name: &syn::Ident,
-        fields: &Fields,
-    ) -> Option<TokenStream> {
+    #[expect(
+        clippy::literal_string_with_formatting_args,
+        reason = "this string becomes the format template emitted by the derive macro"
+    )]
+    pub(crate) fn gen_struct(&self, struct_name: &syn::Ident, fields: &Fields) -> TokenStream {
         let (pat, fmt, args) = match self {
             Url::Display(display) => {
                 let (display_pat, display_members) = display_pat_members(fields);
@@ -124,12 +124,12 @@ impl Url {
                 (pat, fmt, args)
             }
         };
-        Some(quote! {
+        quote! {
             fn url(&self) -> std::option::Option<std::borrow::Cow<'_, str>> {
                 #[allow(unused_variables, deprecated)]
                 let Self #pat = self;
                 std::option::Option::Some(std::borrow::Cow::Owned(format!(#fmt #args)))
             }
-        })
+        }
     }
 }

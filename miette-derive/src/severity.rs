@@ -44,14 +44,20 @@ impl Parse for Severity {
 }
 
 fn get_severity(input: &str, span: Span) -> syn::Result<String> {
-    match input.to_lowercase().as_ref() {
-        "error" | "err" => Ok("Error".into()),
-        "warning" | "warn" => Ok("Warning".into()),
-        "advice" | "adv" | "info" => Ok("Advice".into()),
-        _ => Err(syn::Error::new(
+    if input.eq_ignore_ascii_case("error") || input.eq_ignore_ascii_case("err") {
+        Ok("Error".into())
+    } else if input.eq_ignore_ascii_case("warning") || input.eq_ignore_ascii_case("warn") {
+        Ok("Warning".into())
+    } else if input.eq_ignore_ascii_case("advice")
+        || input.eq_ignore_ascii_case("adv")
+        || input.eq_ignore_ascii_case("info")
+    {
+        Ok("Advice".into())
+    } else {
+        Err(syn::Error::new(
             span,
             "Invalid severity level. Only Error, Warning, and Advice are supported.",
-        )),
+        ))
     }
 }
 
@@ -74,12 +80,12 @@ impl Severity {
         )
     }
 
-    pub(crate) fn gen_struct(&self) -> Option<TokenStream> {
+    pub(crate) fn gen_struct(&self) -> TokenStream {
         let sev = &self.0;
-        Some(quote! {
+        quote! {
             fn severity(&self) -> std::option::Option<miette::Severity> {
                 Some(miette::Severity::#sev)
             }
-        })
+        }
     }
 }

@@ -1,40 +1,23 @@
-use proc_macro2::TokenStream;
-use quote::quote;
-use syn::spanned::Spanned;
-
 use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
     forward::WhichFn,
-    utils::{display_pat_members, gen_all_variants_with},
+    utils::{display_pat_members, field_member, gen_all_variants_with},
 };
+use proc_macro2::TokenStream;
+use quote::quote;
 
 pub struct DiagnosticSource(syn::Member);
 
 impl DiagnosticSource {
-    pub(crate) fn from_fields(fields: &syn::Fields) -> syn::Result<Option<Self>> {
-        match fields {
-            syn::Fields::Named(named) => Self::from_fields_vec(named.named.iter().collect()),
-            syn::Fields::Unnamed(unnamed) => {
-                Self::from_fields_vec(unnamed.unnamed.iter().collect())
-            }
-            syn::Fields::Unit => Ok(None),
-        }
-    }
-
-    fn from_fields_vec(fields: Vec<&syn::Field>) -> syn::Result<Option<Self>> {
+    pub(crate) fn from_fields(fields: &syn::Fields) -> Option<Self> {
         for (i, field) in fields.iter().enumerate() {
             for attr in &field.attrs {
                 if attr.path().is_ident("diagnostic_source") {
-                    let diagnostic_source = if let Some(ident) = field.ident.clone() {
-                        syn::Member::Named(ident)
-                    } else {
-                        syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
-                    };
-                    return Ok(Some(DiagnosticSource(diagnostic_source)));
+                    return Some(DiagnosticSource(field_member(i, field)));
                 }
             }
         }
-        Ok(None)
+        None
     }
 
     pub(crate) fn gen_enum(variants: &[DiagnosticDef]) -> Option<TokenStream> {
@@ -60,12 +43,12 @@ impl DiagnosticSource {
         )
     }
 
-    pub(crate) fn gen_struct(&self) -> Option<TokenStream> {
+    pub(crate) fn gen_struct(&self) -> TokenStream {
         let rel = &self.0;
-        Some(quote! {
+        quote! {
             fn diagnostic_source<'a>(&'a self) -> std::option::Option<&'a dyn miette::Diagnostic> {
                 std::option::Option::Some(std::borrow::Borrow::borrow(&self.#rel))
             }
-        })
+        }
     }
 }

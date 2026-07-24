@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{ToTokens, format_ident, quote};
 use syn::{
     Token, parenthesized,
     parse::{Parse, ParseStream},
@@ -10,7 +10,7 @@ use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
     fmt::{self, Display},
     forward::WhichFn,
-    utils::{display_pat_members, gen_all_variants_with},
+    utils::{display_pat_members, field_member, gen_all_variants_with},
 };
 
 pub struct Labels(Vec<Label>);
@@ -23,7 +23,7 @@ enum LabelType {
 }
 
 struct Label {
-    label: Option<Display>,
+    display: Option<Display>,
     ty: syn::Type,
     span: syn::Member,
     lbl_ty: LabelType,
@@ -78,7 +78,7 @@ impl Parse for LabelAttr {
                 } else {
                     fmt::parse_token_expr(&content, false)?
                 };
-                let display = Display { fmt, args, has_bonus_display: false };
+                let display = Display { fmt, args };
                 (attr, Some(display))
             } else if !content.is_empty() {
                 return Err(syn::Error::new(
@@ -91,14 +91,7 @@ impl Parse for LabelAttr {
         } else if la.peek(Token![=]) {
             // #[label = "blabla"]
             input.parse::<Token![=]>()?;
-            (
-                LabelType::Default,
-                Some(Display {
-                    fmt: input.parse()?,
-                    args: TokenStream::new(),
-                    has_bonus_display: false,
-                }),
-            )
+            (LabelType::Default, Some(Display { fmt: input.parse()?, args: TokenStream::new() }))
         } else {
             (LabelType::Default, None)
         };
@@ -108,26 +101,11 @@ impl Parse for LabelAttr {
 
 impl Labels {
     pub fn from_fields(fields: &syn::Fields) -> syn::Result<Option<Self>> {
-        match fields {
-            syn::Fields::Named(named) => Self::from_fields_vec(named.named.iter().collect()),
-            syn::Fields::Unnamed(unnamed) => {
-                Self::from_fields_vec(unnamed.unnamed.iter().collect())
-            }
-            syn::Fields::Unit => Ok(None),
-        }
-    }
-
-    fn from_fields_vec(fields: Vec<&syn::Field>) -> syn::Result<Option<Self>> {
         let mut labels = Vec::new();
         for (i, field) in fields.iter().enumerate() {
             for attr in &field.attrs {
                 if attr.path().is_ident("label") {
-                    let span = if let Some(ident) = field.ident.clone() {
-                        syn::Member::Named(ident)
-                    } else {
-                        syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
-                    };
-                    use quote::ToTokens;
+                    let span = field_member(i, field);
                     let LabelAttr { label, lbl_ty } =
                         syn::parse2::<LabelAttr>(attr.meta.to_token_stream())?;
 
@@ -140,22 +118,22 @@ impl Labels {
                         ));
                     }
 
-                    labels.push(Label { label, span, ty: field.ty.clone(), lbl_ty });
+                    labels.push(Label { display: label, span, ty: field.ty.clone(), lbl_ty });
                 }
             }
         }
         if labels.is_empty() { Ok(None) } else { Ok(Some(Labels(labels))) }
     }
 
-    pub(crate) fn gen_struct(&self, fields: &syn::Fields) -> Option<TokenStream> {
+    pub(crate) fn gen_struct(&self, fields: &syn::Fields) -> TokenStream {
         let (display_pat, display_members) = display_pat_members(fields);
         let labels = self.0.iter().filter_map(|highlight| {
-            let Label { span, label, ty, lbl_ty } = highlight;
+            let Label { span, display, ty, lbl_ty } = highlight;
             if *lbl_ty == LabelType::Collection {
                 return None;
             }
             let var = quote! { __miette_internal_var };
-            let display = if let Some(display) = label {
+            let display = if let Some(display) = display {
                 let (fmt, args) = display.expand_shorthand_cloned(&display_members);
                 quote! { std::option::Option::Some(format!(#fmt #args)) }
             } else {
@@ -176,11 +154,11 @@ impl Labels {
             })
         });
         let collections_chain = self.0.iter().filter_map(|label| {
-            let Label { span, label, ty: _, lbl_ty } = label;
+            let Label { span, display, ty: _, lbl_ty } = label;
             if *lbl_ty != LabelType::Collection {
                 return None;
             }
-            let display = if let Some(display) = label {
+            let display = if let Some(display) = display {
                 let (fmt, args) = display.expand_shorthand_cloned(&display_members);
                 quote! { std::option::Option::Some(format!(#fmt #args)) }
             } else {
@@ -201,7 +179,7 @@ impl Labels {
             })
         });
 
-        Some(quote! {
+        quote! {
             #[allow(unused_variables)]
             fn labels(&self) -> miette::Labels {
                 use miette::macro_helpers::ToOption;
@@ -215,7 +193,7 @@ impl Labels {
 
                 labels_iter.filter(Option::is_some).map(Option::unwrap).collect()
             }
-        })
+        }
     }
 
     pub(crate) fn gen_enum(variants: &[DiagnosticDef]) -> Option<TokenStream> {
@@ -226,7 +204,7 @@ impl Labels {
                 let (display_pat, display_members) = display_pat_members(fields);
                 labels.as_ref().and_then(|labels| {
                     let variant_labels = labels.0.iter().filter_map(|label| {
-                        let Label { span, label, ty, lbl_ty } = label;
+                        let Label { span, display, ty, lbl_ty } = label;
                         if *lbl_ty == LabelType::Collection {
                             return None;
                         }
@@ -237,7 +215,7 @@ impl Labels {
                             }
                         };
                         let var = quote! { __miette_internal_var };
-                        let display = if let Some(display) = label {
+                        let display = if let Some(display) = display {
                             let (fmt, args) = display.expand_shorthand_cloned(&display_members);
                             quote! { std::option::Option::Some(format!(#fmt #args)) }
                         } else {
@@ -258,7 +236,7 @@ impl Labels {
                         })
                     });
                     let collections_chain = labels.0.iter().filter_map(|label| {
-                        let Label { span, label, ty: _, lbl_ty } = label;
+                        let Label { span, display, ty: _, lbl_ty } = label;
                         if *lbl_ty != LabelType::Collection {
                             return None;
                         }
@@ -268,7 +246,7 @@ impl Labels {
                                 format_ident!("_{}", index)
                             }
                         };
-                        let display = if let Some(display) = label {
+                        let display = if let Some(display) = display {
                             let (fmt, args) = display.expand_shorthand_cloned(&display_members);
                             quote! { std::option::Option::Some(format!(#fmt #args)) }
                         } else {

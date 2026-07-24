@@ -10,6 +10,7 @@ use crate as miette;
 use crate::{Diagnostic, Report, SourceCode};
 
 #[repr(transparent)]
+#[expect(clippy::redundant_pub_crate, reason = "keeps wrapper internals crate-private")]
 pub(crate) struct MessageError<M>(pub(crate) M);
 
 impl<M> Debug for MessageError<M>
@@ -34,6 +35,7 @@ impl<M> StdError for MessageError<M> where M: Display + Debug + 'static {}
 impl<M> Diagnostic for MessageError<M> where M: Display + Debug + 'static {}
 
 #[repr(transparent)]
+#[expect(clippy::redundant_pub_crate, reason = "keeps wrapper internals crate-private")]
 pub(crate) struct BoxedError(pub(crate) Box<dyn Diagnostic + Send + Sync>);
 
 impl Diagnostic for BoxedError {
@@ -92,16 +94,17 @@ impl StdError for BoxedError {
     }
 
     fn description(&self) -> &str {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         self.0.description()
     }
 
     fn cause(&self) -> Option<&dyn StdError> {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         self.0.cause()
     }
 }
 
+#[expect(clippy::redundant_pub_crate, reason = "keeps wrapper internals crate-private")]
 pub(crate) struct WithSourceCode<E, C> {
     pub(crate) error: E,
     pub(crate) source_code: C,

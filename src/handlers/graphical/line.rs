@@ -20,7 +20,7 @@ use crate::{MietteSpanContents, SpanContents};
 
 #[derive(Debug)]
 pub(super) struct Line<'a> {
-    pub(super) line_number: usize,
+    pub(super) number: usize,
     pub(super) offset: usize,
     pub(super) length: usize,
     pub(super) text: &'a str,
@@ -212,6 +212,7 @@ impl GraphicalReportHandler {
     /// [`render_snippets`](GraphicalReportHandler::render_snippets) so the span
     /// doesn't have to be re-read (each read is a scan of the source up to the
     /// span).
+    #[expect(clippy::unused_self, reason = "kept as a renderer method for call-site consistency")]
     pub(super) fn get_lines<'a>(&self, context_data: &MietteSpanContents<'a>) -> Vec<Line<'a>> {
         let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
         let mut line = context_data.line();
@@ -230,7 +231,7 @@ impl GraphicalReportHandler {
                 if newline > start && bytes[newline - 1] == b'\r' { newline - 1 } else { newline };
             line += 1;
             lines.push(Line {
-                line_number: line,
+                number: line,
                 offset: base + start,
                 length: end - start,
                 text: &context[start..text_end],
@@ -244,7 +245,7 @@ impl GraphicalReportHandler {
                 line += 1;
             }
             lines.push(Line {
-                line_number: line,
+                number: line,
                 offset: base + start,
                 length: bytes.len() - start,
                 text: &context[start..],
@@ -256,6 +257,11 @@ impl GraphicalReportHandler {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::cast_possible_truncation,
+        reason = "test fixtures are much smaller than u32::MAX"
+    )]
+
     use super::*;
     use crate::SourceCode;
 
@@ -287,7 +293,7 @@ mod tests {
             let actual = handler
                 .get_lines(&contents)
                 .iter()
-                .map(|line| (line.line_number, line.offset, line.length, line.text))
+                .map(|line| (line.number, line.offset, line.length, line.text))
                 .collect::<Vec<_>>();
             assert_eq!(actual, expected, "text={text:?}");
         }

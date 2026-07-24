@@ -1,8 +1,9 @@
 // NOTE: Most code in this file is taken straight from `thiserror`.
-use std::{collections::HashSet as Set, iter::FromIterator};
+use std::iter::FromIterator;
 
 use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 use quote::{ToTokens, format_ident, quote, quote_spanned};
+use rustc_hash::FxHashSet;
 use syn::{
     Ident, Index, LitStr, Member, Result, Token, braced, bracketed,
     ext::IdentExt,
@@ -14,7 +15,6 @@ use syn::{
 pub struct Display {
     pub fmt: LitStr,
     pub args: TokenStream,
-    pub has_bonus_display: bool,
 }
 
 impl ToTokens for Display {
@@ -29,7 +29,7 @@ impl ToTokens for Display {
 
 impl Display {
     // Transform `"error {var}"` to `"error {}", var`.
-    pub fn expand_shorthand(&mut self, members: &Set<Member>) {
+    pub fn expand_shorthand(&mut self, members: &FxHashSet<Member>) {
         let raw_args = self.args.clone();
         let mut named_args = explicit_named_args.parse2(raw_args).unwrap();
 
@@ -38,8 +38,6 @@ impl Display {
         let mut read = fmt.as_str();
         let mut out = String::new();
         let mut args = self.args.clone();
-        let mut has_bonus_display = false;
-
         let mut has_trailing_comma = false;
         if let Some(TokenTree::Punct(punct)) = args.clone().into_iter().last() {
             if punct.as_char() == ',' {
@@ -48,17 +46,14 @@ impl Display {
         }
 
         while let Some(brace) = read.find('{') {
-            out += &read[..brace + 1];
+            out += &read[..=brace];
             read = &read[brace + 1..];
             if read.starts_with('{') {
                 out.push('{');
                 read = &read[1..];
                 continue;
             }
-            let next = match read.chars().next() {
-                Some(next) => next,
-                None => return,
-            };
+            let Some(next) = read.chars().next() else { return };
             let member = match next {
                 '0'..='9' => {
                     let int = take_int(&mut read);
@@ -102,7 +97,6 @@ impl Display {
             }
             args.extend(quote_spanned!(span=> #formatvar = #local));
             if read.starts_with('}') && members.contains(&member) {
-                has_bonus_display = true;
                 // args.extend(quote_spanned!(span=> .as_display()));
             }
             has_trailing_comma = false;
@@ -111,12 +105,11 @@ impl Display {
         out += read;
         self.fmt = LitStr::new(&out, self.fmt.span());
         self.args = args;
-        self.has_bonus_display = has_bonus_display;
     }
 }
 
-fn explicit_named_args(input: ParseStream) -> Result<Set<Ident>> {
-    let mut named_args = Set::new();
+fn explicit_named_args(input: ParseStream) -> Result<FxHashSet<Ident>> {
+    let mut named_args = FxHashSet::default();
 
     while !input.is_empty() {
         if input.peek(Token![,]) && input.peek2(Ident::peek_any) && input.peek3(Token![=]) {
@@ -135,12 +128,11 @@ fn explicit_named_args(input: ParseStream) -> Result<Set<Ident>> {
 fn take_int(read: &mut &str) -> String {
     let mut int = String::new();
     for (i, ch) in read.char_indices() {
-        match ch {
-            '0'..='9' => int.push(ch),
-            _ => {
-                *read = &read[i..];
-                break;
-            }
+        if let '0'..='9' = ch {
+            int.push(ch);
+        } else {
+            *read = &read[i..];
+            break;
         }
     }
     int

@@ -106,18 +106,18 @@ impl Report {
         E: Diagnostic + Send + Sync + 'static,
     {
         let vtable = &ErrorVTable {
-            object_drop: object_drop::<E>,
-            object_ref: object_ref::<E>,
-            object_ref_stderr: object_ref_stderr::<E>,
-            object_boxed: object_boxed::<E>,
-            object_boxed_stderr: object_boxed_stderr::<E>,
-            object_downcast: object_downcast::<E>,
-            object_drop_rest: object_drop_front::<E>,
+            drop: object_drop::<E>,
+            as_diagnostic: object_ref::<E>,
+            as_error: object_ref_stderr::<E>,
+            into_diagnostic: object_boxed::<E>,
+            into_error: object_boxed_stderr::<E>,
+            downcast: object_downcast::<E>,
+            drop_rest: object_drop_front::<E>,
         };
 
-        // Safety: passing vtable that operates on the right type E.
         let handler = Some(crate::report::capture_handler(&error));
 
+        // SAFETY: Every vtable entry above is monomorphized for `E`.
         unsafe { Report::construct(error, vtable, handler) }
     }
 
@@ -129,19 +129,19 @@ impl Report {
         use crate::wrapper::MessageError;
         let error: MessageError<M> = MessageError(message);
         let vtable = &ErrorVTable {
-            object_drop: object_drop::<MessageError<M>>,
-            object_ref: object_ref::<MessageError<M>>,
-            object_ref_stderr: object_ref_stderr::<MessageError<M>>,
-            object_boxed: object_boxed::<MessageError<M>>,
-            object_boxed_stderr: object_boxed_stderr::<MessageError<M>>,
-            object_downcast: object_downcast::<M>,
-            object_drop_rest: object_drop_front::<M>,
+            drop: object_drop::<MessageError<M>>,
+            as_diagnostic: object_ref::<MessageError<M>>,
+            as_error: object_ref_stderr::<MessageError<M>>,
+            into_diagnostic: object_boxed::<MessageError<M>>,
+            into_error: object_boxed_stderr::<MessageError<M>>,
+            downcast: object_downcast::<M>,
+            drop_rest: object_drop_front::<M>,
         };
 
-        // Safety: MessageError is repr(transparent) so it is okay for the
-        // vtable to allow casting the MessageError<M> to M.
         let handler = Some(crate::report::capture_handler(&error));
 
+        // SAFETY: `MessageError` is transparent, and every vtable entry is
+        // monomorphized for either `MessageError<M>` or its inner `M`.
         unsafe { Report::construct(error, vtable, handler) }
     }
 
@@ -152,16 +152,16 @@ impl Report {
         let handler = Some(crate::report::capture_handler(&error));
 
         let vtable = &ErrorVTable {
-            object_drop: object_drop::<BoxedError>,
-            object_ref: object_ref::<BoxedError>,
-            object_ref_stderr: object_ref_stderr::<BoxedError>,
-            object_boxed: object_boxed::<BoxedError>,
-            object_boxed_stderr: object_boxed_stderr::<BoxedError>,
-            object_downcast: object_downcast::<Box<dyn Diagnostic + Send + Sync>>,
-            object_drop_rest: object_drop_front::<Box<dyn Diagnostic + Send + Sync>>,
+            drop: object_drop::<BoxedError>,
+            as_diagnostic: object_ref::<BoxedError>,
+            as_error: object_ref_stderr::<BoxedError>,
+            into_diagnostic: object_boxed::<BoxedError>,
+            into_error: object_boxed_stderr::<BoxedError>,
+            downcast: object_downcast::<Box<dyn Diagnostic + Send + Sync>>,
+            drop_rest: object_drop_front::<Box<dyn Diagnostic + Send + Sync>>,
         };
 
-        // Safety: BoxedError is repr(transparent) so it is okay for the vtable
+        // SAFETY: BoxedError is repr(transparent) so it is okay for the vtable
         // to allow casting to Box<dyn StdError + Send + Sync>.
         unsafe { Report::construct(error, vtable, handler) }
     }
@@ -179,7 +179,7 @@ impl Report {
     where
         E: Diagnostic + Send + Sync + 'static,
     {
-        let inner = Box::new(ErrorImpl { vtable, handler, _object: error });
+        let inner = Box::new(ErrorImpl { vtable, handler, object: error });
         // Erase the concrete type of E from the compile-time type system. This
         // is equivalent to the safe unsize coercion from Box<ErrorImpl<E>> to
         // Box<ErrorImpl<dyn StdError + Send + Sync + 'static>> except that the
@@ -213,6 +213,8 @@ impl Report {
     /// ```
     #[must_use]
     pub fn chain(&self) -> Chain<'_> {
+        // SAFETY: `self.inner` points to an `ErrorImpl` paired with its original
+        // vtable for the lifetime of `self`.
         unsafe { ErrorImpl::chain(self.inner.by_ref()) }
     }
 
@@ -221,6 +223,11 @@ impl Report {
     ///
     /// The root cause is the last error in the iterator produced by
     /// [`chain()`](Report::chain).
+    ///
+    /// # Panics
+    ///
+    /// This would panic only if the report's cause chain were empty, which a
+    /// valid [`Report`] never permits.
     #[must_use]
     pub fn root_cause(&self) -> &(dyn StdError + 'static) {
         self.chain().next_back().unwrap()
@@ -243,16 +250,22 @@ impl Report {
     }
 
     /// Attempt to downcast the error object to a concrete type.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original report when its stored value is not an `E`.
     pub fn downcast<E>(self) -> Result<E, Self>
     where
         E: Display + Debug + Send + Sync + 'static,
     {
         let target = TypeId::of::<E>();
         let inner = self.inner.by_mut();
+        // SAFETY: The vtable belongs to this allocation. Its downcast entry
+        // returns an `E` pointer only after a matching `TypeId`.
         unsafe {
             // Use vtable to find NonNull<()> which points to a value of type E
             // somewhere inside the data structure.
-            let addr = match (vtable(inner.ptr).object_downcast)(inner.by_ref(), target) {
+            let addr = match (vtable(inner.ptr).downcast)(inner.by_ref(), target) {
                 Some(addr) => addr.by_mut().extend(),
                 None => return Err(self),
             };
@@ -265,7 +278,7 @@ impl Report {
             let error = addr.cast::<E>().read();
 
             // Drop rest of the data structure outside of E.
-            (vtable(outer.inner.ptr).object_drop_rest)(outer.inner, target);
+            (vtable(outer.inner.ptr).drop_rest)(outer.inner, target);
 
             Ok(error)
         }
@@ -313,10 +326,12 @@ impl Report {
         E: Display + Debug + Send + Sync + 'static,
     {
         let target = TypeId::of::<E>();
+        // SAFETY: The vtable belongs to this allocation and validates `target`
+        // before returning the field pointer.
         unsafe {
             // Use vtable to find NonNull<()> which points to a value of type E
             // somewhere inside the data structure.
-            let addr = (vtable(self.inner.ptr).object_downcast)(self.inner.by_ref(), target)?;
+            let addr = (vtable(self.inner.ptr).downcast)(self.inner.by_ref(), target)?;
             Some(addr.cast::<E>().deref())
         }
     }
@@ -327,23 +342,33 @@ impl Report {
         E: Display + Debug + Send + Sync + 'static,
     {
         let target = TypeId::of::<E>();
+        // SAFETY: As above, with exclusive access guaranteed by `&mut self`.
         unsafe {
             // Use vtable to find NonNull<()> which points to a value of type E
             // somewhere inside the data structure.
-            let addr =
-                (vtable(self.inner.ptr).object_downcast)(self.inner.by_ref(), target)?.by_mut();
+            let addr = (vtable(self.inner.ptr).downcast)(self.inner.by_ref(), target)?.by_mut();
             Some(addr.cast::<E>().deref_mut())
         }
     }
 
     /// Get a reference to the Handler for this Report.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the report's internal handler invariant is violated.
     #[must_use]
     pub fn handler(&self) -> &dyn ReportHandler {
+        // SAFETY: `inner` is a live allocation owned by `self`.
         unsafe { self.inner.by_ref().deref().handler.as_ref().unwrap().as_ref() }
     }
 
     /// Get a mutable reference to the Handler for this Report.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the report's internal handler invariant is violated.
     pub fn handler_mut(&mut self) -> &mut dyn ReportHandler {
+        // SAFETY: `&mut self` guarantees exclusive access to the live allocation.
         unsafe { self.inner.by_mut().deref_mut().handler.as_mut().unwrap().as_mut() }
     }
 
@@ -368,54 +393,59 @@ impl Deref for Report {
     type Target = dyn Diagnostic + Send + Sync + 'static;
 
     fn deref(&self) -> &Self::Target {
+        // SAFETY: `inner` and its vtable remain valid for the lifetime of `self`.
         unsafe { ErrorImpl::diagnostic(self.inner.by_ref()) }
     }
 }
 
 impl DerefMut for Report {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        // SAFETY: `&mut self` guarantees exclusive access to the erased value.
         unsafe { ErrorImpl::diagnostic_mut(self.inner.by_mut()) }
     }
 }
 
 impl Display for Report {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // SAFETY: `inner` and its vtable remain valid while formatting.
         unsafe { ErrorImpl::display(self.inner.by_ref(), formatter) }
     }
 }
 
 impl Debug for Report {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // SAFETY: `inner` and its vtable remain valid while formatting.
         unsafe { ErrorImpl::debug(self.inner.by_ref(), formatter) }
     }
 }
 
 impl Drop for Report {
     fn drop(&mut self) {
+        // SAFETY: The allocation is still owned here, and its matching vtable
+        // provides the correct concrete drop implementation.
         unsafe {
             // Invoke the vtable's drop behavior.
-            (vtable(self.inner.ptr).object_drop)(self.inner);
+            (vtable(self.inner.ptr).drop)(self.inner);
         }
     }
 }
 
 struct ErrorVTable {
-    object_drop: unsafe fn(Own<ErasedErrorImpl>),
-    object_ref:
+    drop: unsafe fn(Own<ErasedErrorImpl>),
+    as_diagnostic:
         unsafe fn(Ref<'_, ErasedErrorImpl>) -> Ref<'_, dyn Diagnostic + Send + Sync + 'static>,
-    object_ref_stderr:
-        unsafe fn(Ref<'_, ErasedErrorImpl>) -> Ref<'_, dyn StdError + Send + Sync + 'static>,
-    #[allow(clippy::type_complexity)]
-    object_boxed: unsafe fn(Own<ErasedErrorImpl>) -> Box<dyn Diagnostic + Send + Sync + 'static>,
-    #[allow(clippy::type_complexity)]
-    object_boxed_stderr:
-        unsafe fn(Own<ErasedErrorImpl>) -> Box<dyn StdError + Send + Sync + 'static>,
-    object_downcast: unsafe fn(Ref<'_, ErasedErrorImpl>, TypeId) -> Option<Ref<'_, ()>>,
-    object_drop_rest: unsafe fn(Own<ErasedErrorImpl>, TypeId),
+    as_error: unsafe fn(Ref<'_, ErasedErrorImpl>) -> Ref<'_, dyn StdError + Send + Sync + 'static>,
+    into_diagnostic: unsafe fn(Own<ErasedErrorImpl>) -> Box<dyn Diagnostic + Send + Sync + 'static>,
+    into_error: unsafe fn(Own<ErasedErrorImpl>) -> Box<dyn StdError + Send + Sync + 'static>,
+    downcast: unsafe fn(Ref<'_, ErasedErrorImpl>, TypeId) -> Option<Ref<'_, ()>>,
+    drop_rest: unsafe fn(Own<ErasedErrorImpl>, TypeId),
 }
 
-// Safety: requires layout of *e to match ErrorImpl<E>.
+/// # Safety
+///
+/// `e` must point to an `ErrorImpl<E>` allocation.
 unsafe fn object_drop<E>(e: Own<ErasedErrorImpl>) {
+    // SAFETY: Required by this function's contract.
     unsafe {
         // Cast back to ErrorImpl<E> so that the allocator receives the correct
         // Layout to deallocate the Box's memory.
@@ -424,8 +454,13 @@ unsafe fn object_drop<E>(e: Own<ErasedErrorImpl>) {
     }
 }
 
-// Safety: requires layout of *e to match ErrorImpl<E>.
+/// # Safety
+///
+/// `e` must point to an `ErrorImpl<E>` allocation, and `target` must describe
+/// the value already moved out by the caller.
 unsafe fn object_drop_front<E>(e: Own<ErasedErrorImpl>, target: TypeId) {
+    // SAFETY: Required by this function's contract; `ManuallyDrop<E>` prevents
+    // a second drop of the extracted value.
     unsafe {
         // Drop the fields of ErrorImpl other than E as well as the Box allocation,
         // without dropping E itself. This is used by downcast after doing a
@@ -436,65 +471,83 @@ unsafe fn object_drop_front<E>(e: Own<ErasedErrorImpl>, target: TypeId) {
     }
 }
 
-// Safety: requires layout of *e to match ErrorImpl<E>.
+/// # Safety
+///
+/// `e` must point to an `ErrorImpl<E>`.
 unsafe fn object_ref<E>(
     e: Ref<'_, ErasedErrorImpl>,
 ) -> Ref<'_, dyn Diagnostic + Send + Sync + 'static>
 where
     E: Diagnostic + Send + Sync + 'static,
 {
+    // SAFETY: Required by this function's contract. `addr_of!` yields the
+    // non-null address of the live `object` field.
     unsafe {
-        // Attach E's native StdError vtable onto a pointer to self._object.
+        // Attach E's native StdError vtable onto a pointer to `self.object`.
         let unerased = e.cast::<ErrorImpl<E>>();
 
-        Ref::from_raw(NonNull::new_unchecked(ptr::addr_of!((*unerased.as_ptr())._object) as *mut E))
+        Ref::from_raw(NonNull::new_unchecked(ptr::addr_of!((*unerased.as_ptr()).object).cast_mut()))
     }
 }
 
-// Safety: requires layout of *e to match ErrorImpl<E>.
+/// # Safety
+///
+/// `e` must point to an `ErrorImpl<E>`.
 unsafe fn object_ref_stderr<E>(
     e: Ref<'_, ErasedErrorImpl>,
 ) -> Ref<'_, dyn StdError + Send + Sync + 'static>
 where
     E: StdError + Send + Sync + 'static,
 {
+    // SAFETY: Required by this function's contract. `addr_of!` yields the
+    // non-null address of the live `object` field.
     unsafe {
-        // Attach E's native StdError vtable onto a pointer to self._object.
+        // Attach E's native StdError vtable onto a pointer to `self.object`.
         let unerased = e.cast::<ErrorImpl<E>>();
 
-        Ref::from_raw(NonNull::new_unchecked(ptr::addr_of!((*unerased.as_ptr())._object) as *mut E))
+        Ref::from_raw(NonNull::new_unchecked(ptr::addr_of!((*unerased.as_ptr()).object).cast_mut()))
     }
 }
 
-// Safety: requires layout of *e to match ErrorImpl<E>.
+/// # Safety
+///
+/// `e` must own an `ErrorImpl<E>` allocation.
 unsafe fn object_boxed<E>(e: Own<ErasedErrorImpl>) -> Box<dyn Diagnostic + Send + Sync + 'static>
 where
     E: Diagnostic + Send + Sync + 'static,
 {
+    // SAFETY: Required by this function's contract.
     unsafe {
         // Attach ErrorImpl<E>'s native StdError vtable. The StdError impl is below.
         e.cast::<ErrorImpl<E>>().boxed()
     }
 }
 
-// Safety: requires layout of *e to match ErrorImpl<E>.
+/// # Safety
+///
+/// `e` must own an `ErrorImpl<E>` allocation.
 unsafe fn object_boxed_stderr<E>(
     e: Own<ErasedErrorImpl>,
 ) -> Box<dyn StdError + Send + Sync + 'static>
 where
     E: StdError + Send + Sync + 'static,
 {
+    // SAFETY: Required by this function's contract.
     unsafe {
         // Attach ErrorImpl<E>'s native StdError vtable. The StdError impl is below.
         e.cast::<ErrorImpl<E>>().boxed()
     }
 }
 
-// Safety: requires layout of *e to match ErrorImpl<E>.
+/// # Safety
+///
+/// `e` must point to an `ErrorImpl<E>`.
 unsafe fn object_downcast<E>(e: Ref<'_, ErasedErrorImpl>, target: TypeId) -> Option<Ref<'_, ()>>
 where
     E: 'static,
 {
+    // SAFETY: Required by this function's contract. A pointer is returned only
+    // after confirming that the requested type is `E`.
     unsafe {
         if TypeId::of::<E>() == target {
             // Caller is looking for an E pointer and e is ErrorImpl<E>, take a
@@ -503,7 +556,7 @@ where
 
             Some(
                 Ref::from_raw(NonNull::new_unchecked(
-                    ptr::addr_of!((*unerased.as_ptr())._object) as *mut E
+                    ptr::addr_of!((*unerased.as_ptr()).object).cast_mut(),
                 ))
                 .cast::<()>(),
             )
@@ -515,18 +568,23 @@ where
 
 // repr C to ensure that E remains in the final position.
 #[repr(C)]
+#[expect(clippy::redundant_pub_crate, reason = "keeps erased storage crate-private")]
 pub(crate) struct ErrorImpl<E> {
     vtable: &'static ErrorVTable,
     pub(crate) handler: Option<Box<dyn ReportHandler>>,
     // NOTE: Don't use directly. Use only through vtable. Erased type may have
     // different alignment.
-    _object: E,
+    object: E,
 }
 
 type ErasedErrorImpl = ErrorImpl<()>;
 
-// Safety: `ErrorVTable` must be the first field of `ErrorImpl`
+/// # Safety
+///
+/// `p` must point to an `ErrorImpl`; `ErrorVTable` is its first field.
 unsafe fn vtable(p: NonNull<ErasedErrorImpl>) -> &'static ErrorVTable {
+    // SAFETY: Required by this function's contract and guaranteed by
+    // `ErrorImpl`'s `repr(C)` layout.
     unsafe { (p.as_ptr() as *const &'static ErrorVTable).read() }
 }
 
@@ -543,34 +601,41 @@ impl ErasedErrorImpl {
     pub(crate) unsafe fn error<'a>(
         this: Ref<'a, Self>,
     ) -> &'a (dyn StdError + Send + Sync + 'static) {
+        // SAFETY: The caller guarantees `this` is paired with its original
+        // vtable, whose `as_error` entry reconstructs the correct trait object.
         unsafe {
             // Use vtable to attach E's native StdError vtable for the right
             // original type E.
-            (vtable(this.ptr).object_ref_stderr)(this).deref()
+            (vtable(this.ptr).as_error)(this).deref()
         }
     }
 
     pub(crate) unsafe fn diagnostic<'a>(
         this: Ref<'a, Self>,
     ) -> &'a (dyn Diagnostic + Send + Sync + 'static) {
+        // SAFETY: The caller guarantees `this` is paired with its original
+        // vtable, whose `as_diagnostic` entry reconstructs the trait object.
         unsafe {
             // Use vtable to attach E's native StdError vtable for the right
             // original type E.
-            (vtable(this.ptr).object_ref)(this).deref()
+            (vtable(this.ptr).as_diagnostic)(this).deref()
         }
     }
 
     pub(crate) unsafe fn diagnostic_mut<'a>(
         this: Mut<'a, Self>,
     ) -> &'a mut (dyn Diagnostic + Send + Sync + 'static) {
+        // SAFETY: The caller additionally guarantees exclusive access through
+        // `this`.
         unsafe {
             // Use vtable to attach E's native StdError vtable for the right
             // original type E.
-            (vtable(this.ptr).object_ref)(this.by_ref()).by_mut().deref_mut()
+            (vtable(this.ptr).as_diagnostic)(this.by_ref()).by_mut().deref_mut()
         }
     }
 
     pub(crate) unsafe fn chain(this: Ref<'_, Self>) -> Chain<'_> {
+        // SAFETY: The caller guarantees `this` is a valid erased error.
         unsafe { Chain::new(Self::error(this)) }
     }
 }
@@ -580,6 +645,7 @@ where
     E: StdError,
 {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        // SAFETY: `erase` preserves this allocation's vtable and lifetime.
         unsafe { ErrorImpl::diagnostic(self.erase()).source() }
     }
 }
@@ -591,6 +657,7 @@ where
     E: Debug,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // SAFETY: `erase` preserves this allocation's vtable and lifetime.
         unsafe { ErrorImpl::debug(self.erase(), formatter) }
     }
 }
@@ -600,6 +667,7 @@ where
     E: Display,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // SAFETY: `erase` preserves this allocation's vtable and lifetime.
         unsafe { Display::fmt(ErrorImpl::diagnostic(self.erase()), formatter) }
     }
 }
@@ -607,10 +675,12 @@ where
 impl From<Report> for Box<dyn Diagnostic + Send + Sync + 'static> {
     fn from(error: Report) -> Self {
         let outer = ManuallyDrop::new(error);
+        // SAFETY: `outer` retains its allocation and matching vtable; the
+        // vtable conversion takes ownership exactly once.
         unsafe {
             // Use vtable to attach ErrorImpl<E>'s native StdError vtable for
             // the right original type E.
-            (vtable(outer.inner.ptr).object_boxed)(outer.inner)
+            (vtable(outer.inner.ptr).into_diagnostic)(outer.inner)
         }
     }
 }
@@ -618,10 +688,12 @@ impl From<Report> for Box<dyn Diagnostic + Send + Sync + 'static> {
 impl From<Report> for Box<dyn StdError + Send + Sync + 'static> {
     fn from(error: Report) -> Self {
         let outer = ManuallyDrop::new(error);
+        // SAFETY: `outer` retains its allocation and matching vtable; the
+        // vtable conversion takes ownership exactly once.
         unsafe {
             // Use vtable to attach ErrorImpl<E>'s native StdError vtable for
             // the right original type E.
-            (vtable(outer.inner.ptr).object_boxed_stderr)(outer.inner)
+            (vtable(outer.inner.ptr).into_error)(outer.inner)
         }
     }
 }
@@ -652,12 +724,14 @@ impl AsRef<dyn Diagnostic> for Report {
 
 impl AsRef<dyn StdError + Send + Sync> for Report {
     fn as_ref(&self) -> &(dyn StdError + Send + Sync + 'static) {
+        // SAFETY: `inner` and its matching vtable live as long as `self`.
         unsafe { ErrorImpl::error(self.inner.by_ref()) }
     }
 }
 
 impl AsRef<dyn StdError> for Report {
     fn as_ref(&self) -> &(dyn StdError + 'static) {
+        // SAFETY: `inner` and its matching vtable live as long as `self`.
         unsafe { ErrorImpl::error(self.inner.by_ref()) }
     }
 }

@@ -27,7 +27,7 @@ struct SpanRequest {
 }
 
 impl SpanRequest {
-    fn new(span: &SourceSpan) -> Self {
+    fn new(span: SourceSpan) -> Self {
         Self { offset: span.offset() as usize, len: span.len() as usize }
     }
 
@@ -374,9 +374,11 @@ impl<'a> SpanReader<'a> {
         let Some(data) = self.input.get(start..self.offset) else {
             return Err(MietteError::OutOfBounds);
         };
+        let span_start = u32::try_from(start).map_err(|_| MietteError::OutOfBounds)?;
+        let span_len = u32::try_from(self.offset - start).map_err(|_| MietteError::OutOfBounds)?;
         Ok(MietteSpanContents::new(
             data,
-            (start as u32, (self.offset - start) as u32).into(),
+            (span_start, span_len).into(),
             self.leading.start_line,
             if self.context.before == 0 { self.start_column } else { 0 },
             self.line_count,
@@ -399,7 +401,7 @@ impl MietteSpanContents<'_> {
     /// primitive so a long (e.g. minified) line stays cheap.
     // Only the `fancy` graphical renderer consumes this today; without it the
     // method is dead in a lib-only build (CI lints `-D warnings`).
-    #[cfg_attr(not(feature = "fancy-base"), allow(dead_code))]
+    #[cfg_attr(all(not(feature = "fancy-base"), not(test)), expect(dead_code))]
     pub(crate) fn line_column_at(&self, offset: usize) -> Option<(usize, usize)> {
         let data = self.data();
         let base = self.span().offset() as usize;
@@ -500,17 +502,14 @@ impl<'a> LineIndex<'a> {
     /// line start after it. `None` at end of input (with `frontier` advanced
     /// there so the probe isn't repeated).
     fn extend(&mut self) -> Option<LineBreak> {
-        match LineBreaks::new(&self.input[self.frontier..]).next() {
-            Some(line_break) => {
-                let line_break = line_break.shifted(self.frontier);
-                self.line_starts.push(line_break.next_line_start());
-                self.frontier = line_break.next_line_start();
-                Some(line_break)
-            }
-            None => {
-                self.frontier = self.input.len();
-                None
-            }
+        if let Some(line_break) = LineBreaks::new(&self.input[self.frontier..]).next() {
+            let line_break = line_break.shifted(self.frontier);
+            self.line_starts.push(line_break.next_line_start());
+            self.frontier = line_break.next_line_start();
+            Some(line_break)
+        } else {
+            self.frontier = self.input.len();
+            None
         }
     }
 
@@ -665,9 +664,11 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
         let Some(data) = self.index.input.get(start..window_end) else {
             return Err(MietteError::OutOfBounds);
         };
+        let span_start = u32::try_from(start).map_err(|_| MietteError::OutOfBounds)?;
+        let span_len = u32::try_from(window_end - start).map_err(|_| MietteError::OutOfBounds)?;
         Ok(MietteSpanContents::new(
             data,
-            (start as u32, (window_end - start) as u32).into(),
+            (span_start, span_len).into(),
             self.leading.start_line,
             if self.context.before == 0 { self.start_column } else { 0 },
             self.line_count,
@@ -687,6 +688,7 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
 /// [`read_span`]: crate::SourceCode::read_span
 /// [`GraphicalReportHandler`]: crate::handlers::GraphicalReportHandler
 #[cfg(feature = "fancy-base")]
+#[expect(clippy::redundant_pub_crate, reason = "keeps the renderer fast path crate-private")]
 pub(crate) struct SpanScanner<'a> {
     context: ContextLines,
     index: LineIndex<'a>,
@@ -708,7 +710,7 @@ impl<'a> SpanScanner<'a> {
     /// Read a span while scanning only source bytes no earlier query scanned.
     pub(crate) fn read_span(
         &mut self,
-        span: &SourceSpan,
+        span: SourceSpan,
     ) -> Result<MietteSpanContents<'a>, MietteError> {
         let request = SpanRequest::new(span);
         let cut = request.prefix_end(self.index.input);
@@ -743,7 +745,7 @@ impl SourceCode for [u8] {
     ) -> Result<MietteSpanContents<'a>, MietteError> {
         SpanReader::new(
             self,
-            SpanRequest::new(span),
+            SpanRequest::new(*span),
             ContextLines::new(context_lines_before, context_lines_after),
         )
         .read()
@@ -996,6 +998,11 @@ mod tests {
 
 #[cfg(test)]
 mod line_column_tests {
+    #![expect(
+        clippy::cast_possible_truncation,
+        reason = "deterministic fuzz inputs are tightly bounded"
+    )]
+
     use super::*;
 
     /// Deterministic xorshift so any failure reproduces from a fixed seed.
@@ -1090,6 +1097,11 @@ mod line_column_tests {
 
 #[cfg(all(test, feature = "fancy-base"))]
 mod scanner_tests {
+    #![expect(
+        clippy::cast_possible_truncation,
+        reason = "deterministic fuzz inputs are tightly bounded"
+    )]
+
     use super::*;
 
     /// Deterministic xorshift so any failure reproduces from a fixed seed.
@@ -1122,13 +1134,10 @@ mod scanner_tests {
         history: &[(usize, usize)],
     ) {
         let source_span: SourceSpan = (span.0 as u32, span.1 as u32).into();
-        let expected = SpanReader::new(
-            input,
-            SpanRequest::new(&source_span),
-            ContextLines::new(before, after),
-        )
-        .read();
-        let got = scanner.read_span(&source_span);
+        let expected =
+            SpanReader::new(input, SpanRequest::new(source_span), ContextLines::new(before, after))
+                .read();
+        let got = scanner.read_span(source_span);
         let src = String::from_utf8_lossy(input);
         match (&expected, &got) {
             (Ok(expected), Ok(got)) => {
@@ -1182,9 +1191,11 @@ mod scanner_tests {
                 }
                 let input = s.as_bytes();
                 for (before, after) in [(0, 0), (1, 1), (2, 2), (0, 2), (2, 0)] {
-                    let mut spans: Vec<(usize, usize)> = (0..6)
-                        .map(|_| (rng.below(input.len() + 3), [0, 1, 2, 5][rng.below(4)]))
-                        .collect();
+                    let mut spans: Vec<(usize, usize)> = std::iter::repeat_with(|| {
+                        (rng.below(input.len() + 3), [0, 1, 2, 5][rng.below(4)])
+                    })
+                    .take(6)
+                    .collect();
 
                     // Random order: queries may jump backwards past the
                     // index origin.

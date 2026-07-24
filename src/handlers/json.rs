@@ -59,15 +59,19 @@ impl JSONReportHandler {
     /// Render a [`Diagnostic`]. This function is mostly internal and meant to
     /// be called by the toplevel [`ReportHandler`] handler, but is made public
     /// to make it easier (possible) to test in isolation from global state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing the rendered report fails.
     pub fn render_report(
         &self,
         f: &mut impl fmt::Write,
         diagnostic: &dyn Diagnostic,
     ) -> fmt::Result {
-        self._render_report(f, diagnostic, None)
+        self.render_report_inner(f, diagnostic, None)
     }
 
-    fn _render_report(
+    fn render_report_inner(
         &self,
         f: &mut impl fmt::Write,
         diagnostic: &dyn Diagnostic,
@@ -103,7 +107,7 @@ impl JSONReportHandler {
             write!(f, r#""causes": [],"#)?;
         }
         if let Some(url) = diagnostic.url() {
-            write!(f, r#""url": "{}","#, url)?;
+            write!(f, r#""url": "{url}","#)?;
         }
         if let Some(help) = diagnostic.help() {
             write!(f, r#""help": "{}","#, escape(&help))?;
@@ -159,13 +163,14 @@ impl JSONReportHandler {
                 } else {
                     add_comma = true;
                 }
-                self._render_report(f, related, src)?;
+                self.render_report_inner(f, related, src)?;
             }
             write!(f, "]")?;
         }
         write!(f, "}}")
     }
 
+    #[expect(clippy::unused_self, reason = "kept as a renderer method for call-site consistency")]
     fn render_snippets(
         &self,
         f: &mut impl fmt::Write,

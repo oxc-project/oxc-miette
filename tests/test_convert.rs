@@ -15,8 +15,8 @@ fn test_convert() {
 }
 
 #[test]
-#[allow(clippy::unnecessary_wraps)]
 fn test_question_mark() -> Result<(), Box<dyn Diagnostic>> {
+    #[expect(clippy::unnecessary_wraps, reason = "exercises question-mark conversion")]
     fn f() -> Result<()> {
         Ok(())
     }
@@ -36,6 +36,7 @@ fn test_convert_stderr() {
 
 #[test]
 fn test_question_mark_stderr() -> Result<(), Box<dyn std::error::Error>> {
+    #[expect(clippy::unnecessary_wraps, reason = "exercises question-mark conversion")]
     fn f() -> Result<()> {
         Ok(())
     }
