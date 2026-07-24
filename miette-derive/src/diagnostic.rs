@@ -291,7 +291,7 @@ impl Diagnostic {
                         let code_body = concrete
                             .code
                             .as_ref()
-                            .map(super::code::Code::gen_struct)
+                            .map(Code::gen_struct)
                             .or_else(|| forward(WhichFn::Code));
                         let help_body = concrete
                             .help
@@ -301,12 +301,12 @@ impl Diagnostic {
                         let sev_body = concrete
                             .severity
                             .as_ref()
-                            .map(super::severity::Severity::gen_struct)
+                            .map(Severity::gen_struct)
                             .or_else(|| forward(WhichFn::Severity));
                         let rel_body = concrete
                             .related
                             .as_ref()
-                            .map(super::related::Related::gen_struct)
+                            .map(Related::gen_struct)
                             .or_else(|| forward(WhichFn::Related));
                         let url_body = concrete
                             .url
@@ -326,7 +326,7 @@ impl Diagnostic {
                         let diagnostic_source = concrete
                             .diagnostic_source
                             .as_ref()
-                            .map(super::diagnostic_source::DiagnosticSource::gen_struct)
+                            .map(DiagnosticSource::gen_struct)
                             .or_else(|| forward(WhichFn::DiagnosticSource));
                         quote! {
                             impl #impl_generics miette::Diagnostic for #ident #ty_generics #where_clause {
