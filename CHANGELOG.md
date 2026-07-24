@@ -61,6 +61,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [4.0.0] - 2026-07-24
+
+### Bug Fixes
+
+- Reject out-of-bounds label offsets, scan the prefix with memchr2 ([#223](https://github.com/oxc-project/oxc-miette/pull/223))
+
+### Performance
+
+- Derive primary-label line/column instead of a second read_span ([#222](https://github.com/oxc-project/oxc-miette/pull/222))
+- Scan the source once per snippet render via a shared line-break index ([#225](https://github.com/oxc-project/oxc-miette/pull/225))
+- Optimize single-context prefix scans ([#242](https://github.com/oxc-project/oxc-miette/pull/242))
+- Specialize LF-only prefix scans ([#243](https://github.com/oxc-project/oxc-miette/pull/243))
+- Inline single-line context storage ([#245](https://github.com/oxc-project/oxc-miette/pull/245))
+- Skip wrapping for fitting text ([#246](https://github.com/oxc-project/oxc-miette/pull/246))
+- Skip width scan for tabless lines ([#247](https://github.com/oxc-project/oxc-miette/pull/247))
+- Use byte widths for plain ascii ([#248](https://github.com/oxc-project/oxc-miette/pull/248))
+- Scan snippet lines with memchr ([#249](https://github.com/oxc-project/oxc-miette/pull/249))
+- Measure ascii display widths by byte ([#250](https://github.com/oxc-project/oxc-miette/pull/250))
+- Write labels without temporary strings ([#251](https://github.com/oxc-project/oxc-miette/pull/251))
+- Write fitting diagnostic text directly ([#252](https://github.com/oxc-project/oxc-miette/pull/252))
+- Borrow graphical label text ([#253](https://github.com/oxc-project/oxc-miette/pull/253))
+- Write underline runs in chunks ([#255](https://github.com/oxc-project/oxc-miette/pull/255))
+- Preallocate snippet lines ([#258](https://github.com/oxc-project/oxc-miette/pull/258))
+- Skip plain style formatting ([#259](https://github.com/oxc-project/oxc-miette/pull/259))
+- Write label padding in chunks ([#280](https://github.com/oxc-project/oxc-miette/pull/280))
+
+### Documentation
+
+- Document the flattened error-report modules ([#236](https://github.com/oxc-project/oxc-miette/pull/236))
+- Synchronize the documented MSRV ([#277](https://github.com/oxc-project/oxc-miette/pull/277))
+
+### Refactor
+
+- Move line_column_at onto MietteSpanContents ([#224](https://github.com/oxc-project/oxc-miette/pull/224))
+- Split the graphical renderer into a module directory ([#227](https://github.com/oxc-project/oxc-miette/pull/227))
+- Remove dead commented-out code from the graphical renderer ([#233](https://github.com/oxc-project/oxc-miette/pull/233))
+- Flatten the eyreish module into the crate root ([#235](https://github.com/oxc-project/oxc-miette/pull/235))
+- Remove the inert graphical cause-chain builders ([#238](https://github.com/oxc-project/oxc-miette/pull/238))
+- Remove the unused ErrReport / EyreContext compat aliases ([#239](https://github.com/oxc-project/oxc-miette/pull/239))
+- Remove the unused with_urls builder ([#241](https://github.com/oxc-project/oxc-miette/pull/241))
+- Encapsulate source span scanning ([#244](https://github.com/oxc-project/oxc-miette/pull/244))
+- Remove the anyhow/eyre-style WrapErr/Context feature ([#240](https://github.com/oxc-project/oxc-miette/pull/240))
+- Mark value-returning APIs as must use ([#275](https://github.com/oxc-project/oxc-miette/pull/275))
+- Make tests clippy-clean and race-free ([#276](https://github.com/oxc-project/oxc-miette/pull/276))
+- Simplify derive and runtime code ([#282](https://github.com/oxc-project/oxc-miette/pull/282))
+
+### Testing
+
+- Move public-API unit tests into the integration suite ([#229](https://github.com/oxc-project/oxc-miette/pull/229))
+
+### Chore
+
+- *(deps)* Update rust crates ([#231](https://github.com/oxc-project/oxc-miette/pull/231))
+- *(deps)* Update rust crate syn to v3 ([#232](https://github.com/oxc-project/oxc-miette/pull/232))
+- *(deps)* Update rust crate syn to v3.0.1 ([#234](https://github.com/oxc-project/oxc-miette/pull/234))
+- Sync Rust and Clippy lints ([#281](https://github.com/oxc-project/oxc-miette/pull/281))
+
+### CI
+
+- Skip exhaustive textwrap test under miri ([#254](https://github.com/oxc-project/oxc-miette/pull/254))
+- *(semgrep)* Add scan workflow ([#257](https://github.com/oxc-project/oxc-miette/pull/257))
+
+### Bench
+
+- Add CodSpeed benchmark for diagnostic rendering ([#215](https://github.com/oxc-project/oxc-miette/pull/215))
+- Add a multi-label diagnostic rendering case ([#220](https://github.com/oxc-project/oxc-miette/pull/220))
+- Align render cases with oxlint ([#279](https://github.com/oxc-project/oxc-miette/pull/279))
 ## [3.0.1] - 2026-07-19
 
 ### Performance
