@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{ToTokens, quote};
+use rustc_hash::FxHashSet;
 use syn::{
     Token, parenthesized,
     parse::{Parse, ParseStream},
@@ -10,7 +11,7 @@ use crate::{
     diagnostic::{DiagnosticConcreteArgs, DiagnosticDef},
     fmt::{self, Display},
     forward::WhichFn,
-    utils::{display_pat_members, field_member, gen_all_variants_with},
+    utils::{display_pat_members, field_member, gen_all_variants_with, member_ident},
 };
 
 pub struct Labels(Vec<Label>);
@@ -27,6 +28,62 @@ struct Label {
     ty: syn::Type,
     span: syn::Member,
     lbl_ty: LabelType,
+}
+
+impl Label {
+    fn display_tokens(&self, members: &FxHashSet<syn::Member>) -> TokenStream {
+        let Some(display) = &self.display else {
+            return quote! { std::option::Option::None };
+        };
+        let (fmt, args) = display.expand_shorthand_cloned(members);
+        quote! { std::option::Option::Some(format!(#fmt #args)) }
+    }
+
+    fn gen_label(
+        &self,
+        value: &TokenStream,
+        display_members: &FxHashSet<syn::Member>,
+    ) -> Option<TokenStream> {
+        if self.lbl_ty == LabelType::Collection {
+            return None;
+        }
+        let ty = &self.ty;
+        let display = self.display_tokens(display_members);
+        let constructor = if self.lbl_ty == LabelType::Primary {
+            quote! { miette::LabeledSpan::new_primary_with_span }
+        } else {
+            quote! { miette::LabeledSpan::new_with_span }
+        };
+        let var = quote! { __miette_internal_var };
+        Some(quote! {
+            miette::macro_helpers::OptionalWrapper::<#ty>::new().to_option(#value)
+                .map(|#var| #constructor(#display, #var.clone()))
+        })
+    }
+
+    fn gen_collection(
+        &self,
+        value: &TokenStream,
+        display_members: &FxHashSet<syn::Member>,
+    ) -> Option<TokenStream> {
+        if self.lbl_ty != LabelType::Collection {
+            return None;
+        }
+        let display = self.display_tokens(display_members);
+        Some(quote! {
+            .chain({
+                let display = #display;
+                #value.iter().map(move |span| {
+                    use miette::macro_helpers::{ToLabelSpanWrapper, ToLabeledSpan};
+                    let mut labeled_span = ToLabelSpanWrapper::to_labeled_span(span.clone());
+                    if display.is_some() && labeled_span.label().is_none() {
+                        labeled_span.set_label(display.clone())
+                    }
+                    Some(labeled_span)
+                })
+            })
+        })
+    }
 }
 
 struct LabelAttr {
@@ -127,56 +184,13 @@ impl Labels {
 
     pub(crate) fn gen_struct(&self, fields: &syn::Fields) -> TokenStream {
         let (display_pat, display_members) = display_pat_members(fields);
-        let labels = self.0.iter().filter_map(|highlight| {
-            let Label { span, display, ty, lbl_ty } = highlight;
-            if *lbl_ty == LabelType::Collection {
-                return None;
-            }
-            let var = quote! { __miette_internal_var };
-            let display = if let Some(display) = display {
-                let (fmt, args) = display.expand_shorthand_cloned(&display_members);
-                quote! { std::option::Option::Some(format!(#fmt #args)) }
-            } else {
-                quote! { std::option::Option::None }
-            };
-            let ctor = if *lbl_ty == LabelType::Primary {
-                quote! { miette::LabeledSpan::new_primary_with_span }
-            } else {
-                quote! { miette::LabeledSpan::new_with_span }
-            };
-
-            Some(quote! {
-                miette::macro_helpers::OptionalWrapper::<#ty>::new().to_option(&self.#span)
-                .map(|#var| #ctor(
-                    #display,
-                    #var.clone(),
-                ))
-            })
+        let labels = self.0.iter().filter_map(|label| {
+            let span = &label.span;
+            label.gen_label(&quote! { &self.#span }, &display_members)
         });
         let collections_chain = self.0.iter().filter_map(|label| {
-            let Label { span, display, ty: _, lbl_ty } = label;
-            if *lbl_ty != LabelType::Collection {
-                return None;
-            }
-            let display = if let Some(display) = display {
-                let (fmt, args) = display.expand_shorthand_cloned(&display_members);
-                quote! { std::option::Option::Some(format!(#fmt #args)) }
-            } else {
-                quote! { std::option::Option::None }
-            };
-            Some(quote! {
-                .chain({
-                    let display = #display;
-                    self.#span.iter().map(move |span| {
-                        use miette::macro_helpers::{ToLabelSpanWrapper,ToLabeledSpan};
-                        let mut labeled_span = ToLabelSpanWrapper::to_labeled_span(span.clone());
-                        if display.is_some() && labeled_span.label().is_none() {
-                            labeled_span.set_label(display.clone())
-                        }
-                        Some(labeled_span)
-                    })
-                })
-            })
+            let span = &label.span;
+            label.gen_collection(&quote! { self.#span }, &display_members)
         });
 
         quote! {
@@ -204,73 +218,17 @@ impl Labels {
                 let (display_pat, display_members) = display_pat_members(fields);
                 labels.as_ref().and_then(|labels| {
                     let variant_labels = labels.0.iter().filter_map(|label| {
-                        let Label { span, display, ty, lbl_ty } = label;
-                        if *lbl_ty == LabelType::Collection {
-                            return None;
-                        }
-                        let field = match &span {
-                            syn::Member::Named(ident) => ident.clone(),
-                            syn::Member::Unnamed(syn::Index { index, .. }) => {
-                                format_ident!("_{}", index)
-                            }
-                        };
-                        let var = quote! { __miette_internal_var };
-                        let display = if let Some(display) = display {
-                            let (fmt, args) = display.expand_shorthand_cloned(&display_members);
-                            quote! { std::option::Option::Some(format!(#fmt #args)) }
-                        } else {
-                            quote! { std::option::Option::None }
-                        };
-                        let ctor = if *lbl_ty == LabelType::Primary {
-                            quote! { miette::LabeledSpan::new_primary_with_span }
-                        } else {
-                            quote! { miette::LabeledSpan::new_with_span }
-                        };
-
-                        Some(quote! {
-                            miette::macro_helpers::OptionalWrapper::<#ty>::new().to_option(#field)
-                            .map(|#var| #ctor(
-                                #display,
-                                #var.clone(),
-                            ))
-                        })
+                        let field = member_ident(&label.span);
+                        label.gen_label(&quote! { #field }, &display_members)
                     });
                     let collections_chain = labels.0.iter().filter_map(|label| {
-                        let Label { span, display, ty: _, lbl_ty } = label;
-                        if *lbl_ty != LabelType::Collection {
-                            return None;
-                        }
-                        let field = match &span {
-                            syn::Member::Named(ident) => ident.clone(),
-                            syn::Member::Unnamed(syn::Index { index, .. }) => {
-                                format_ident!("_{}", index)
-                            }
-                        };
-                        let display = if let Some(display) = display {
-                            let (fmt, args) = display.expand_shorthand_cloned(&display_members);
-                            quote! { std::option::Option::Some(format!(#fmt #args)) }
-                        } else {
-                            quote! { std::option::Option::None }
-                        };
-                        Some(quote! {
-                            .chain({
-                                let display = #display;
-                                #field.iter().map(move |span| {
-                                    use miette::macro_helpers::{ToLabelSpanWrapper,ToLabeledSpan};
-                                    let mut labeled_span = ToLabelSpanWrapper::to_labeled_span(span.clone());
-                                    if display.is_some() && labeled_span.label().is_none() {
-                                        labeled_span.set_label(display.clone());
-                                    }
-                                    Some(labeled_span)
-                                })
-                            })
-                        })
+                        let field = member_ident(&label.span);
+                        label.gen_collection(&quote! { #field }, &display_members)
                     });
-                    let variant_name = ident.clone();
                     match &fields {
                         syn::Fields::Unit => None,
                         _ => Some(quote! {
-                            Self::#variant_name #display_pat => {
+                            Self::#ident #display_pat => {
                                 use miette::macro_helpers::ToOption;
                                 let labels_iter = [
                                     #(#variant_labels),*

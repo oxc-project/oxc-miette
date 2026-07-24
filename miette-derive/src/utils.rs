@@ -40,13 +40,26 @@ pub fn gen_all_variants_with(
 use crate::fmt::Display;
 
 pub fn field_member(index: usize, field: &syn::Field) -> syn::Member {
-    if let Some(ident) = field.ident.clone() {
-        syn::Member::Named(ident)
-    } else {
-        syn::Member::Unnamed(syn::Index {
+    match &field.ident {
+        Some(ident) => syn::Member::Named(ident.clone()),
+        None => syn::Member::Unnamed(syn::Index {
             index: u32::try_from(index).expect("field index exceeds u32::MAX"),
             span: field.span(),
-        })
+        }),
+    }
+}
+
+pub fn find_attr<'a>(fields: &'a syn::Fields, name: &str) -> Option<(usize, &'a syn::Field)> {
+    fields
+        .iter()
+        .enumerate()
+        .find(|(_, field)| field.attrs.iter().any(|attr| attr.path().is_ident(name)))
+}
+
+pub fn member_ident(member: &syn::Member) -> syn::Ident {
+    match member {
+        syn::Member::Named(ident) => ident.clone(),
+        syn::Member::Unnamed(index) => format_ident!("_{}", index),
     }
 }
 

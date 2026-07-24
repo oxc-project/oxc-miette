@@ -60,6 +60,27 @@ impl Url {
         clippy::literal_string_with_formatting_args,
         reason = "this string becomes the format template emitted by the derive macro"
     )]
+    fn expand(&self, fields: &Fields, item_path: &str) -> (TokenStream, String, TokenStream) {
+        match self {
+            Url::Display(display) => {
+                let (pat, members) = display_pat_members(fields);
+                let (fmt, args) = display.expand_shorthand_cloned(&members);
+                (pat, fmt.value(), args)
+            }
+            Url::DocsRs => (
+                gen_unused_pat(fields),
+                "https://docs.rs/{crate_name}/{crate_version}/{mod_name}/{item_path}".into(),
+                quote! {
+                    ,
+                    crate_name=env!("CARGO_PKG_NAME"),
+                    crate_version=env!("CARGO_PKG_VERSION"),
+                    mod_name=env!("CARGO_PKG_NAME").replace('-', "_"),
+                    item_path=#item_path
+                },
+            ),
+        }
+    }
+
     pub(crate) fn gen_enum(
         enum_name: &syn::Ident,
         variants: &[DiagnosticDef],
@@ -68,29 +89,8 @@ impl Url {
             variants,
             WhichFn::Url,
             |ident, fields, DiagnosticConcreteArgs { url, .. }| {
-                let (pat, fmt, args) = match url.as_ref()? {
-                    // fall through to `_ => None` below
-                    Url::Display(display) => {
-                        let (display_pat, display_members) = display_pat_members(fields);
-                        let (fmt, args) = display.expand_shorthand_cloned(&display_members);
-                        (display_pat, fmt.value(), args)
-                    }
-                    Url::DocsRs => {
-                        let pat = gen_unused_pat(fields);
-                        let fmt =
-                            "https://docs.rs/{crate_name}/{crate_version}/{mod_name}/{item_path}"
-                                .into();
-                        let item_path = format!("enum.{enum_name}.html#variant.{ident}");
-                        let args = quote! {
-                            ,
-                            crate_name=env!("CARGO_PKG_NAME"),
-                            crate_version=env!("CARGO_PKG_VERSION"),
-                            mod_name=env!("CARGO_PKG_NAME").replace('-', "_"),
-                            item_path=#item_path
-                        };
-                        (pat, fmt, args)
-                    }
-                };
+                let item_path = format!("enum.{enum_name}.html#variant.{ident}");
+                let (pat, fmt, args) = url.as_ref()?.expand(fields, &item_path);
                 Some(quote! {
                     Self::#ident #pat => std::option::Option::Some(std::borrow::Cow::Owned(format!(#fmt #args))),
                 })
@@ -98,32 +98,9 @@ impl Url {
         )
     }
 
-    #[expect(
-        clippy::literal_string_with_formatting_args,
-        reason = "this string becomes the format template emitted by the derive macro"
-    )]
     pub(crate) fn gen_struct(&self, struct_name: &syn::Ident, fields: &Fields) -> TokenStream {
-        let (pat, fmt, args) = match self {
-            Url::Display(display) => {
-                let (display_pat, display_members) = display_pat_members(fields);
-                let (fmt, args) = display.expand_shorthand_cloned(&display_members);
-                (display_pat, fmt.value(), args)
-            }
-            Url::DocsRs => {
-                let pat = gen_unused_pat(fields);
-                let fmt =
-                    "https://docs.rs/{crate_name}/{crate_version}/{mod_name}/{item_path}".into();
-                let item_path = format!("struct.{struct_name}.html");
-                let args = quote! {
-                    ,
-                    crate_name=env!("CARGO_PKG_NAME"),
-                    crate_version=env!("CARGO_PKG_VERSION"),
-                    mod_name=env!("CARGO_PKG_NAME").replace('-', "_"),
-                    item_path=#item_path
-                };
-                (pat, fmt, args)
-            }
-        };
+        let item_path = format!("struct.{struct_name}.html");
+        let (pat, fmt, args) = self.expand(fields, &item_path);
         quote! {
             fn url(&self) -> std::option::Option<std::borrow::Cow<'_, str>> {
                 #[allow(unused_variables, deprecated)]
