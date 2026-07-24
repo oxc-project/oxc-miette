@@ -26,7 +26,7 @@ const BENCHMARK_FILES_REV: &str = "c61afec7dd5a66cd5ecfc57ac74cf00687a0ca39";
 /// Fixtures fetched from `benchmark-files`, spanning a range of sizes.
 const FIXTURES: &[&str] = &[
     "RadixUIAdoptionSection.jsx", // small  (~2.5 KB)
-    "kitchen-sink.tsx",           // large  (~716 KB)
+    "cal.com.tsx",                // large  (~1.0 MB)
     "cal.com.ts",                 // xlarge (~1.4 MB)
 ];
 
