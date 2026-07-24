@@ -69,6 +69,10 @@ impl NarratableReportHandler {
     /// be called by the toplevel [`ReportHandler`] handler, but is
     /// made public to make it easier (possible) to test in isolation from
     /// global state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing the rendered report fails.
     pub fn render_report(
         &self,
         f: &mut impl fmt::Write,
@@ -88,6 +92,7 @@ impl NarratableReportHandler {
         Ok(())
     }
 
+    #[expect(clippy::unused_self, reason = "kept as a renderer method for call-site consistency")]
     fn render_header(&self, f: &mut impl fmt::Write, diagnostic: &dyn Diagnostic) -> fmt::Result {
         writeln!(f, "{diagnostic}")?;
         let severity = match diagnostic.severity() {
@@ -99,6 +104,7 @@ impl NarratableReportHandler {
         Ok(())
     }
 
+    #[expect(clippy::unused_self, reason = "kept as a renderer method for call-site consistency")]
     fn render_causes(&self, f: &mut impl fmt::Write, diagnostic: &dyn Diagnostic) -> fmt::Result {
         if let Some(cause_iter) = diagnostic
             .diagnostic_source()
@@ -113,6 +119,7 @@ impl NarratableReportHandler {
         Ok(())
     }
 
+    #[expect(clippy::unused_self, reason = "kept as a renderer method for call-site consistency")]
     fn render_footer(&self, f: &mut impl fmt::Write, diagnostic: &dyn Diagnostic) -> fmt::Result {
         if let Some(help) = diagnostic.help() {
             writeln!(f, "diagnostic help: {help}")?;
@@ -140,7 +147,7 @@ impl NarratableReportHandler {
                     Some(Severity::Error) | None => write!(f, "Error: ")?,
                     Some(Severity::Warning) => write!(f, "Warning: ")?,
                     Some(Severity::Advice) => write!(f, "Advice: ")?,
-                };
+                }
                 self.render_header(f, rel)?;
                 writeln!(f)?;
                 self.render_causes(f, rel)?;
@@ -166,7 +173,7 @@ impl NarratableReportHandler {
                 if !labels.is_empty() {
                     let mut contexts: Vec<(LabeledSpan, MietteSpanContents<'_>)> =
                         Vec::with_capacity(labels.len());
-                    for right in labels.iter() {
+                    for right in &labels {
                         let right_conts = source
                             .read_span(right.inner(), self.context_lines, self.context_lines)
                             .map_err(|_| fmt::Error)?;
@@ -207,7 +214,7 @@ impl NarratableReportHandler {
                         contexts.push((right.clone(), right_conts));
                     }
                     for (_, conts) in contexts {
-                        self.render_context(f, conts, &labels[..])?;
+                        self.render_context(f, &conts, &labels[..])?;
                     }
                 }
             }
@@ -218,10 +225,10 @@ impl NarratableReportHandler {
     fn render_context(
         &self,
         f: &mut impl fmt::Write,
-        contents: MietteSpanContents<'_>,
+        contents: &MietteSpanContents<'_>,
         labels: &[LabeledSpan],
     ) -> fmt::Result {
-        let lines = self.get_lines(&contents);
+        let lines = self.get_lines(contents);
         write!(f, "Begin snippet")?;
         if let Some(filename) = contents.name() {
             write!(f, " for {filename}")?;
@@ -229,34 +236,30 @@ impl NarratableReportHandler {
         writeln!(f, " starting at line {}, column {}", contents.line() + 1, contents.column() + 1)?;
         writeln!(f)?;
         for line in &lines {
-            writeln!(f, "snippet line {}: {}", line.line_number, line.text)?;
+            writeln!(f, "snippet line {}: {}", line.number, line.text)?;
             let relevant =
-                labels.iter().filter_map(|l| line.span_attach(l.inner()).map(|a| (a, l)));
+                labels.iter().filter_map(|l| line.span_attach(*l.inner()).map(|a| (a, l)));
             for (attach, label) in relevant {
                 match attach {
                     SpanAttach::Contained { col_start, col_end } if col_start == col_end => {
-                        write!(f, "    label at line {}, column {}", line.line_number, col_start,)?;
+                        write!(f, "    label at line {}, column {}", line.number, col_start)?;
                     }
                     SpanAttach::Contained { col_start, col_end } => {
                         write!(
                             f,
                             "    label at line {}, columns {} to {}",
-                            line.line_number, col_start, col_end,
+                            line.number, col_start, col_end,
                         )?;
                     }
                     SpanAttach::Starts { col_start } => {
                         write!(
                             f,
                             "    label starting at line {}, column {}",
-                            line.line_number, col_start,
+                            line.number, col_start,
                         )?;
                     }
                     SpanAttach::Ends { col_end } => {
-                        write!(
-                            f,
-                            "    label ending at line {}, column {}",
-                            line.line_number, col_end,
-                        )?;
+                        write!(f, "    label ending at line {}, column {}", line.number, col_end)?;
                     }
                 }
                 if let Some(label) = label.label() {
@@ -272,6 +275,7 @@ impl NarratableReportHandler {
     /// produced by the `read_span` call in [`Self::render_snippets`] so the
     /// span doesn't have to be re-read (each read is a scan of the source up
     /// to the span).
+    #[expect(clippy::unused_self, reason = "kept as a renderer method for call-site consistency")]
     fn get_lines<'a>(&self, context_data: &MietteSpanContents<'a>) -> Vec<Line<'a>> {
         let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
         let mut line = context_data.line();
@@ -317,7 +321,7 @@ impl NarratableReportHandler {
             if column == 0 || iter.peek().is_none() {
                 let text_start = line_offset - base;
                 lines.push(Line {
-                    line_number: line,
+                    number: line,
                     offset: line_offset,
                     text: &context[text_start..text_start + line_len],
                     at_end_of_file,
@@ -345,7 +349,7 @@ Support types
 */
 
 struct Line<'a> {
-    line_number: usize,
+    number: usize,
     offset: usize,
     text: &'a str,
     at_end_of_file: bool,
@@ -360,16 +364,19 @@ enum SpanAttach {
 /// Returns column at offset, and nearest boundary if offset is in the middle of
 /// the character
 fn safe_get_column(text: &str, offset: usize, start: bool) -> usize {
-    let mut column = text.get(0..offset).map(UnicodeWidthStr::width).unwrap_or_else(|| {
-        let mut column = 0;
-        for (idx, c) in text.char_indices() {
-            if offset <= idx {
-                break;
+    let mut column = text.get(0..offset).map_or_else(
+        || {
+            let mut column = 0;
+            for (idx, c) in text.char_indices() {
+                if offset <= idx {
+                    break;
+                }
+                column += c.width().unwrap_or(0);
             }
-            column += c.width().unwrap_or(0);
-        }
-        column
-    });
+            column
+        },
+        UnicodeWidthStr::width,
+    );
     if start {
         // Offset are zero-based, so plus one
         column += 1;
@@ -379,7 +386,7 @@ fn safe_get_column(text: &str, offset: usize, start: bool) -> usize {
 }
 
 impl Line<'_> {
-    fn span_attach(&self, span: &SourceSpan) -> Option<SpanAttach> {
+    fn span_attach(&self, span: SourceSpan) -> Option<SpanAttach> {
         let span_offset = span.offset() as usize;
         let span_end = span_offset + span.len() as usize;
         let line_end = self.offset + self.text.len();

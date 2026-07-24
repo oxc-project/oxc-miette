@@ -5,7 +5,7 @@ NOTE: This module is taken wholesale from <https://crates.io/crates/eyre>.
 */
 use std::{error::Error as StdError, vec};
 
-use ChainState::*;
+use ChainState::{Buffered, Linked};
 
 /// Iterator of a chain of source errors.
 ///
@@ -27,12 +27,13 @@ use ChainState::*;
 /// }
 /// ```
 #[derive(Clone)]
-#[allow(missing_debug_implementations)]
+#[expect(missing_debug_implementations)]
 pub struct Chain<'a> {
     state: crate::chain::ChainState<'a>,
 }
 
 #[derive(Clone)]
+#[expect(clippy::redundant_pub_crate, reason = "prevents accidental glob re-export")]
 pub(crate) enum ChainState<'a> {
     Linked { next: Option<&'a (dyn StdError + 'static)> },
     Buffered { rest: vec::IntoIter<&'a (dyn StdError + 'static)> },

@@ -1,4 +1,8 @@
 #![cfg(feature = "fancy-no-backtrace")]
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "deterministic fuzz inputs are tightly bounded"
+)]
 //! Differential fuzz test for the graphical renderer's two span-reading paths.
 //!
 //! `render_snippets` reads each label's span either through a shared
@@ -122,7 +126,7 @@ fn buffer_and_read_span_paths_render_identically() {
                 byte
             };
             for context_lines in 0..=2 {
-                let labels: Vec<LabeledSpan> = (0..1 + rng.below(4))
+                let labels: Vec<LabeledSpan> = (0..=rng.below(4))
                     .map(|i| {
                         // One in six labels lands just past EOF, making
                         // the whole render fail; both paths must agree on

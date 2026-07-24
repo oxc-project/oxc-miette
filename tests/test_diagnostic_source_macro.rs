@@ -85,7 +85,7 @@ fn test_diagnostic_source() {
     assert!(error.diagnostic_source().is_some());
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 #[derive(Debug, miette::Diagnostic, thiserror::Error)]
 #[error("A nested error happened")]
 struct NestedError {
@@ -97,7 +97,7 @@ struct NestedError {
     the_other_err: Box<dyn Diagnostic>,
 }
 
-#[allow(unused)]
+#[expect(unused)]
 #[derive(Debug, miette::Diagnostic, thiserror::Error)]
 #[error("A multi-error happened")]
 struct MultiError {

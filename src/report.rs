@@ -12,7 +12,6 @@
 use std::{error::Error as StdError, sync::OnceLock};
 
 /// Compatibility re-export of `Report` for interop with `anyhow`
-#[allow(unreachable_pub)]
 pub use Report as Error;
 
 #[cfg(not(feature = "fancy-base"))]
@@ -32,7 +31,10 @@ pub struct Report {
     pub(crate) inner: Own<ErrorImpl<()>>,
 }
 
+// SAFETY: `Report` only exposes the erased value when its concrete type is
+// `Send + Sync`, and `Own` has exclusive ownership of the allocation.
 unsafe impl Sync for Report {}
+// SAFETY: See the `Sync` implementation above.
 unsafe impl Send for Report {}
 
 /// `ErrorHook`
@@ -57,12 +59,17 @@ impl Diagnostic for InstallError {}
 
 /**
 Set the error hook.
+
+# Errors
+
+Returns [`InstallError`] when a hook was already installed.
 */
 pub fn set_hook(hook: ErrorHook) -> Result<(), InstallError> {
     HOOK.set(hook).map_err(|_| InstallError)
 }
 
 #[track_caller]
+#[expect(clippy::redundant_pub_crate, reason = "keeps hook plumbing crate-private")]
 pub(crate) fn capture_handler(error: &(dyn Diagnostic + 'static)) -> Box<dyn ReportHandler> {
     let hook = HOOK.get_or_init(|| Box::new(get_default_printer)).as_ref();
     hook(error)
@@ -91,7 +98,8 @@ impl dyn ReportHandler {
     /// `downcast_ref`
     pub fn downcast_ref<T: ReportHandler>(&self) -> Option<&T> {
         if self.is::<T>() {
-            unsafe { Some(&*(self as *const dyn ReportHandler as *const T)) }
+            // SAFETY: `is::<T>()` proves the trait object's concrete type is `T`.
+            unsafe { Some(&*std::ptr::from_ref::<dyn ReportHandler>(self).cast::<T>()) }
         } else {
             None
         }
@@ -100,7 +108,9 @@ impl dyn ReportHandler {
     /// `downcast_mut`
     pub fn downcast_mut<T: ReportHandler>(&mut self) -> Option<&mut T> {
         if self.is::<T>() {
-            unsafe { Some(&mut *(self as *mut dyn ReportHandler as *mut T)) }
+            // SAFETY: `is::<T>()` proves the trait object's concrete type is `T`,
+            // and `&mut self` guarantees exclusive access.
+            unsafe { Some(&mut *std::ptr::from_mut::<dyn ReportHandler>(self).cast::<T>()) }
         } else {
             None
         }
@@ -139,9 +149,17 @@ pub trait ReportHandler: core::any::Any + Send + Sync {
     ///     }
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing the report fails.
     fn debug(&self, error: &dyn Diagnostic, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result;
 
     /// Override for the `Display` format
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing the report fails.
     fn display(
         &self,
         error: &(dyn StdError + 'static),
@@ -159,7 +177,7 @@ pub trait ReportHandler: core::any::Any + Send + Sync {
     }
 
     /// Store the location of the caller who constructed this error report
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     fn track_caller(&mut self, location: &'static std::panic::Location<'static>) {}
 }
 

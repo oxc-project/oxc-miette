@@ -1,3 +1,4 @@
+use std::io::Write as _;
 use std::{env, fmt::Write, mem::size_of, panic::set_hook};
 
 use backtrace::Backtrace;
@@ -14,13 +15,13 @@ pub fn set_panic_hook() {
             message = msg.to_string();
         }
         if let Some(msg) = payload.downcast_ref::<String>() {
-            message = msg.clone();
+            message.clone_from(msg);
         }
         if let Some(loc) = info.location() {
             let _ = write!(message, "\n\tat {}:{}:{}", loc.file(), loc.line(), loc.column());
         }
         let report: Report = Panic(message).into();
-        eprintln!("Error: {report:?}");
+        let _ = writeln!(std::io::stderr().lock(), "Error: {report:?}");
     }));
 }
 
@@ -80,6 +81,6 @@ impl Panic {
                 return backtrace;
             }
         }
-        "".into()
+        String::new()
     }
 }

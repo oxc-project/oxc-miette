@@ -8,7 +8,7 @@ use crate::protocol::Diagnostic;
 
 /// Iterator of a chain of cause errors.
 #[derive(Clone, Default)]
-#[allow(missing_debug_implementations)]
+#[expect(clippy::redundant_pub_crate, reason = "keeps this implementation type crate-private")]
 pub(crate) struct DiagnosticChain<'a> {
     state: Option<ErrorKind<'a>>,
 }
@@ -55,6 +55,7 @@ impl ExactSizeIterator for DiagnosticChain<'_> {
 }
 
 #[derive(Clone)]
+#[expect(clippy::redundant_pub_crate, reason = "keeps this implementation type crate-private")]
 pub(crate) enum ErrorKind<'a> {
     Diagnostic(&'a dyn Diagnostic),
     StdError(&'a (dyn std::error::Error + 'static)),

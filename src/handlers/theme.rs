@@ -184,7 +184,7 @@ impl ThemeStyles {
 
 /// Characters to be used when drawing when using
 /// [`GraphicalReportHandler`](crate::GraphicalReportHandler).
-#[allow(missing_docs)]
+#[expect(missing_docs)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ThemeCharacters {
     pub hbar: char,

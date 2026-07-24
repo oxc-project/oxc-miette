@@ -29,6 +29,11 @@ impl DebugReportHandler {
     /// Render a [`Diagnostic`]. This function is mostly internal and meant to
     /// be called by the toplevel [`ReportHandler`] handler, but is made public
     /// to make it easier (possible) to test in isolation from global state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing the rendered report fails.
+    #[expect(clippy::unused_self, reason = "kept as a method for consistency with other handlers")]
     pub fn render_report(
         &self,
         f: &mut fmt::Formatter<'_>,

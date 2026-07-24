@@ -44,7 +44,7 @@ pub enum WhichFn {
 }
 
 impl WhichFn {
-    pub fn method_call(&self) -> TokenStream {
+    pub fn method_call(self) -> TokenStream {
         match self {
             Self::Code => quote! { code() },
             Self::Help => quote! { help() },
@@ -57,7 +57,7 @@ impl WhichFn {
         }
     }
 
-    pub fn signature(&self) -> TokenStream {
+    pub fn signature(self) -> TokenStream {
         match self {
             Self::Code => quote! {
                 fn code(&self) -> std::option::Option<std::borrow::Cow<'_, str>>
@@ -86,7 +86,7 @@ impl WhichFn {
         }
     }
 
-    pub fn catchall_arm(&self) -> TokenStream {
+    pub fn catchall_arm(self) -> TokenStream {
         match self {
             Self::Labels => quote! { _ => miette::Labels::None },
             Self::Related => quote! { _ => miette::Related::None },
@@ -119,7 +119,7 @@ impl Forward {
                 }
                 Ok(Self::Unnamed(0))
             }
-            _ => Err(syn::Error::new(
+            syn::Fields::Unit => Err(syn::Error::new(
                 fields.span(),
                 "you cannot use #[diagnostic(transparent)] with a unit struct or a unit variant",
             )),

@@ -26,7 +26,7 @@ struct Underline {
     left: usize,
     marker: char,
     right: usize,
-    underline: char,
+    line: char,
 }
 
 const CHUNK_CHARS: usize = 64;
@@ -71,15 +71,15 @@ impl fmt::Display for Underline {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Built-in themes repeat these characters frequently, so emit them in chunks.
         // Preserve the original character loop for custom themes.
-        let Some((underline_chunk, char_len)) = (match self.underline {
+        let Some((underline_chunk, char_len)) = (match self.line {
             '─' => Some((UNICODE_BARS, '─'.len_utf8())),
             '^' => Some((ASCII_CARETS, 1)),
             _ => None,
         }) else {
             write_repeated_char(f, ' ', self.padding)?;
-            write_repeated_char(f, self.underline, self.left)?;
+            write_repeated_char(f, self.line, self.left)?;
             f.write_char(self.marker)?;
-            return write_repeated_char(f, self.underline, self.right);
+            return write_repeated_char(f, self.line, self.right);
         };
 
         write_repeated_chunk(f, SPACES, 1, self.padding)?;
@@ -126,7 +126,7 @@ impl GraphicalReportHandler {
 
         let chars = &self.theme.characters;
         let mut vbar_offsets = Vec::with_capacity(single_liners.len());
-        for hl in single_liners {
+        for &hl in single_liners {
             let byte_start = hl.offset();
             let byte_end = hl.offset() + hl.len();
             let start = self.visual_offset(line, byte_start, true).max(highest);
@@ -136,7 +136,7 @@ impl GraphicalReportHandler {
                 self.visual_offset(line, byte_end, false).max(start + 1)
             };
 
-            let vbar_offset = (start + end) / 2;
+            let vbar_offset = usize::midpoint(start, end);
             let num_left = vbar_offset - start;
             let num_right = end - vbar_offset - 1;
             // Throws `Formatting argument out of range` when width is above u16::MAX.
@@ -156,7 +156,7 @@ impl GraphicalReportHandler {
                     left: num_left,
                     marker,
                     right: num_right,
-                    underline: chars.underline,
+                    line: chars.underline,
                 }
                 .style(hl.style)
             )?;
@@ -165,7 +165,7 @@ impl GraphicalReportHandler {
         }
         f.write_char('\n')?;
 
-        for hl in single_liners.iter().rev() {
+        for &hl in single_liners.iter().rev() {
             if let Some(label) = hl.label() {
                 let mut lines = label.split('\n');
                 let first = lines.next().expect("split always yields at least one item");
@@ -229,7 +229,7 @@ impl GraphicalReportHandler {
 
     // I know it's not good practice, but making this a function makes a lot of sense
     // and making a struct for this does not...
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn write_label_text(
         &self,
         f: &mut impl fmt::Write,
@@ -238,8 +238,8 @@ impl GraphicalReportHandler {
         max_gutter: usize,
         all_highlights: &[FancySpan],
         chars: &ThemeCharacters,
-        vbar_offsets: &[(&&FancySpan, usize)],
-        hl: &&FancySpan,
+        vbar_offsets: &[(&FancySpan, usize)],
+        hl: &FancySpan,
         label: &str,
         render_mode: LabelRenderMode,
     ) -> fmt::Result {
@@ -256,14 +256,13 @@ impl GraphicalReportHandler {
             let padding = (*vbar_offset + 1).saturating_sub(curr_offset);
             write_padding(f, padding)?;
             curr_offset += padding;
-            if *offset_hl != hl {
-                write!(f, "{}", chars.vbar.style(offset_hl.style))?;
-                curr_offset += 1;
-            } else {
+            if *offset_hl == hl {
                 let line = LabelText { chars, label, style: hl.style, render_mode };
                 writeln!(f, "{}", line.style(hl.style))?;
                 break;
             }
+            write!(f, "{}", chars.vbar.style(offset_hl.style))?;
+            curr_offset += 1;
         }
         Ok(())
     }

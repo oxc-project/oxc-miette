@@ -1,4 +1,11 @@
 #![cfg(all(feature = "fancy-no-backtrace", not(miri)))]
+#![expect(
+    clippy::cast_possible_truncation,
+    clippy::needless_pass_by_value,
+    clippy::print_stdout,
+    clippy::unnecessary_wraps,
+    reason = "snapshot fixtures use bounded spans and optional debug output"
+)]
 
 use miette::{
     Diagnostic, GraphicalReportHandler, GraphicalTheme, MietteError, NamedSource,
@@ -34,7 +41,7 @@ fn fmt_report(diag: Report) -> String {
             .with_width(80)
             .render_report(&mut out, diag.as_ref())
             .unwrap();
-    };
+    }
     out
 }
 
@@ -48,7 +55,7 @@ fn fmt_report_with_settings(
 
     handler.render_report(&mut out, diag.as_ref()).unwrap();
 
-    println!("Error:\n```\n{}\n```", out);
+    println!("Error:\n```\n{out}\n```");
 
     out
 }
@@ -414,10 +421,10 @@ fn empty_source() -> Result<(), MietteError> {
         highlight: SourceSpan,
     }
 
-    let src = "".to_string();
+    let src = String::new();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (0, 0).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     // For an empty string, the label cannot be rendered.
     insta::assert_snapshot!(out, @"
 
@@ -457,7 +464,7 @@ b
         small: (14, 1).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
 
     insta::assert_snapshot!(out, @r#"
 
@@ -488,7 +495,7 @@ fn single_line_highlight_span_full_line() {
     }
     let err = MyBad { src: NamedSource::new("issue", "source\ntext"), bad_bit: (7, 4).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
 
     insta::assert_snapshot!(out, @"
 
@@ -517,7 +524,7 @@ fn single_line_with_wide_char() -> Result<(), MietteError> {
     let src = "source\n  👼🏼text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (13, 8).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -551,7 +558,7 @@ fn single_line_with_two_tabs() -> Result<(), MietteError> {
     let src = "source\n\t\ttext\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -585,7 +592,7 @@ fn single_line_with_tab_in_middle() -> Result<(), MietteError> {
     let src = "source\ntext =\ttext\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (14, 4).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -616,7 +623,7 @@ fn single_line_highlight() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -646,7 +653,7 @@ fn external_source() -> Result<(), MietteError> {
     let err = Report::from(MyBad { highlight: (9, 4).into() })
         .with_source_code(NamedSource::new("bad_file.rs", src));
     let out = fmt_report(err);
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -677,7 +684,7 @@ fn single_line_highlight_offset_zero() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (0, 0).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -707,7 +714,7 @@ fn single_line_highlight_offset_end_of_line() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (6, 0).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -737,7 +744,7 @@ fn single_line_highlight_include_end_of_line() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 5).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -768,7 +775,7 @@ fn single_line_highlight_include_end_of_line_crlf() -> Result<(), MietteError> {
     let src = "source\r\n  text\r\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (10, 6).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -799,7 +806,7 @@ fn single_line_highlight_with_empty_span() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 0).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -830,7 +837,7 @@ fn single_line_highlight_no_label() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 4).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -860,7 +867,7 @@ fn single_line_highlight_at_line_start() -> Result<(), MietteError> {
     let src = "source\ntext\n  here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (7, 4).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -891,7 +898,7 @@ fn multiline_label() -> Result<(), MietteError> {
     let src = "source\ntext\n  here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (7, 4).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -934,7 +941,7 @@ fn multiple_multi_line_labels() -> Result<(), MietteError> {
         highlight3: (24, 4).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -979,7 +986,7 @@ fn multiple_same_line_highlights() -> Result<(), MietteError> {
         highlight3: (24, 4).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1024,7 +1031,7 @@ fn multiple_same_line_highlights_with_tabs_in_middle() -> Result<(), MietteError
         highlight3: (24, 4).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1057,7 +1064,7 @@ fn multiline_highlight_adjacent() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 11).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1087,7 +1094,7 @@ fn multiline_highlight_multiline_label() -> Result<(), MietteError> {
     let src = "source\n  text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 11).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1117,12 +1124,12 @@ fn multiline_highlight_flyby() -> Result<(), MietteError> {
         highlight2: SourceSpan,
     }
 
-    let src = r#"line1
+    let src = r"line1
 line2
 line3
 line4
 line5
-"#
+"
     .to_string();
     let len = src.len() as u32;
     let err = MyBad {
@@ -1131,7 +1138,7 @@ line5
         highlight2: (10, 9).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1175,12 +1182,12 @@ fn multiline_highlight_no_label() -> Result<(), MietteError> {
     #[error("very much went wrong")]
     struct InnerInner;
 
-    let src = r#"line1
+    let src = r"line1
 line2
 line3
 line4
 line5
-"#
+"
     .to_string();
     let len = src.len() as u32;
     let err = MyBad {
@@ -1190,7 +1197,7 @@ line5
         highlight2: (10, 9).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: wtf?!
@@ -1229,7 +1236,7 @@ fn multiple_multiline_highlights_adjacent() -> Result<(), MietteError> {
         highlight2: (20, 6).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1249,7 +1256,7 @@ fn multiple_multiline_highlights_adjacent() -> Result<(), MietteError> {
 #[test]
 // TODO: This breaks because those highlights aren't "truly" overlapping (in absolute byte offset),
 // but they ARE overlapping in lines. Need to detect the latter case better
-#[ignore]
+#[ignore = "known overlapping highlight rendering failure"]
 /// Lines are overlapping, but the offsets themselves aren't, so they _look_
 /// disjunct if you only look at offsets.
 fn multiple_multiline_highlights_overlapping_lines() -> Result<(), MietteError> {
@@ -1272,14 +1279,14 @@ fn multiple_multiline_highlights_overlapping_lines() -> Result<(), MietteError> 
         highlight2: (9, 10).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     assert_eq!("Error [oops::my::bad]: oops!\n\n[bad_file.rs] This is the part that broke:\n\n 1 │ source\n 2 │   text\n   ·   ──┬─\n   ·     ╰── this bit here\n 3 │     here\n\n﹦ try doing it better next time?\n".to_string(), out);
     Ok(())
 }
 
 #[test]
 /// Offsets themselves are overlapping, regardless of lines.
-#[ignore]
+#[ignore = "known overlapping highlight rendering failure"]
 fn multiple_multiline_highlights_overlapping_offsets() -> Result<(), MietteError> {
     #[derive(Debug, Diagnostic, Error)]
     #[error("oops!")]
@@ -1300,7 +1307,7 @@ fn multiple_multiline_highlights_overlapping_offsets() -> Result<(), MietteError
         highlight2: (10, 10).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     assert_eq!("Error [oops::my::bad]: oops!\n\n[bad_file.rs] This is the part that broke:\n\n 1 │ source\n 2 │   text\n   ·   ──┬─\n   ·     ╰── this bit here\n 3 │     here\n\n﹦ try doing it better next time?\n".to_string(), out);
     Ok(())
 }
@@ -1318,7 +1325,7 @@ fn url_links() -> Result<(), MietteError> {
     struct MyBad;
     let err = MyBad;
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     assert!(out.contains("https://example.com"));
     assert!(out.contains("(link)"));
     assert!(out.contains("oops::my::bad"));
@@ -1334,7 +1341,7 @@ fn url_links_no_code() -> Result<(), MietteError> {
     struct MyBad;
     let err = MyBad;
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     assert!(out.contains("https://example.com"));
     assert!(out.contains("(link)"));
     Ok(())
@@ -1354,7 +1361,7 @@ fn disable_url_links() -> Result<(), MietteError> {
     let err = MyBad;
     let mut out = String::new();
     handler().with_links(false).render_report(&mut out, &err).unwrap();
-    println!("Error: {}", out);
+    println!("Error: {out}");
     assert!(out.contains("https://example.com"));
     assert!(!out.contains("(link)"));
     assert!(out.contains("oops::my::bad"));
@@ -1377,7 +1384,7 @@ fn url_links_with_display_text() -> Result<(), MietteError> {
         handler.with_link_display_text("Read the documentation")
     });
 
-    println!("Error: {}", out);
+    println!("Error: {out}");
     assert!(out.contains("https://example.com"));
     assert!(out.contains("Read the documentation"));
     assert!(out.contains("oops::my::bad"));
@@ -1409,7 +1416,7 @@ fn related() -> Result<(), MietteError> {
         }],
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
       × oops::my::bad: oops!
@@ -1465,7 +1472,7 @@ fn related_source_code_propagation() -> Result<(), MietteError> {
         related: vec![InnerError { highlight: (0, 6).into() }],
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
       × oops::my::bad: oops!
@@ -1567,7 +1574,7 @@ fn related_severity() -> Result<(), MietteError> {
         ],
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
       × oops::my::bad: oops!
@@ -1630,7 +1637,7 @@ fn zero_length_eol_span() {
         bad_bit: (23, 0).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
 
     insta::assert_snapshot!(out, @"
 
@@ -1662,7 +1669,7 @@ fn primary_label() {
         second_label: (24, 4).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
 
     // line 2 should be the primary, not line 1
     insta::assert_snapshot!(out, @"
@@ -1693,7 +1700,7 @@ fn single_line_with_wide_char_unaligned_span_start() -> Result<(), MietteError> 
     let src = "source\n  👼🏼text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (10, 5).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1724,7 +1731,7 @@ fn single_line_with_wide_char_unaligned_span_end() -> Result<(), MietteError> {
     let src = "source\n  text 👼🏼\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (9, 6).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1755,7 +1762,7 @@ fn single_line_with_wide_char_unaligned_span_empty() -> Result<(), MietteError> 
     let src = "source\n  👼🏼text\n    here".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight: (10, 0).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1795,7 +1802,7 @@ fn triple_adjacent_highlight() -> Result<(), MietteError> {
         highlight3: (22, 4).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1840,7 +1847,7 @@ fn non_adjacent_highlight() -> Result<(), MietteError> {
         highlight2: (12, 4).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::bad: oops!
@@ -1877,7 +1884,7 @@ fn invalid_span_bad_offset() -> Result<(), MietteError> {
     let src = "blabla blibli".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight1: (50, 6).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @r#"
     oops::my::bad
 
@@ -1904,7 +1911,7 @@ fn invalid_span_bad_length() -> Result<(), MietteError> {
     let src = "blabla blibli".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight1: (0, 50).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @r#"
     oops::my::bad
 
@@ -1931,7 +1938,7 @@ fn invalid_span_no_label() -> Result<(), MietteError> {
     let src = "blabla blibli".to_string();
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight1: (50, 6).into() };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @r#"
     oops::my::bad
 
@@ -1964,7 +1971,7 @@ fn invalid_span_2nd_label() -> Result<(), MietteError> {
         highlight2: (50, 6).into(),
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @r#"
     oops::my::bad
 
@@ -2010,7 +2017,7 @@ fn invalid_span_inner() -> Result<(), MietteError> {
         },
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @"
 
      × oops::my::outer: oops outside!
@@ -2060,7 +2067,7 @@ fn invalid_span_related() -> Result<(), MietteError> {
         }],
     };
     let out = fmt_report(err.into());
-    println!("Error: {}", out);
+    println!("Error: {out}");
     insta::assert_snapshot!(out, @r#"
     oops::my::outer
 

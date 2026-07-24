@@ -183,7 +183,7 @@ mod debug_handler_tests {
         let diag = MietteDiagnostic::new("test message").with_note("test note");
 
         let mut out = String::new();
-        write!(&mut out, "{:?}", diag).unwrap();
+        write!(&mut out, "{diag:?}").unwrap();
 
         assert!(out.contains("note"));
         assert!(out.contains("test note"));
@@ -194,7 +194,7 @@ mod debug_handler_tests {
         let diag = MietteDiagnostic::new("test message");
 
         let mut out = String::new();
-        write!(&mut out, "{:?}", diag).unwrap();
+        write!(&mut out, "{diag:?}").unwrap();
 
         assert!(out.contains("test message"));
     }
@@ -204,7 +204,7 @@ mod debug_handler_tests {
         let diag = MietteDiagnostic::new("message").with_help("help text").with_note("note text");
 
         let mut out = String::new();
-        write!(&mut out, "{:?}", diag).unwrap();
+        write!(&mut out, "{diag:?}").unwrap();
 
         assert!(out.contains("help"));
         assert!(out.contains("help text"));

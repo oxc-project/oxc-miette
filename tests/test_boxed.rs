@@ -1,3 +1,9 @@
+#![expect(
+    clippy::cast_possible_truncation,
+    clippy::unused_self,
+    reason = "test fixtures preserve trait method shape and use bounded spans"
+)]
+
 use std::{error::Error as StdError, io};
 
 use miette::{Diagnostic, LabeledSpan, Report, SourceSpan, SpanContents, miette};

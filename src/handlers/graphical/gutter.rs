@@ -153,11 +153,7 @@ impl GraphicalReportHandler {
                                 num_repeat
                                     // if we are rendering a multiline label, then leave a bit of space for the
                                     // rcross character
-                                    - if render_mode == LabelRenderMode::BlockFirst {
-                                        1
-                                    } else {
-                                        0
-                                    },
+                                    - usize::from(render_mode == LabelRenderMode::BlockFirst),
                             )
                             .style(hl.style)
                     )?;
@@ -169,13 +165,12 @@ impl GraphicalReportHandler {
                     gutter_cols += num_repeat + 1;
                 }
                 break;
-            } else {
-                write!(gutter, "{}", chars.vbar.style(hl.style))?;
-
-                // we may push many bytes for the ansi escape codes style adds,
-                // but we still only add a single character-width to the string in a terminal
-                gutter_cols += 1;
             }
+            write!(gutter, "{}", chars.vbar.style(hl.style))?;
+
+            // we may push many bytes for the ansi escape codes style adds,
+            // but we still only add a single character-width to the string in a terminal
+            gutter_cols += 1;
         }
 
         // now calculate how many spaces to add based on how many columns we just created.

@@ -28,10 +28,7 @@ impl GraphicalReportHandler {
         diagnostic: &dyn Diagnostic,
         opt_source: Option<&dyn SourceCode>,
     ) -> fmt::Result {
-        let source = match opt_source {
-            Some(source) => source,
-            None => return Ok(()),
-        };
+        let Some(source) = opt_source else { return Ok(()) };
         let mut labels = diagnostic.labels();
         if labels.is_empty() {
             return Ok(());
@@ -48,7 +45,7 @@ impl GraphicalReportHandler {
             .map(|bytes| SpanScanner::new(bytes, self.context_lines, self.context_lines));
         let source_name = source.name();
         let mut read = |span: &SourceSpan| match scanner.as_mut() {
-            Some(scanner) => scanner.read_span(span).map(|contents| match source_name {
+            Some(scanner) => scanner.read_span(*span).map(|contents| match source_name {
                 Some(name) => MietteSpanContents::new_named(
                     Cow::Borrowed(name),
                     contents.data(),
@@ -63,7 +60,7 @@ impl GraphicalReportHandler {
         };
 
         let mut contexts: Vec<(Cow<'_, LabeledSpan>, _)> = Vec::with_capacity(labels.len());
-        for right in labels.iter() {
+        for right in &labels {
             let right_conts = read(right.inner()).map_err(|_| fmt::Error)?;
 
             if contexts.is_empty() {
@@ -94,7 +91,7 @@ impl GraphicalReportHandler {
             contexts.push((Cow::Borrowed(right), right_conts));
         }
         for (ctx, conts) in contexts {
-            self.render_context(f, &ctx, conts, &labels[..])?;
+            self.render_context(f, &ctx, &conts, &labels[..])?;
         }
 
         Ok(())
@@ -104,10 +101,10 @@ impl GraphicalReportHandler {
         &self,
         f: &mut impl fmt::Write,
         context: &LabeledSpan,
-        contents: MietteSpanContents<'_>,
+        contents: &MietteSpanContents<'_>,
         labels: &[LabeledSpan],
     ) -> fmt::Result {
-        let lines = self.get_lines(&contents);
+        let lines = self.get_lines(contents);
 
         // only consider labels from the context as primary label
         let ctx_labels = labels.iter().filter(|l| {
@@ -121,7 +118,7 @@ impl GraphicalReportHandler {
         // sorting is your friend
         let labels = labels
             .iter()
-            .zip(self.theme.styles.highlights.iter().cloned().cycle())
+            .zip(self.theme.styles.highlights.iter().copied().cycle())
             .map(|(label, st)| FancySpan::new(label.label(), *label.inner(), st))
             .collect::<Vec<_>>();
 
@@ -141,13 +138,7 @@ impl GraphicalReportHandler {
 
         // Oh and one more thing: We need to figure out how much room our line
         // numbers need!
-        let linum_width = lines[..]
-            .last()
-            .map(|line| line.line_number)
-            // It's possible for the source to be an empty string.
-            .unwrap_or(0)
-            .to_string()
-            .len();
+        let linum_width = lines[..].last().map_or(0, |line| line.number).to_string().len();
 
         // Header
         write!(
@@ -188,7 +179,7 @@ impl GraphicalReportHandler {
         // Now it's time for the fun part--actually rendering everything!
         for line in &lines {
             // Line number, appropriately padded.
-            self.write_linum(f, linum_width, line.line_number)?;
+            self.write_linum(f, linum_width, line.number)?;
 
             // Then, we need to print the gutter, along with any fly-bys We
             // have separate gutters depending on whether we're on the actual

@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
+use rustc_hash::FxHashSet;
 use syn::spanned::Spanned;
 
 use crate::{
@@ -7,7 +8,7 @@ use crate::{
     forward::WhichFn,
 };
 
-pub(crate) fn gen_all_variants_with(
+pub fn gen_all_variants_with(
     variants: &[DiagnosticDef],
     which_fn: WhichFn,
     mut f: impl FnMut(&syn::Ident, &syn::Fields, &DiagnosticConcreteArgs) -> Option<TokenStream>,
@@ -36,11 +37,20 @@ pub(crate) fn gen_all_variants_with(
     })
 }
 
-use std::collections::HashSet;
-
 use crate::fmt::Display;
 
-pub(crate) fn gen_unused_pat(fields: &syn::Fields) -> TokenStream {
+pub fn field_member(index: usize, field: &syn::Field) -> syn::Member {
+    if let Some(ident) = field.ident.clone() {
+        syn::Member::Named(ident)
+    } else {
+        syn::Member::Unnamed(syn::Index {
+            index: u32::try_from(index).expect("field index exceeds u32::MAX"),
+            span: field.span(),
+        })
+    }
+}
+
+pub fn gen_unused_pat(fields: &syn::Fields) -> TokenStream {
     match fields {
         syn::Fields::Named(_) => quote! { { .. } },
         syn::Fields::Unnamed(_) => quote! { ( .. ) },
@@ -54,7 +64,7 @@ fn gen_fields_pat(fields: &syn::Fields) -> TokenStream {
     let member_idents = fields
         .iter()
         .enumerate()
-        .map(|(i, field)| field.ident.as_ref().cloned().unwrap_or_else(|| format_ident!("_{}", i)));
+        .map(|(i, field)| field.ident.clone().unwrap_or_else(|| format_ident!("_{}", i)));
     match fields {
         syn::Fields::Named(_) => quote! {
             { #(#member_idents),* }
@@ -69,19 +79,9 @@ fn gen_fields_pat(fields: &syn::Fields) -> TokenStream {
 /// The returned tokens go in the slot `let Self #pat = self;` or `match self {
 /// Self #pat => ... }`. The members can be passed to
 /// `Display::expand_shorthand[_cloned]`.
-pub(crate) fn display_pat_members(fields: &syn::Fields) -> (TokenStream, HashSet<syn::Member>) {
+pub fn display_pat_members(fields: &syn::Fields) -> (TokenStream, FxHashSet<syn::Member>) {
     let pat = gen_fields_pat(fields);
-    let members: HashSet<syn::Member> = fields
-        .iter()
-        .enumerate()
-        .map(|(i, field)| {
-            if let Some(ident) = field.ident.as_ref().cloned() {
-                syn::Member::Named(ident)
-            } else {
-                syn::Member::Unnamed(syn::Index { index: i as u32, span: field.span() })
-            }
-        })
-        .collect();
+    let members = fields.iter().enumerate().map(|(i, field)| field_member(i, field)).collect();
     (pat, members)
 }
 
@@ -90,11 +90,11 @@ impl Display {
     /// without tokens in between, i.e. `format!(#fmt #args)`.
     pub(crate) fn expand_shorthand_cloned(
         &self,
-        members: &HashSet<syn::Member>,
+        members: &FxHashSet<syn::Member>,
     ) -> (syn::LitStr, TokenStream) {
         let mut display = self.clone();
         display.expand_shorthand(members);
-        let Display { fmt, args, .. } = display;
+        let Display { fmt, args } = display;
         (fmt, args)
     }
 }

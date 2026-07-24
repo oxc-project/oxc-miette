@@ -6,6 +6,7 @@ use std::{marker::PhantomData, ptr::NonNull};
 
 #[repr(transparent)]
 /// A raw pointer that owns its pointee
+#[expect(clippy::redundant_pub_crate, reason = "keeps pointer internals crate-private")]
 pub(crate) struct Own<T>
 where
     T: ?Sized,
@@ -13,8 +14,10 @@ where
     pub(crate) ptr: NonNull<T>,
 }
 
-unsafe impl<T> Send for Own<T> where T: ?Sized {}
-unsafe impl<T> Sync for Own<T> where T: ?Sized {}
+// SAFETY: `Own` has exclusive ownership and only transfers a `Send` pointee.
+unsafe impl<T> Send for Own<T> where T: ?Sized + Send {}
+// SAFETY: Shared access through `Own` is safe only when the pointee is `Sync`.
+unsafe impl<T> Sync for Own<T> where T: ?Sized + Sync {}
 
 impl<T> Copy for Own<T> where T: ?Sized {}
 
@@ -32,7 +35,7 @@ where
     T: ?Sized,
 {
     pub(crate) fn new(ptr: Box<T>) -> Self {
-        Own { ptr: unsafe { NonNull::new_unchecked(Box::into_raw(ptr)) } }
+        Own { ptr: NonNull::from(Box::leak(ptr)) }
     }
 
     pub(crate) fn cast<U: CastTo>(self) -> Own<U::Target> {
@@ -40,6 +43,8 @@ where
     }
 
     pub(crate) unsafe fn boxed(self) -> Box<T> {
+        // SAFETY: `Own` was constructed from a `Box` and still uniquely owns
+        // the same allocation.
         unsafe { Box::from_raw(self.ptr.as_ptr()) }
     }
 
@@ -52,9 +57,9 @@ where
     }
 }
 
-#[allow(explicit_outlives_requirements)]
 #[repr(transparent)]
 /// A raw pointer that represents a shared borrow of its pointee
+#[expect(clippy::redundant_pub_crate, reason = "keeps pointer internals crate-private")]
 pub(crate) struct Ref<'a, T>
 where
     T: ?Sized,
@@ -95,17 +100,18 @@ where
     }
 
     pub(crate) const fn as_ptr(self) -> *const T {
-        self.ptr.as_ptr() as *const T
+        self.ptr.as_ptr().cast_const()
     }
 
     pub(crate) unsafe fn deref(self) -> &'a T {
+        // SAFETY: The caller guarantees the pointer remains valid for `'a`.
         unsafe { &*self.ptr.as_ptr() }
     }
 }
 
-#[allow(explicit_outlives_requirements)]
 #[repr(transparent)]
 /// A raw pointer that represents a unique borrow of its pointee
+#[expect(clippy::redundant_pub_crate, reason = "keeps pointer internals crate-private")]
 pub(crate) struct Mut<'a, T>
 where
     T: ?Sized,
@@ -142,16 +148,21 @@ where
     }
 
     pub(crate) unsafe fn deref_mut(self) -> &'a mut T {
+        // SAFETY: The caller guarantees exclusive access to a valid pointee
+        // for `'a`.
         unsafe { &mut *self.ptr.as_ptr() }
     }
 }
 
 impl<T> Mut<'_, T> {
     pub(crate) unsafe fn read(self) -> T {
+        // SAFETY: The caller guarantees the pointer is valid for reads and
+        // transfers ownership of the pointee.
         unsafe { self.ptr.as_ptr().read() }
     }
 }
 
+#[expect(clippy::redundant_pub_crate, reason = "keeps pointer internals crate-private")]
 pub(crate) trait CastTo {
     type Target;
 }

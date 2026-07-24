@@ -20,6 +20,10 @@ impl GraphicalReportHandler {
     /// be called by the toplevel [`ReportHandler`](crate::ReportHandler)
     /// handler, but is made public to make it easier (possible) to test in
     /// isolation from global state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing the rendered report fails.
     pub fn render_report(
         &self,
         f: &mut impl fmt::Write,
@@ -54,7 +58,7 @@ impl GraphicalReportHandler {
                 Some(code) => {
                     format!("{code} ")
                 }
-                _ => "".to_string(),
+                _ => String::new(),
             };
             let display_text = self.link_display_text.as_deref().unwrap_or("(link)");
             let link = format!(
@@ -67,7 +71,7 @@ impl GraphicalReportHandler {
             writeln!(f, "{header}")?;
             writeln!(f)?;
         } else if let Some(code) = diagnostic.code() {
-            write!(header, "{}", code.style(severity_style),)?;
+            write!(header, "{}", code.style(severity_style))?;
             if self.links == LinkStyle::Text && diagnostic.url().is_some() {
                 let url = diagnostic.url().unwrap(); // safe
                 write!(header, " ({})", url.style(self.theme.styles.link))?;
@@ -104,7 +108,7 @@ impl GraphicalReportHandler {
                 const END: &str = "\u{1b}]8;;\u{1b}\\";
                 let code = code.style(severity_style);
                 let title = diagnostic.style(severity_style);
-                format!("{CTL}{url}\u{1b}\\{code}{END}: {title}",)
+                format!("{CTL}{url}\u{1b}\\{code}{END}: {title}")
             }
             (_, _, Some(code)) if severity_style.is_plain() => format!("{code}: {diagnostic}"),
             (_, _, Some(code)) => {
@@ -154,7 +158,7 @@ impl GraphicalReportHandler {
                     Some(Severity::Error) | None => write!(f, "Error: ")?,
                     Some(Severity::Warning) => write!(f, "Warning: ")?,
                     Some(Severity::Advice) => write!(f, "Advice: ")?,
-                };
+                }
                 inner_renderer.render_header(f, rel)?;
                 inner_renderer.render_causes(f, rel)?;
                 let src = rel.source_code().or(parent_src);

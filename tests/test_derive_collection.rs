@@ -115,6 +115,7 @@ fn attr_collection_as_linked_list() {
         #[label("this bit here")]
         highlight: SourceSpan,
         #[label(collection, "and here")]
+        #[expect(clippy::linkedlist, reason = "verifies support for non-Vec collections")]
         highlight2: LinkedList<SourceSpan>,
     }
 

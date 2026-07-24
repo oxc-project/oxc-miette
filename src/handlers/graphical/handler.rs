@@ -45,6 +45,7 @@ pub struct GraphicalReportHandler {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(clippy::redundant_pub_crate, reason = "prevents accidental glob re-export")]
 pub(crate) enum LinkStyle {
     Link,
     Text,
