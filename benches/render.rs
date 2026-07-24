@@ -1,24 +1,23 @@
 //! Benchmarks for miette's diagnostic rendering pipeline.
 //!
 //! These mirror how oxc actually consumes this crate: oxlint and oxfmt build a
-//! `GraphicalReportHandler` (via [`GraphicalReportHandler::new`], i.e. a 400
-//! column width and a single context line) and call
-//! [`GraphicalReportHandler::render_report`] once per diagnostic. A typical
-//! diagnostic is a single-label `Warning` carrying a rule code and a help line,
-//! pointing somewhere into a source file.
+//! [`GraphicalReportHandler`] with its 400-column width and single context line,
+//! attach an `Arc<NamedSource<_>>` to each diagnostic, and call
+//! [`GraphicalReportHandler::render_report`]. The cases below match common
+//! `OxcDiagnostic` shapes emitted by oxlint's `no-unused-vars` rule.
 //!
 //! The fixtures are real-world TypeScript/JSX files pulled from
 //! <https://github.com/oxc-project/benchmark-files> (pinned to a fixed
 //! revision). They are downloaded once and cached under `target/` so that
 //! neither the repository nor the published crate carries multi-megabyte blobs.
 
-use std::{fs, path::PathBuf, time::Duration};
+use std::{fs, path::PathBuf, sync::Arc, time::Duration};
 
 use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use miette::{
-    Diagnostic, GraphicalReportHandler, GraphicalTheme, NamedSource, SourceCode, SourceSpan,
+    Error, GraphicalReportHandler, GraphicalTheme, LabeledSpan, MietteDiagnostic, NamedSource,
+    Severity, SourceCode, SourceSpan,
 };
-use thiserror::Error;
 
 /// Pinned revision of <https://github.com/oxc-project/benchmark-files>, so the
 /// inputs (and therefore CodSpeed instruction counts) stay reproducible.
@@ -27,69 +26,42 @@ const BENCHMARK_FILES_REV: &str = "c61afec7dd5a66cd5ecfc57ac74cf00687a0ca39";
 /// Fixtures fetched from `benchmark-files`, spanning a range of sizes.
 const FIXTURES: &[&str] = &[
     "RadixUIAdoptionSection.jsx", // small  (~2.5 KB)
-    "kitchen-sink.tsx",           // large  (~716 KB)
+    "cal.com.tsx",                // large  (~1.0 MB)
     "cal.com.ts",                 // xlarge (~1.4 MB)
 ];
 
-/// A label is placed this fraction of the way through each file — near the end,
-/// to exercise the full forward scan miette performs to locate a span's line and
-/// column.
+/// Labels are placed near the end of each file to exercise the forward scan
+/// miette performs to locate a span's line and column.
 const SPAN_FRACTION: f64 = 0.9;
-/// Byte length of the benchmarked label span.
-const SPAN_LEN: usize = 8;
+/// Distance between the declaration and assignment labels.
+const RELATED_SPAN_DELTA: usize = 250;
 
 struct Fixture {
     name: &'static str,
-    source: String,
-    span: SourceSpan,
+    source: Arc<NamedSource<String>>,
+    source_len: usize,
+    declaration_span: SourceSpan,
+    assignment_span: SourceSpan,
 }
 
-/// A single-label warning with a code and help text — the shape of the vast
-/// majority of `OxcDiagnostic`s emitted by oxlint.
-#[derive(Debug, Diagnostic, Error)]
-#[error("'resolve' is assigned a value but never used")]
-#[diagnostic(
-    severity = "Warning",
-    code = "eslint(no-unused-vars)",
-    help = "Consider removing this declaration or prefixing it with an underscore"
-)]
-struct LintDiagnostic {
-    #[source_code]
-    src: NamedSource<String>,
-    #[label("'resolve' is declared here")]
-    span: SourceSpan,
+struct DiagnosticCase {
+    name: &'static str,
+    build: fn(&Fixture) -> Error,
 }
 
-/// A diagnostic with several labels spread across the file — the shape of
-/// oxlint diagnostics that point at a declaration plus related uses. Each
-/// label makes the renderer locate a line/column far into the source.
-#[derive(Debug, Diagnostic, Error)]
-#[error("'resolve' is assigned a value but never used")]
-#[diagnostic(
-    severity = "Warning",
-    code = "eslint(no-unused-vars)",
-    help = "Consider removing this declaration or prefixing it with an underscore"
-)]
-struct MultiLabelDiagnostic {
-    #[source_code]
-    src: NamedSource<String>,
-    #[label("'resolve' is declared here")]
-    decl: SourceSpan,
-    #[label("it is written here")]
-    write: SourceSpan,
-    #[label("but never read after this point")]
-    last: SourceSpan,
+const DIAGNOSTIC_CASES: &[DiagnosticCase] = &[
+    DiagnosticCase { name: "declared", build: declared_diagnostic },
+    DiagnosticCase { name: "assigned", build: assigned_diagnostic },
+];
+
+/// oxlint's interactive output: unicode, color, and terminal hyperlinks.
+fn terminal_handler() -> GraphicalReportHandler {
+    GraphicalReportHandler::new().with_theme(GraphicalTheme::unicode()).with_links(true)
 }
 
-/// oxc's interactive default: `GraphicalReportHandler::new()` in a terminal
-/// resolves to unicode characters + RGB colors at a 400 column width.
-fn colored_handler() -> GraphicalReportHandler {
-    GraphicalReportHandler::new().with_theme(GraphicalTheme::unicode())
-}
-
-/// oxc's piped/CI output: `GraphicalTheme::none()` — ascii art, no color styling.
-fn monochrome_handler() -> GraphicalReportHandler {
-    GraphicalReportHandler::new().with_theme(GraphicalTheme::none())
+/// oxlint's piped/CI output: ASCII, no color, and a textual documentation URL.
+fn ci_handler() -> GraphicalReportHandler {
+    GraphicalReportHandler::new().with_theme(GraphicalTheme::none()).with_links(false)
 }
 
 /// Download `name` from `benchmark-files` (once) and cache it under `target/`.
@@ -119,28 +91,88 @@ fn load_fixture(name: &'static str) -> Fixture {
         source
     });
 
-    let span = span_at(&source, SPAN_FRACTION, SPAN_LEN);
-    Fixture { name, source, span }
+    let source_len = source.len();
+    let declaration_offset = (source_len as f64 * SPAN_FRACTION) as usize;
+    let declaration_span = identifier_span_at(&source, declaration_offset);
+    let remaining = source_len - declaration_span.offset() as usize;
+    let assignment_offset =
+        declaration_span.offset() as usize + RELATED_SPAN_DELTA.min(remaining / 2);
+    let assignment_span = identifier_span_at(&source, assignment_offset);
+    let source = Arc::new(NamedSource::new(name, source));
+
+    Fixture { name, source, source_len, declaration_span, assignment_span }
 }
 
-/// Snap `byte` down to the nearest UTF-8 char boundary within `source`.
-///
-/// Hand-rolled rather than `str::floor_char_boundary` because that method is
-/// only stable since 1.93, above this crate's 1.85 MSRV (enforced by clippy).
-fn floor_char_boundary(source: &str, mut byte: usize) -> usize {
-    byte = byte.min(source.len());
-    while byte > 0 && !source.is_char_boundary(byte) {
-        byte -= 1;
+fn is_identifier_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'$')
+}
+
+fn is_identifier_start(byte: u8) -> bool {
+    byte.is_ascii_alphabetic() || matches!(byte, b'_' | b'$')
+}
+
+/// Find an identifier-shaped token at or immediately after `offset`.
+fn identifier_span_at(source: &str, offset: usize) -> SourceSpan {
+    let bytes = source.as_bytes();
+    let offset = offset.min(bytes.len().saturating_sub(1));
+    let at = (offset..bytes.len())
+        .find(|&index| is_identifier_start(bytes[index]))
+        .or_else(|| (0..offset).rev().find(|&index| is_identifier_start(bytes[index])))
+        .expect("benchmark fixtures contain identifiers");
+
+    let mut start = at;
+    while start > 0 && is_identifier_byte(bytes[start - 1]) {
+        start -= 1;
     }
-    byte
+    let mut end = at + 1;
+    while end < bytes.len() && is_identifier_byte(bytes[end]) {
+        end += 1;
+    }
+
+    (start as u32, (end - start) as u32).into()
 }
 
-/// A [`SourceSpan`] of roughly `len` bytes located `fraction` of the way through
-/// `source`, snapped to char boundaries so it is always valid.
-fn span_at(source: &str, fraction: f64, len: usize) -> SourceSpan {
-    let start = floor_char_boundary(source, (source.len() as f64 * fraction) as usize);
-    let end = floor_char_boundary(source, start + len);
-    (start as u32, (end - start) as u32).into()
+/// A one-label warning representative of most oxlint diagnostics.
+fn declared_diagnostic(fixture: &Fixture) -> Error {
+    let diagnostic = lint_diagnostic(
+        "Variable 'resolve' is declared but never used.",
+        "Consider removing this declaration.",
+    )
+    .with_label(LabeledSpan::new_with_span(
+        Some("'resolve' is declared here".to_string()),
+        fixture.declaration_span,
+    ));
+
+    Error::new(diagnostic).with_source_code(Arc::clone(&fixture.source))
+}
+
+/// The two-label form emitted when `no-unused-vars` sees a later assignment.
+fn assigned_diagnostic(fixture: &Fixture) -> Error {
+    let diagnostic = lint_diagnostic(
+        "Variable 'resolve' is assigned a value but never used.",
+        "Did you mean to use this variable?",
+    )
+    .with_labels([
+        LabeledSpan::new_with_span(
+            Some("'resolve' is declared here".to_string()),
+            fixture.declaration_span,
+        ),
+        LabeledSpan::new_with_span(
+            Some("it was last assigned here".to_string()),
+            fixture.assignment_span,
+        ),
+    ]);
+
+    Error::new(diagnostic).with_source_code(Arc::clone(&fixture.source))
+}
+
+/// Add the rule metadata that `LintContext` attaches to every oxlint diagnostic.
+fn lint_diagnostic(message: &str, help: &str) -> MietteDiagnostic {
+    MietteDiagnostic::new(message)
+        .with_severity(Severity::Warning)
+        .with_code("eslint(no-unused-vars)")
+        .with_url("https://oxc.rs/docs/guide/usage/linter/rules/eslint/no-unused-vars.html")
+        .with_help(help)
 }
 
 fn bench(c: &mut Criterion) {
@@ -151,12 +183,13 @@ fn bench(c: &mut Criterion) {
     // and #212. A context of 1 line matches the renderer's default.
     let mut group = c.benchmark_group("read_span");
     for fixture in &fixtures {
-        group.throughput(Throughput::Bytes(fixture.source.len() as u64));
+        group.throughput(Throughput::Bytes(fixture.source_len as u64));
         group.bench_function(BenchmarkId::from_parameter(fixture.name), |b| {
             b.iter(|| {
                 let contents = fixture
                     .source
-                    .read_span(black_box(&fixture.span), 1, 1)
+                    .inner()
+                    .read_span(black_box(&fixture.declaration_span), 1, 1)
                     .expect("span within source");
                 black_box(contents);
             });
@@ -164,65 +197,27 @@ fn bench(c: &mut Criterion) {
     }
     group.finish();
 
-    // Full `render_report` — the call oxlint/oxfmt make per diagnostic — with
-    // both real themes: colored `unicode()` (interactive terminal) and `none()`
-    // (piped/CI output).
-    for (name, handler) in
-        [("render", colored_handler()), ("render_monochrome", monochrome_handler())]
-    {
-        let mut group = c.benchmark_group(name);
-        for fixture in &fixtures {
-            let diagnostic = LintDiagnostic {
-                src: NamedSource::new(fixture.name, fixture.source.clone()),
-                span: fixture.span,
-            };
-            group.bench_function(BenchmarkId::from_parameter(fixture.name), |b| {
-                b.iter(|| {
-                    let mut out = String::new();
-                    handler
-                        .render_report(&mut out, black_box(&diagnostic as &dyn Diagnostic))
-                        .expect("render succeeds");
-                    black_box(out);
+    // Full `render_report`, using the same report/source wrapper and the two
+    // diagnostic shapes used by oxlint.
+    for (mode, handler) in [("terminal", terminal_handler()), ("ci", ci_handler())] {
+        let mut group = c.benchmark_group(format!("render/{mode}"));
+        for case in DIAGNOSTIC_CASES {
+            for fixture in &fixtures {
+                let diagnostic = (case.build)(fixture);
+                group.throughput(Throughput::Bytes(fixture.source_len as u64));
+                group.bench_function(BenchmarkId::new(case.name, fixture.name), |b| {
+                    b.iter(|| {
+                        let mut out = String::new();
+                        handler
+                            .render_report(&mut out, black_box(diagnostic.as_ref()))
+                            .expect("render succeeds");
+                        black_box(out);
+                    });
                 });
-            });
+            }
         }
         group.finish();
     }
-
-    // Several labels near each other — a declaration and two related uses in
-    // the same stretch of code, the realistic multi-label shape. The snippet
-    // contexts overlap, so the renderer combines them into one window; every
-    // label read and every merge attempt historically issued its own
-    // `read_span`, i.e. its own scan of the source from byte 0 (five scans
-    // for this shape), so this measures how rendering scales with label count.
-    let mut group = c.benchmark_group("render_multi_label");
-    let handler = colored_handler();
-    for fixture in &fixtures {
-        let start = fixture.span.offset() as usize;
-        // A little under a screen of code apart, scaled down for tiny files
-        // and clamped so every span stays in bounds.
-        let delta = (fixture.source.len() / 20).clamp(1, 250);
-        let near = |n: usize| {
-            let at = (start + n * delta).min(fixture.source.len().saturating_sub(SPAN_LEN));
-            span_at(&fixture.source, at as f64 / fixture.source.len() as f64, SPAN_LEN)
-        };
-        let diagnostic = MultiLabelDiagnostic {
-            src: NamedSource::new(fixture.name, fixture.source.clone()),
-            decl: near(0),
-            write: near(1),
-            last: near(2),
-        };
-        group.bench_function(BenchmarkId::from_parameter(fixture.name), |b| {
-            b.iter(|| {
-                let mut out = String::new();
-                handler
-                    .render_report(&mut out, black_box(&diagnostic as &dyn Diagnostic))
-                    .expect("render succeeds");
-                black_box(out);
-            });
-        });
-    }
-    group.finish();
 }
 
 criterion_group!(
