@@ -39,11 +39,13 @@ required-features = ["fancy"]
 absolute_paths_not_starting_with_crate = "warn"
 non_ascii_idents = "warn"
 unit-bindings = "warn"
+unsafe_op_in_unsafe_fn = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }
 
 [lints.clippy]
 must_use_candidate = "warn"
 return_self_not_must_use = "warn"
+undocumented_unsafe_blocks = "warn"
 
 [dependencies]
 oxc-miette-derive = { path = "miette-derive", version = "=3.0.1", optional = true }
