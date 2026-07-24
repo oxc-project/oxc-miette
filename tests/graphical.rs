@@ -1862,7 +1862,6 @@ fn non_adjacent_highlight() -> Result<(), MietteError> {
 }
 
 #[test]
-#[ignore = "This test is currently failing and needs to be fixed."]
 fn invalid_span_bad_offset() -> Result<(), MietteError> {
     #[derive(Debug, Diagnostic, Error)]
     #[error("oops!")]
@@ -1878,18 +1877,16 @@ fn invalid_span_bad_offset() -> Result<(), MietteError> {
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight1: (50, 6).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
-    insta::assert_snapshot!(out, @r#"
-    oops::my::bad
+    insta::assert_snapshot!(out, @"
 
-    × oops!
-    [Failed to read contents for label `1st` (offset: 50, length: 6): OutOfBounds]
-    help: help info
-    "#);
+      × oops::my::bad: oops!
+    [Failed to read contents for label `1st` (offset: 50, length: 6): The given offset is outside the bounds of its Source]
+      help: help info
+    ");
     Ok(())
 }
 
 #[test]
-#[ignore = "This test is currently failing and needs to be fixed."]
 fn invalid_span_bad_length() -> Result<(), MietteError> {
     #[derive(Debug, Diagnostic, Error)]
     #[error("oops!")]
@@ -1905,18 +1902,16 @@ fn invalid_span_bad_length() -> Result<(), MietteError> {
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight1: (0, 50).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
-    insta::assert_snapshot!(out, @r#"
-    oops::my::bad
+    insta::assert_snapshot!(out, @"
 
-    × oops!
-    [Failed to read contents for label `1st` (offset: 0, length: 50): OutOfBounds]
-    help: help info
-    "#);
+      × oops::my::bad: oops!
+    [Failed to read contents for label `1st` (offset: 0, length: 50): The given offset is outside the bounds of its Source]
+      help: help info
+    ");
     Ok(())
 }
 
 #[test]
-#[ignore = "This test is currently failing and needs to be fixed."]
 fn invalid_span_no_label() -> Result<(), MietteError> {
     #[derive(Debug, Diagnostic, Error)]
     #[error("oops!")]
@@ -1932,18 +1927,16 @@ fn invalid_span_no_label() -> Result<(), MietteError> {
     let err = MyBad { src: NamedSource::new("bad_file.rs", src), highlight1: (50, 6).into() };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
-    insta::assert_snapshot!(out, @r#"
-    oops::my::bad
+    insta::assert_snapshot!(out, @"
 
-    × oops!
-    [Failed to read contents for label `<none>` (offset: 50, length: 6): OutOfBounds]
-    help: help info
-    "#);
+      × oops::my::bad: oops!
+    [Failed to read contents for label `<none>` (offset: 50, length: 6): The given offset is outside the bounds of its Source]
+      help: help info
+    ");
     Ok(())
 }
 
 #[test]
-#[ignore = "This test is currently failing and needs to be fixed."]
 fn invalid_span_2nd_label() -> Result<(), MietteError> {
     #[derive(Debug, Diagnostic, Error)]
     #[error("oops!")]
@@ -1965,13 +1958,12 @@ fn invalid_span_2nd_label() -> Result<(), MietteError> {
     };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
-    insta::assert_snapshot!(out, @r#"
-    oops::my::bad
+    insta::assert_snapshot!(out, @"
 
-    × oops!
-    [Failed to read contents for label `2nd` (offset: 50, length: 6): OutOfBounds]
-    help: help info
-    "#);
+      × oops::my::bad: oops!
+    [Failed to read contents for label `2nd` (offset: 50, length: 6): The given offset is outside the bounds of its Source]
+      help: help info
+    ");
     Ok(())
 }
 
@@ -2025,7 +2017,6 @@ fn invalid_span_inner() -> Result<(), MietteError> {
 }
 
 #[test]
-#[ignore = "This test is currently failing and needs to be fixed."]
 fn invalid_span_related() -> Result<(), MietteError> {
     #[derive(Debug, Diagnostic, Error)]
     #[error("oops inside!")]
@@ -2061,22 +2052,21 @@ fn invalid_span_related() -> Result<(), MietteError> {
     };
     let out = fmt_report(err.into());
     println!("Error: {}", out);
-    insta::assert_snapshot!(out, @r#"
-    oops::my::outer
+    insta::assert_snapshot!(out, @"
 
-    × oops outside!
-    ╭─[bad_file.rs:1:1]
-    1 │ outer source
-    · ───┬──
-    ·    ╰── outer label
-    ╰────
-    help: help info
+      × oops::my::outer: oops outside!
+       ╭─[bad_file.rs:1:1]
+     1 │ outer source
+       · ───┬──
+       ·    ╰── outer label
+       ╰────
+      help: help info
 
     Error: oops::my::inner
 
-    × oops inside!
-    [Failed to read contents for label `inner label` (offset: 60, length: 6): OutOfBounds]
-    help: help info
-    "#);
+      × oops::my::inner: oops inside!
+    [Failed to read contents for label `inner label` (offset: 60, length: 6): The given offset is outside the bounds of its Source]
+      help: help info
+    ");
     Ok(())
 }

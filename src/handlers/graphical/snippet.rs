@@ -63,8 +63,21 @@ impl GraphicalReportHandler {
         };
 
         let mut contexts: Vec<(Cow<'_, LabeledSpan>, _)> = Vec::with_capacity(labels.len());
-        for right in labels.iter() {
-            let right_conts = read(right.inner()).map_err(|_| fmt::Error)?;
+        for right in &labels {
+            let right_conts = match read(right.inner()) {
+                Ok(contents) => contents,
+                Err(error) => {
+                    writeln!(
+                        f,
+                        "[Failed to read contents for label `{}` (offset: {}, length: {}): \
+                         {error}]",
+                        right.label().unwrap_or("<none>"),
+                        right.offset(),
+                        right.len(),
+                    )?;
+                    return Ok(());
+                }
+            };
 
             if contexts.is_empty() {
                 contexts.push((Cow::Borrowed(right), right_conts));

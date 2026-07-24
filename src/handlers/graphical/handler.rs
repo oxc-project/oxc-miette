@@ -90,9 +90,11 @@ impl GraphicalReportHandler {
     }
 
     /// Set the displayed tab width in spaces.
+    ///
+    /// A width of zero is normalized to one.
     #[must_use]
     pub fn tab_width(mut self, width: usize) -> Self {
-        self.tab_width = width;
+        self.tab_width = width.max(1);
         self
     }
 
