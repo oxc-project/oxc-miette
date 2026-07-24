@@ -90,6 +90,8 @@
 //! ## Example
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")]
+//! # {
 //! /*
 //! You can derive a `Diagnostic` from any `std::error::Error` type.
 //!
@@ -149,6 +151,7 @@
 //!
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! And this is the output you'll get if you run this program:
@@ -187,6 +190,8 @@
 //! the trait directly, just like with `std::error::Error`.
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")]
+//! # {
 //! // lib/error.rs
 //! use miette::{Diagnostic, SourceSpan};
 //! use thiserror::Error;
@@ -213,6 +218,7 @@
 //!    #[label("here")]
 //!    pub at: SourceSpan
 //! }
+//! # }
 //! ```
 //!
 //! Then, return this error type from all your fallible public APIs. It's a best
@@ -325,6 +331,8 @@
 //! attribute:
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")]
+//! # {
 //! use miette::Diagnostic;
 //! use thiserror::Error;
 //!
@@ -336,6 +344,7 @@
 //!     url("https://my_website.com/error_codes#{}", self.code().unwrap())
 //! )]
 //! struct MyErr;
+//! # }
 //! ```
 //!
 //! Additionally, if you're developing a library and your error type is exported
@@ -345,6 +354,8 @@
 //! (very high quality and detailed!) documentation on this diagnostic:
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")]
+//! # {
 //! use miette::Diagnostic;
 //! use thiserror::Error;
 //!
@@ -356,6 +367,7 @@
 //! )]
 //! #[error("kaboom")]
 //! struct MyErr;
+//! # }
 //! ```
 //!
 //! ### ... snippets
@@ -375,6 +387,8 @@
 //! `derive(Diagnostic)` macro:
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")]
+//! # {
 //! use miette::{Diagnostic, SourceSpan};
 //! use thiserror::Error;
 //!
@@ -404,6 +418,7 @@
 //!     #[label]
 //!     snip4: Option<SourceSpan>,
 //! }
+//! # }
 //! ```
 //!
 //! ### ... help text
@@ -413,6 +428,8 @@
 //! enum variants:
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")]
+//! # {
 //! use miette::Diagnostic;
 //! use thiserror::Error;
 //!
@@ -420,12 +437,15 @@
 //! #[error("welp")]
 //! #[diagnostic(help("try doing this instead"))]
 //! struct Foo;
+//! # }
 //! ```
 //!
 //! The other is by programmatically supplying the help text as a field to
 //! your diagnostic:
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")]
+//! # {
 //! use miette::Diagnostic;
 //! use thiserror::Error;
 //!
@@ -440,12 +460,15 @@
 //! let err = Foo {
 //!     advice: Some("try doing this instead".to_string()),
 //! };
+//! # }
 //! ```
 //!
 //! ### ... severity level
 //! `miette` provides a way to set the severity level of a diagnostic.
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")]
+//! # {
 //! use miette::Diagnostic;
 //! use thiserror::Error;
 //!
@@ -453,6 +476,7 @@
 //! #[error("welp")]
 //! #[diagnostic(severity(Warning))]
 //! struct Foo;
+//! # }
 //! ```
 //!
 //! ### ... multiple related errors
@@ -464,6 +488,8 @@
 //! `Diagnostic` type:
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")]
+//! # {
 //! use miette::Diagnostic;
 //! use thiserror::Error;
 //!
@@ -473,6 +499,7 @@
 //!     #[related]
 //!     others: Vec<MyError>,
 //! }
+//! # }
 //! ```
 //!
 //! ### ... delayed source code
@@ -482,6 +509,8 @@
 //! method for that:
 //!
 //! ```rust,no_run
+//! # #[cfg(feature = "derive")]
+//! # {
 //! use miette::{Diagnostic, SourceSpan};
 //! use thiserror::Error;
 //!
@@ -507,6 +536,7 @@
 //!         error.with_source_code(String::from("source code"))
 //!     })
 //! }
+//! # }
 //! ```
 //!
 //! Also source code can be provided by a wrapper type. This is especially
@@ -514,6 +544,8 @@
 //! emitted at the same time:
 //!
 //! ```rust,no_run
+//! # #[cfg(feature = "derive")]
+//! # {
 //! use miette::{Diagnostic, Report, SourceSpan};
 //! use thiserror::Error;
 //!
@@ -556,6 +588,7 @@
 //!     })?;
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! ### ... Diagnostic-based error sources.
@@ -575,6 +608,8 @@
 //! will likely want to use _both_:
 //!
 //! ```rust
+//! # #[cfg(feature = "derive")]
+//! # {
 //! use miette::Diagnostic;
 //! use thiserror::Error;
 //!
@@ -589,6 +624,7 @@
 //! #[derive(Debug, Diagnostic, Error)]
 //! #[error("OtherError")]
 //! struct OtherError;
+//! # }
 //! ```
 //!
 //! ### ... handler options
