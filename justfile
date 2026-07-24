@@ -3,6 +3,8 @@
 set windows-shell := ["powershell"]
 set shell := ["bash", "-cu"]
 
+export RUSTDOCFLAGS := "-D warnings"
+
 _default:
   @just --list -u
 
@@ -20,12 +22,14 @@ ready:
   git diff --exit-code --quiet
   typos
   cargo shear --check-test-targets
-  cargo fmt
+  cargo fmt --all -- --check
   cargo check
-  cargo clippy
+  cargo clippy --workspace --all-targets --all-features -- -D warnings
+  cargo test --workspace --no-default-features
+  cargo test --workspace --all-features
   cargo test --features fancy
   cargo check --benches --features fancy
-  cargo doc
+  cargo doc --workspace --all-features --no-deps
   git status
 
 # Run the benchmarks (fixtures are downloaded from benchmark-files on first run)
