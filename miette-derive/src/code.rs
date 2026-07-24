@@ -71,12 +71,12 @@ impl Code {
         )
     }
 
-    pub(crate) fn gen_struct(&self) -> Option<TokenStream> {
+    pub(crate) fn gen_struct(&self) -> TokenStream {
         let code = &self.0;
-        Some(quote! {
+        quote! {
             fn code(&self) -> std::option::Option<std::borrow::Cow<'_, str>> {
                 std::option::Option::Some(std::borrow::Cow::Borrowed(#code))
             }
-        })
+        }
     }
 }
