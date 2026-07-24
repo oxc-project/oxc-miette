@@ -31,20 +31,16 @@ struct Escape<'a>(&'a str);
 impl fmt::Display for Escape<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for c in self.0.chars() {
-            let escape = match c {
-                '\\' => Some(r"\\"),
-                '"' => Some(r#"\""#),
-                '\r' => Some(r"\r"),
-                '\n' => Some(r"\n"),
-                '\t' => Some(r"\t"),
-                '\u{08}' => Some(r"\b"),
-                '\u{0c}' => Some(r"\f"),
-                _ => None,
-            };
-            if let Some(escape) = escape {
-                f.write_str(escape)?;
-            } else {
-                f.write_char(c)?;
+            match c {
+                '\\' => f.write_str(r"\\")?,
+                '"' => f.write_str(r#"\""#)?,
+                '\r' => f.write_str(r"\r")?,
+                '\n' => f.write_str(r"\n")?,
+                '\t' => f.write_str(r"\t")?,
+                '\u{08}' => f.write_str(r"\b")?,
+                '\u{0c}' => f.write_str(r"\f")?,
+                '\u{00}'..='\u{1f}' => write!(f, r"\u{:04x}", u32::from(c))?,
+                _ => f.write_char(c)?,
             }
         }
         Ok(())
@@ -103,7 +99,7 @@ impl JSONReportHandler {
             write!(f, r#""causes": [],"#)?;
         }
         if let Some(url) = diagnostic.url() {
-            write!(f, r#""url": "{}","#, url)?;
+            write!(f, r#""url": "{}","#, escape(&url))?;
         }
         if let Some(help) = diagnostic.help() {
             write!(f, r#""help": "{}","#, escape(&help))?;
@@ -192,4 +188,8 @@ impl ReportHandler for JSONReportHandler {
 fn test_escape() {
     assert_eq!(escape("a\nb").to_string(), r"a\nb");
     assert_eq!(escape("C:\\Miette").to_string(), r"C:\\Miette");
+
+    let controls: String = ('\u{00}'..='\u{1f}').collect();
+    let encoded = format!(r#""{}""#, escape(&controls));
+    assert_eq!(serde_json::from_str::<String>(&encoded).unwrap(), controls);
 }
