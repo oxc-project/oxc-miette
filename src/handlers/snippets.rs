@@ -28,6 +28,15 @@ impl<E: fmt::Display> fmt::Display for SnippetReadError<'_, E> {
     }
 }
 
+#[cold]
+#[inline(never)]
+pub(super) fn write_read_error(
+    formatter: &mut impl fmt::Write,
+    error: &impl fmt::Display,
+) -> fmt::Result {
+    writeln!(formatter, "[{error}]")
+}
+
 /// Reads sorted labels and combines source windows that overlap by line.
 pub(super) fn merge_contexts<'label, 'source, E>(
     labels: &'label [LabeledSpan],
