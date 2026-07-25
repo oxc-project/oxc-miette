@@ -89,17 +89,7 @@ impl GraphicalReportHandler {
             Some(Severity::Advice) => (self.theme.styles.advice, &self.theme.characters.advice),
         };
 
-        // No-color themes can bypass owo-colors' formatting machinery entirely.
-        let (initial_indent, rest_indent) = if severity_style.is_plain() {
-            (format!("  {severity_icon} "), format!("  {} ", self.theme.characters.vbar))
-        } else {
-            (
-                format!("  {} ", severity_icon.style(severity_style)),
-                format!("  {} ", self.theme.characters.vbar.style(severity_style)),
-            )
-        };
         let width = self.termwidth.saturating_sub(2);
-        let opts = self.wrap_options(width, &initial_indent, &rest_indent);
 
         let title = match (self.links, diagnostic.url(), diagnostic.code()) {
             (LinkStyle::Link, Some(url), Some(code)) => {
@@ -117,7 +107,30 @@ impl GraphicalReportHandler {
             _ if severity_style.is_plain() => diagnostic.to_string(),
             _ => format!("{}", diagnostic.style(severity_style)),
         };
-        Self::write_fill(f, &title, opts)?;
+        if !title.contains('\n')
+            && severity_icon.len().saturating_add(title.len()).saturating_add(3) <= width
+        {
+            f.write_str("  ")?;
+            if severity_style.is_plain() {
+                f.write_str(severity_icon)?;
+            } else {
+                write!(f, "{}", severity_icon.style(severity_style))?;
+            }
+            f.write_char(' ')?;
+            f.write_str(title.trim_end_matches(' '))?;
+        } else {
+            // No-color themes can bypass owo-colors' formatting machinery entirely.
+            let (initial_indent, rest_indent) = if severity_style.is_plain() {
+                (format!("  {severity_icon} "), format!("  {} ", self.theme.characters.vbar))
+            } else {
+                (
+                    format!("  {} ", severity_icon.style(severity_style)),
+                    format!("  {} ", self.theme.characters.vbar.style(severity_style)),
+                )
+            };
+            let opts = self.wrap_options(width, &initial_indent, &rest_indent);
+            Self::write_fill(f, &title, opts)?;
+        }
         f.write_char('\n')?;
 
         Ok(())
