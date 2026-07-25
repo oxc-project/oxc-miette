@@ -14,6 +14,7 @@ use owo_colors::OwoColorize;
 
 use super::{
     handler::GraphicalReportHandler,
+    label::write_repeated_char,
     span::{FancySpan, LabelRenderMode},
 };
 use crate::{
@@ -58,6 +59,11 @@ impl GraphicalReportHandler {
             }),
             None => source.read_span(span, self.context_lines, self.context_lines),
         };
+
+        if let [label] = labels.as_slice() {
+            let contents = read(label.inner()).map_err(|_| fmt::Error)?;
+            return self.render_context(f, label, &contents, &labels);
+        }
 
         let mut contexts: Vec<(Cow<'_, LabeledSpan>, _)> = Vec::with_capacity(labels.len());
         for right in &labels {
@@ -138,16 +144,14 @@ impl GraphicalReportHandler {
 
         // Oh and one more thing: We need to figure out how much room our line
         // numbers need!
-        let linum_width = lines[..].last().map_or(0, |line| line.number).to_string().len();
+        let linum_width = lines
+            .last()
+            .map_or(1, |line| line.number.checked_ilog10().map_or(1, |width| width as usize + 1));
 
         // Header
-        write!(
-            f,
-            "{}{}{}",
-            " ".repeat(linum_width + 2),
-            self.theme.characters.ltop,
-            self.theme.characters.hbar,
-        )?;
+        write_repeated_char(f, ' ', linum_width + 2)?;
+        f.write_char(self.theme.characters.ltop)?;
+        f.write_char(self.theme.characters.hbar)?;
 
         // The snippet header reports the primary label's line/column. Rather
         // than issuing a second full `read_span` (which re-scans the source
@@ -169,7 +173,8 @@ impl GraphicalReportHandler {
             }
             _ => {
                 if lines.len() <= 1 {
-                    writeln!(f, "{}", self.theme.characters.hbar.to_string().repeat(3))?;
+                    write_repeated_char(f, self.theme.characters.hbar, 3)?;
+                    f.write_char('\n')?;
                 } else {
                     writeln!(f, "[{}:{}]", primary_line + 1, primary_column + 1)?;
                 }
@@ -220,13 +225,10 @@ impl GraphicalReportHandler {
                 }
             }
         }
-        writeln!(
-            f,
-            "{}{}{}",
-            " ".repeat(linum_width + 2),
-            self.theme.characters.lbot,
-            self.theme.characters.hbar.to_string().repeat(4),
-        )?;
+        write_repeated_char(f, ' ', linum_width + 2)?;
+        f.write_char(self.theme.characters.lbot)?;
+        write_repeated_char(f, self.theme.characters.hbar, 4)?;
+        f.write_char('\n')?;
         Ok(())
     }
 
