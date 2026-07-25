@@ -51,7 +51,7 @@ fn write_repeated_chunk(
     if count == 0 { Ok(()) } else { f.write_str(&chunk[..count * char_len]) }
 }
 
-fn write_repeated_char(f: &mut impl fmt::Write, c: char, count: usize) -> fmt::Result {
+pub(super) fn write_repeated_char(f: &mut impl fmt::Write, c: char, count: usize) -> fmt::Result {
     for _ in 0..count {
         f.write_char(c)?;
     }
