@@ -138,10 +138,23 @@ impl GraphicalReportHandler {
 
     fn render_footer(&self, f: &mut impl fmt::Write, diagnostic: &dyn Diagnostic) -> fmt::Result {
         if let Some(help) = diagnostic.help() {
+            const PREFIX: &str = "  help: ";
             let width = self.termwidth.saturating_sub(4);
-            let initial_indent = "  help: ".style(self.theme.styles.help).to_string();
-            let opts = self.wrap_options(width, &initial_indent, "        ");
-            self.write_wrap(f, &help, opts)?;
+            if self.wrap_lines
+                && memchr::memchr(b'\n', help.as_bytes()).is_none()
+                && PREFIX.len().saturating_add(help.len()) <= width
+            {
+                if self.theme.styles.help.is_plain() {
+                    f.write_str(PREFIX)?;
+                } else {
+                    write!(f, "{}", PREFIX.style(self.theme.styles.help))?;
+                }
+                f.write_str(help.trim_end_matches(' '))?;
+            } else {
+                let initial_indent = PREFIX.style(self.theme.styles.help).to_string();
+                let opts = self.wrap_options(width, &initial_indent, "        ");
+                self.write_wrap(f, &help, opts)?;
+            }
             f.write_char('\n')?;
         }
         if let Some(note) = diagnostic.note() {
