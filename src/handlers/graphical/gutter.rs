@@ -12,6 +12,7 @@ use owo_colors::OwoColorize;
 
 use super::{
     handler::GraphicalReportHandler,
+    label::write_repeated_char,
     line::Line,
     span::{FancySpan, LabelRenderMode},
 };
@@ -34,8 +35,9 @@ impl GraphicalReportHandler {
     }
 
     pub(super) fn write_no_linum(&self, f: &mut impl fmt::Write, width: usize) -> fmt::Result {
-        write!(f, " {:width$} {} ", "", self.theme.characters.vbar_break, width = width)?;
-        Ok(())
+        write_repeated_char(f, ' ', width + 2)?;
+        f.write_char(self.theme.characters.vbar_break)?;
+        f.write_char(' ')
     }
 
     /// Draws the gutter alongside the source line itself: for each active
