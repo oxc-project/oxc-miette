@@ -24,14 +24,15 @@ impl GraphicalReportHandler {
         width: usize,
         linum: usize,
     ) -> fmt::Result {
-        write!(
-            f,
-            " {:width$} {} ",
-            linum.style(self.theme.styles.linum),
-            self.theme.characters.vbar,
-            width = width
-        )?;
-        Ok(())
+        f.write_char(' ')?;
+        if self.theme.styles.linum.is_plain() {
+            write!(f, "{linum:width$}")?;
+        } else {
+            write!(f, "{:width$}", linum.style(self.theme.styles.linum), width = width)?;
+        }
+        f.write_char(' ')?;
+        f.write_char(self.theme.characters.vbar)?;
+        f.write_char(' ')
     }
 
     pub(super) fn write_no_linum(&self, f: &mut impl fmt::Write, width: usize) -> fmt::Result {
