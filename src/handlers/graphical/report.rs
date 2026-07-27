@@ -13,7 +13,7 @@ use std::fmt::{self, Write};
 use owo_colors::OwoColorize;
 
 use super::handler::{GraphicalReportHandler, LinkStyle};
-use crate::{Diagnostic, Severity, SourceCode};
+use crate::{Diagnostic, Severity, SourceCode, source_impls::ScanSeed};
 
 impl GraphicalReportHandler {
     /// Render a [`Diagnostic`]. This function is mostly internal and meant to
@@ -29,20 +29,74 @@ impl GraphicalReportHandler {
         f: &mut impl fmt::Write,
         diagnostic: &dyn Diagnostic,
     ) -> fmt::Result {
-        writeln!(f)?;
-        self.render_causes(f, diagnostic)?;
-        let src = diagnostic.source_code();
-        self.render_snippets(f, diagnostic, src)?;
-        self.render_footer(f, diagnostic)?;
-        self.render_related(f, diagnostic, src)?;
-        if let Some(footer) = &self.footer {
+        self.render_report_carry(f, diagnostic, None).0
+    }
+
+    /// Render each of `diagnostics` in sequence, scanning each shared source
+    /// once across them.
+    ///
+    /// Yields one `(result, rendered)` pair per diagnostic, matching
+    /// [`render_report`](Self::render_report) byte for byte. Consecutive
+    /// diagnostics whose sources expose the same backing buffer (the same
+    /// [`contiguous_bytes`](crate::SourceCode::contiguous_bytes) pointer and
+    /// length) share one line scan: the first report scans the source's
+    /// prefix, and each later one reads only the bytes between the previous
+    /// report's span and its own — the dominant cost of rendering several
+    /// diagnostics against one large source, which is how a linter reports a
+    /// file. The iterator is lazy, so callers can stop early without paying
+    /// for unrendered reports.
+    pub fn render_reports<'h, 'd>(
+        &'h self,
+        diagnostics: &'d [&'d dyn Diagnostic],
+    ) -> impl Iterator<Item = (fmt::Result, String)> + use<'h, 'd> {
+        let mut carry: Option<((*const u8, usize), ScanSeed)> = None;
+        diagnostics.iter().map(move |diagnostic| {
+            let id = diagnostic
+                .source_code()
+                .and_then(SourceCode::contiguous_bytes)
+                .map(|bytes| (bytes.as_ptr(), bytes.len()));
+            // Sharing is keyed by buffer identity, which the borrow of
+            // `diagnostics` keeps stable for the iterator's lifetime.
+            let resume = match (&carry, &id) {
+                (Some((carry_id, seed)), Some(id)) if carry_id == id => Some(*seed),
+                _ => None,
+            };
+            let mut out = String::new();
+            let (result, memo) = self.render_report_carry(&mut out, *diagnostic, resume);
+            carry = id.zip(memo);
+            (result, out)
+        })
+    }
+
+    /// [`render_report`](Self::render_report) with the cross-report scan memo
+    /// threaded through: `resume` is the previous report's memo over the same
+    /// source, and the returned memo is this report's, for the next one.
+    /// Stages after the snippets can fail once the memo already exists, so it
+    /// is returned alongside the result instead of through `?`.
+    fn render_report_carry(
+        &self,
+        f: &mut impl fmt::Write,
+        diagnostic: &dyn Diagnostic,
+        resume: Option<ScanSeed>,
+    ) -> (fmt::Result, Option<ScanSeed>) {
+        let mut memo = None;
+        let result = (|| {
             writeln!(f)?;
-            let width = self.termwidth.saturating_sub(4);
-            let opts = self.wrap_options(width, "  ", "  ");
-            self.write_wrap(f, footer, opts)?;
-            f.write_char('\n')?;
-        }
-        Ok(())
+            self.render_causes(f, diagnostic)?;
+            let src = diagnostic.source_code();
+            memo = self.render_snippets(f, diagnostic, src, resume)?;
+            self.render_footer(f, diagnostic)?;
+            self.render_related(f, diagnostic, src)?;
+            if let Some(footer) = &self.footer {
+                writeln!(f)?;
+                let width = self.termwidth.saturating_sub(4);
+                let opts = self.wrap_options(width, "  ", "  ");
+                self.write_wrap(f, footer, opts)?;
+                f.write_char('\n')?;
+            }
+            Ok(())
+        })();
+        (result, memo)
     }
 
     fn render_header(&self, f: &mut impl fmt::Write, diagnostic: &dyn Diagnostic) -> fmt::Result {
@@ -188,7 +242,7 @@ impl GraphicalReportHandler {
                 inner_renderer.render_header(f, rel)?;
                 inner_renderer.render_causes(f, rel)?;
                 let src = rel.source_code().or(parent_src);
-                inner_renderer.render_snippets(f, rel, src)?;
+                inner_renderer.render_snippets(f, rel, src, None)?;
                 inner_renderer.render_footer(f, rel)?;
                 inner_renderer.render_related(f, rel, src)?;
             }

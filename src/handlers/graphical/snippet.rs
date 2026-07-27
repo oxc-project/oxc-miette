@@ -19,31 +19,37 @@ use super::{
 };
 use crate::{
     Diagnostic, LabeledSpan, MietteSpanContents, SourceCode, SourceSpan, SpanContents,
-    source_impls::SpanScanner,
+    source_impls::{ScanSeed, SpanScanner},
 };
 
 impl GraphicalReportHandler {
+    /// Renders the diagnostic's snippets and returns the memoizable state of
+    /// the source scan they shared, which a caller rendering several reports
+    /// against one source passes back in as the next report's `resume` (see
+    /// [`render_reports`](GraphicalReportHandler::render_reports)).
     pub(super) fn render_snippets(
         &self,
         f: &mut impl fmt::Write,
         diagnostic: &dyn Diagnostic,
         opt_source: Option<&dyn SourceCode>,
-    ) -> fmt::Result {
-        let Some(source) = opt_source else { return Ok(()) };
+        resume: Option<ScanSeed>,
+    ) -> Result<Option<ScanSeed>, fmt::Error> {
+        let Some(source) = opt_source else { return Ok(None) };
         let mut labels = diagnostic.labels();
         if labels.is_empty() {
-            return Ok(());
+            return Ok(None);
         }
         labels.sort_unstable_by_key(|l| l.inner().offset());
 
         // When the source exposes its backing buffer, share one forward scan
         // across every span lookup below (one per label plus one per merge
         // attempt); each `read_span` otherwise scans the source from byte 0
-        // again. The scanner bypasses the source's own `read_span`, so
-        // re-attach the source's name the way `NamedSource` would.
+        // again. `resume` carries that scan across reports in turn. The
+        // scanner bypasses the source's own `read_span`, so re-attach the
+        // source's name the way `NamedSource` would.
         let mut scanner = source
             .contiguous_bytes()
-            .map(|bytes| SpanScanner::new(bytes, self.context_lines, self.context_lines));
+            .map(|bytes| SpanScanner::new(bytes, self.context_lines, self.context_lines, resume));
         let source_name = source.name();
         let mut read = |span: &SourceSpan| match scanner.as_mut() {
             Some(scanner) => scanner.read_span(*span).map(|contents| match source_name {
@@ -62,7 +68,9 @@ impl GraphicalReportHandler {
 
         if let [label] = labels.as_slice() {
             let contents = read(label.inner()).map_err(|_| fmt::Error)?;
-            return self.render_context(f, label, &contents, &labels);
+            let memo = scanner.as_ref().and_then(SpanScanner::memo);
+            self.render_context(f, label, &contents, &labels)?;
+            return Ok(memo);
         }
 
         let mut contexts: Vec<(Cow<'_, LabeledSpan>, _)> = Vec::with_capacity(labels.len());
@@ -96,11 +104,12 @@ impl GraphicalReportHandler {
 
             contexts.push((Cow::Borrowed(right), right_conts));
         }
+        let memo = scanner.as_ref().and_then(SpanScanner::memo);
         for (ctx, conts) in contexts {
             self.render_context(f, &ctx, &conts, &labels[..])?;
         }
 
-        Ok(())
+        Ok(memo)
     }
 
     pub(super) fn render_context(

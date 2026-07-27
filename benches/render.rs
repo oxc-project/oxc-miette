@@ -25,8 +25,8 @@ use criterion::{
     BatchSize, BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main,
 };
 use miette::{
-    Error, GraphicalReportHandler, GraphicalTheme, LabeledSpan, MietteDiagnostic, NamedSource,
-    Severity, SourceCode, SourceSpan,
+    Diagnostic, Error, GraphicalReportHandler, GraphicalTheme, LabeledSpan, MietteDiagnostic,
+    NamedSource, Severity, SourceCode, SourceSpan,
 };
 
 /// Pinned revision of <https://github.com/oxc-project/benchmark-files>, so the
@@ -267,6 +267,60 @@ fn bench(c: &mut Criterion) {
         }
         group.finish();
     }
+
+    // A file with several diagnostics renders them in one batch: oxlint sends
+    // one `Vec` of wrapped diagnostics per file. `sequential` renders each
+    // report standalone, paying one full prefix scan per report; `batched`
+    // shares the scan across the batch through `render_reports`.
+    let mut group = c.benchmark_group("render_batch/ci");
+    let handler = ci_handler();
+    for fixture in &fixtures {
+        let diagnostics: Vec<Error> = [0.2, 0.4, 0.6, 0.8]
+            .iter()
+            .map(|&fraction| {
+                let offset = (fixture.source_len as f64 * fraction) as usize;
+                let span = identifier_span_at(fixture.source.inner(), offset);
+                let diagnostic = lint_diagnostic(
+                    "Variable 'resolve' is declared but never used.",
+                    "Consider removing this declaration.",
+                )
+                .with_label(LabeledSpan::new_with_span(
+                    Some("'resolve' is declared here".to_string()),
+                    span,
+                ));
+                Error::new(diagnostic).with_source_code(Arc::clone(&fixture.source))
+            })
+            .collect();
+        let refs: Vec<&dyn Diagnostic> =
+            diagnostics.iter().map(|diagnostic| diagnostic.as_ref() as &dyn Diagnostic).collect();
+
+        group.throughput(Throughput::Bytes(fixture.source_len as u64));
+        group.bench_function(BenchmarkId::new("sequential", fixture.name), |b| {
+            b.iter(|| {
+                let mut outputs = Vec::with_capacity(refs.len());
+                for diagnostic in &refs {
+                    let mut out = String::new();
+                    handler
+                        .render_report(&mut out, black_box(*diagnostic))
+                        .expect("render succeeds");
+                    outputs.push(out);
+                }
+                outputs
+            });
+        });
+        group.bench_function(BenchmarkId::new("batched", fixture.name), |b| {
+            b.iter(|| {
+                handler
+                    .render_reports(black_box(&refs))
+                    .map(|(result, out)| {
+                        result.expect("render succeeds");
+                        out
+                    })
+                    .collect::<Vec<_>>()
+            });
+        });
+    }
+    group.finish();
 }
 
 criterion_group!(
