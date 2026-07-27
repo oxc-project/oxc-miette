@@ -219,10 +219,13 @@ fn bench(c: &mut Criterion) {
     group.finish();
 
     // The render benches below reuse one `NamedSource` across iterations, so
-    // its embedded scan cache memoizes the prefix scan after the first render
-    // — matching how oxlint renders a file with several diagnostics. This
-    // group rebuilds the source every iteration (outside the timing) to keep
-    // the cold first-render cost, a full prefix scan, measured.
+    // any state the source carries across reports turns them into warm
+    // steady-state measurements — matching how oxlint renders a file with
+    // several diagnostics. This group rebuilds the source every iteration
+    // (outside the timing) to keep the cold first-render cost, a full prefix
+    // scan, measured. The diagnostic is returned so its teardown — dropping
+    // the sole `Arc` to the megabyte-sized source — also stays outside the
+    // timing, like the reused sources below.
     let mut group = c.benchmark_group("render_cold/ci/declared");
     let handler = ci_handler();
     for fixture in &fixtures {
@@ -235,7 +238,7 @@ fn bench(c: &mut Criterion) {
                     handler
                         .render_report(&mut out, black_box(diagnostic.as_ref()))
                         .expect("render succeeds");
-                    out
+                    (out, diagnostic)
                 },
                 BatchSize::LargeInput,
             );
