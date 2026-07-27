@@ -21,7 +21,9 @@
 
 use std::{fs, path::PathBuf, sync::Arc, time::Duration};
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{
+    BatchSize, BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main,
+};
 use miette::{
     Error, GraphicalReportHandler, GraphicalTheme, LabeledSpan, MietteDiagnostic, NamedSource,
     Severity, SourceCode, SourceSpan,
@@ -142,6 +144,17 @@ fn identifier_span_at(source: &str, offset: usize) -> SourceSpan {
 
 /// A one-label warning representative of most oxlint diagnostics.
 fn declared_diagnostic(fixture: &Fixture) -> Error {
+    declared_diagnostic_with_source(fixture, Arc::clone(&fixture.source))
+}
+
+/// The one-label warning against a freshly created source, whose embedded
+/// scan cache is necessarily empty.
+fn cold_declared_diagnostic(fixture: &Fixture) -> Error {
+    let source = Arc::new(NamedSource::new(fixture.name, fixture.source.inner().clone()));
+    declared_diagnostic_with_source(fixture, source)
+}
+
+fn declared_diagnostic_with_source(fixture: &Fixture, source: Arc<NamedSource<String>>) -> Error {
     let diagnostic = lint_diagnostic(
         "Variable 'resolve' is declared but never used.",
         "Consider removing this declaration.",
@@ -151,7 +164,7 @@ fn declared_diagnostic(fixture: &Fixture) -> Error {
         fixture.declaration_span,
     ));
 
-    Error::new(diagnostic).with_source_code(Arc::clone(&fixture.source))
+    Error::new(diagnostic).with_source_code(source)
 }
 
 /// The two-label form emitted when `no-unused-vars` sees a later assignment.
@@ -201,6 +214,34 @@ fn bench(c: &mut Criterion) {
                     .expect("span within source");
                 black_box(contents);
             });
+        });
+    }
+    group.finish();
+
+    // The render benches below reuse one `NamedSource` across iterations, so
+    // any state the source carries across reports turns them into warm
+    // steady-state measurements — matching how oxlint renders a file with
+    // several diagnostics. This group rebuilds the source every iteration
+    // (outside the timing) to keep the cold first-render cost, a full prefix
+    // scan, measured. The diagnostic is returned so its teardown — dropping
+    // the sole `Arc` to the megabyte-sized source — also stays outside the
+    // timing, like the reused sources below.
+    let mut group = c.benchmark_group("render_cold/ci/declared");
+    let handler = ci_handler();
+    for fixture in &fixtures {
+        group.throughput(Throughput::Bytes(fixture.source_len as u64));
+        group.bench_function(BenchmarkId::from_parameter(fixture.name), |b| {
+            b.iter_batched(
+                || cold_declared_diagnostic(fixture),
+                |diagnostic| {
+                    let mut out = String::new();
+                    handler
+                        .render_report(&mut out, black_box(diagnostic.as_ref()))
+                        .expect("render succeeds");
+                    (out, diagnostic)
+                },
+                BatchSize::LargeInput,
+            );
         });
     }
     group.finish();
