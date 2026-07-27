@@ -3,14 +3,16 @@
     clippy::cast_possible_truncation,
     reason = "deterministic fuzz inputs are tightly bounded"
 )]
-//! Differential fuzz test for the graphical renderer's two span-reading paths.
+//! Differential fuzz tests for the graphical renderer's span-reading paths.
 //!
 //! `render_snippets` reads each label's span either through a shared
 //! `SpanScanner` scan (when the source exposes its backing buffer) or through
-//! one `SourceCode::read_span` call per label. Both paths must render
-//! byte-identical reports. See the test's own doc comment for the full matrix.
+//! one `SourceCode::read_span` call per label, and a `NamedSource` carries a
+//! scan memo from one report to the next. Every combination — buffered or
+//! not, memo warm or cold — must render byte-identical reports. See each
+//! test's own doc comment for its matrix.
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use miette::{
     Diagnostic, GraphicalReportHandler, GraphicalTheme, LabeledSpan, Labels, MietteError,
@@ -85,6 +87,62 @@ fn render(diagnostic: &dyn Diagnostic, context_lines: usize) -> (fmt::Result, St
     (result, out)
 }
 
+/// Line-ending mixes the fuzzers sweep: LF-only, CRLF, lone-CR, and
+/// multibyte text around all three.
+const ALPHABETS: &[&[&str]] = &[
+    &["a", "\n"],
+    &["a", "b", "c", "\n"],
+    &["a", "b", "\r\n"],
+    &["a", "\r", "\n", "\r\n"],
+    &["x", "y", "\n", "é", "🦀", "\r\n"],
+];
+
+/// A random source of up to 23 segments drawn from `alpha`.
+fn random_source(rng: &mut Rng, alpha: &[&str]) -> String {
+    let n = rng.below(24);
+    let mut src = String::new();
+    for _ in 0..n {
+        src.push_str(alpha[rng.below(alpha.len())]);
+    }
+    src
+}
+
+/// 1–4 random labels over `src`, snapped to char boundaries: rendering
+/// (unlike `read_span`) slices the data as UTF-8 text.
+fn random_labels(rng: &mut Rng, src: &str, context_lines: usize) -> Vec<LabeledSpan> {
+    let floor = |mut byte: usize| {
+        byte = byte.min(src.len());
+        while byte > 0 && !src.is_char_boundary(byte) {
+            byte -= 1;
+        }
+        byte
+    };
+    (0..=rng.below(4))
+        .map(|i| {
+            // One in six labels lands just past EOF, making the whole render
+            // fail; every rendering path must agree on that too.
+            let offset =
+                if rng.below(6) == 0 { src.len() + 1 } else { floor(rng.below(src.len() + 1)) };
+            let mut len = floor(offset + [0, 1, 2, 6][rng.below(4)]).saturating_sub(offset);
+            // A zero-length span at offset 0 with zero context makes
+            // `read_span` return the window `[0, 1)` (a pre-existing quirk of
+            // its saturating span-end arithmetic), which need not be valid
+            // UTF-8 — rendering panics on every path alike. Widen such spans
+            // to the first char.
+            if context_lines == 0 && offset == 0 && len == 0 {
+                len = src.chars().next().map_or(0, char::len_utf8);
+            }
+            let label = Some(format!("label {i}"));
+            let span = (offset as u32, len as u32);
+            if rng.below(4) == 0 {
+                LabeledSpan::new_primary_with_span(label, span)
+            } else {
+                LabeledSpan::new_with_span(label, span)
+            }
+        })
+        .collect()
+}
+
 /// `render_snippets` has two ways to read spans — a shared
 /// `SpanScanner` scan when the source
 /// exposes [`SourceCode::contiguous_bytes`], and one `read_span` per
@@ -100,62 +158,13 @@ fn render(diagnostic: &dyn Diagnostic, context_lines: usize) -> (fmt::Result, St
               both paths are exercised under Miri by the normal snapshot tests"
 )]
 fn buffer_and_read_span_paths_render_identically() {
-    let alphabets: &[&[&str]] = &[
-        &["a", "\n"],
-        &["a", "b", "c", "\n"],
-        &["a", "b", "\r\n"],
-        &["a", "\r", "\n", "\r\n"],
-        &["x", "y", "\n", "é", "🦀", "\r\n"],
-    ];
     let mut rng = Rng(0x2545_F491_4F6C_DD1D);
     let mut checked = 0usize;
-    for alpha in alphabets {
+    for alpha in ALPHABETS {
         for _ in 0..300 {
-            let n = rng.below(24);
-            let mut src = String::new();
-            for _ in 0..n {
-                src.push_str(alpha[rng.below(alpha.len())]);
-            }
-            // Snap span edges to char boundaries: rendering (unlike
-            // `read_span`) slices the data as UTF-8 text.
-            let floor = |mut byte: usize| {
-                byte = byte.min(src.len());
-                while byte > 0 && !src.is_char_boundary(byte) {
-                    byte -= 1;
-                }
-                byte
-            };
+            let src = random_source(&mut rng, alpha);
             for context_lines in 0..=2 {
-                let labels: Vec<LabeledSpan> = (0..=rng.below(4))
-                    .map(|i| {
-                        // One in six labels lands just past EOF, making
-                        // the whole render fail; both paths must agree on
-                        // that too.
-                        let offset = if rng.below(6) == 0 {
-                            src.len() + 1
-                        } else {
-                            floor(rng.below(src.len() + 1))
-                        };
-                        let mut len =
-                            floor(offset + [0, 1, 2, 6][rng.below(4)]).saturating_sub(offset);
-                        // A zero-length span at offset 0 with zero
-                        // context makes `read_span` return the window
-                        // `[0, 1)` (a pre-existing quirk of its
-                        // saturating span-end arithmetic), which need not
-                        // be valid UTF-8 — rendering panics on both paths
-                        // alike. Widen such spans to the first char.
-                        if context_lines == 0 && offset == 0 && len == 0 {
-                            len = src.chars().next().map_or(0, char::len_utf8);
-                        }
-                        let label = Some(format!("label {i}"));
-                        let span = (offset as u32, len as u32);
-                        if rng.below(4) == 0 {
-                            LabeledSpan::new_primary_with_span(label, span)
-                        } else {
-                            LabeledSpan::new_with_span(label, span)
-                        }
-                    })
-                    .collect();
+                let labels = random_labels(&mut rng, &src, context_lines);
 
                 let with_buffer = TestDiag {
                     src: NamedSource::new("fuzz.rs", src.clone()),
@@ -177,4 +186,61 @@ fn buffer_and_read_span_paths_render_identically() {
         }
     }
     assert!(checked >= 4000, "expected a broad sweep, only checked {checked}");
+}
+
+/// `NamedSource` embeds a scan cache, so a report rendered against an
+/// already-rendered source resumes the previous report's line scan instead of
+/// re-reading the source from byte 0. Whatever the cache's state, output must
+/// be byte-identical to rendering against a fresh source: sequences of
+/// reports through one `Arc<NamedSource>` (how oxlint renders a file's
+/// diagnostics) are each compared against a cold render, across LF / CRLF /
+/// lone-CR and multibyte sources, spans in any order (backwards ones fall off
+/// the memoized path), varying context widths against the same source, and
+/// labels past EOF (both renders must fail identically).
+#[test]
+#[cfg_attr(
+    miri,
+    ignore = "renders thousands of graphical diagnostics to differentially fuzz two safe \
+              code paths — Miri finds no UB here and interpreting the renders is far too slow; \
+              the warm-cache path is exercised under Miri by \
+              `second_render_through_shared_source_matches_fresh_render`"
+)]
+fn warm_scan_cache_renders_identically() {
+    let mut rng = Rng(0x6C62_272E_07BB_0142);
+    for alpha in ALPHABETS {
+        for _ in 0..200 {
+            let src = random_source(&mut rng, alpha);
+            let shared = Arc::new(NamedSource::new("fuzz.rs", src.clone()));
+            for _report in 0..4 {
+                let context_lines = rng.below(3);
+                let labels = random_labels(&mut rng, &src, context_lines);
+                let warm = TestDiag { src: Arc::clone(&shared), labels: labels.clone() };
+                let cold = TestDiag { src: NamedSource::new("fuzz.rs", src.clone()), labels };
+                let (warm_result, warm_out) = render(&warm, context_lines);
+                let (cold_result, cold_out) = render(&cold, context_lines);
+                assert_eq!(
+                    (warm_result, &warm_out),
+                    (cold_result, &cold_out),
+                    "diverged for src={src:?} context_lines={context_lines} labels={:?}",
+                    warm.labels,
+                );
+            }
+        }
+    }
+}
+
+/// Two reports against one source: the second render's line scan resumes
+/// where the first one stopped, and a third, earlier span falls off the
+/// memoized path. Small deterministic twin of
+/// `warm_scan_cache_renders_identically` that also runs under Miri.
+#[test]
+fn second_render_through_shared_source_matches_fresh_render() {
+    let src = "zero\none\ntwo\nthree\nfour\nfive\n";
+    let shared = Arc::new(NamedSource::new("shared.rs", src.to_string()));
+    for (offset, len) in [(5u32, 3u32), (24, 4), (9, 3)] {
+        let labels = vec![LabeledSpan::new_with_span(Some("here".into()), (offset, len))];
+        let warm = TestDiag { src: Arc::clone(&shared), labels: labels.clone() };
+        let cold = TestDiag { src: NamedSource::new("shared.rs", src.to_string()), labels };
+        assert_eq!(render(&warm, 1), render(&cold, 1), "span=({offset}, {len})");
+    }
 }

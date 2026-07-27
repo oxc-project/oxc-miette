@@ -5,17 +5,21 @@ full reporting and such features.
 */
 use std::{
     borrow::{Borrow, Cow},
+    cmp,
     error::Error,
     fmt::{self, Display},
-    fs, mem,
+    fs,
+    hash::{Hash, Hasher},
+    mem,
     ops::{Deref, Range},
     panic::Location,
+    sync::{Mutex, MutexGuard, PoisonError},
 };
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::MietteError;
+use crate::{MietteError, source_impls::ScanSeed};
 
 /// Adds rich metadata to your Error that can be used by
 /// [`Report`](crate::Report) to print really nice and human-friendly error
@@ -375,6 +379,106 @@ pub trait SourceCode: Send + Sync {
     fn contiguous_bytes(&self) -> Option<&[u8]> {
         None
     }
+
+    /// Returns this source's [`SourceScanCache`], if it embeds one.
+    ///
+    /// This is an optional fast path layered on [`contiguous_bytes`]: when
+    /// both return `Some`, renderers memoize where one report's line scan
+    /// ended and resume the next report's scan there, so rendering many
+    /// diagnostics against one source scans it once in total instead of once
+    /// per report. Implementations returning `Some` must keep the bytes
+    /// exposed by [`contiguous_bytes`] unchanged for the life of the value,
+    /// since the memo describes those bytes.
+    ///
+    /// The default returns `None`, which keeps every render scanning
+    /// independently. Wrapper sources should forward to the wrapped source.
+    ///
+    /// [`contiguous_bytes`]: SourceCode::contiguous_bytes
+    fn scan_cache(&self) -> Option<&SourceScanCache> {
+        None
+    }
+}
+
+/// A memo of the source-prefix line scan that snippet rendering performs,
+/// shared across reports.
+///
+/// Rendering a snippet must find the line number of each labeled span, which
+/// means counting the line breaks before it — a scan of the source from byte
+/// 0 for every rendered diagnostic. A `SourceScanCache` embedded in a
+/// [`SourceCode`] (see [`SourceCode::scan_cache`]) remembers where the last
+/// render's scan stopped so the next render scans only the bytes past that
+/// point. The cache never changes what a render produces, only how many bytes
+/// it re-reads; [`NamedSource`](crate::NamedSource) embeds one.
+#[derive(Debug, Default)]
+pub struct SourceScanCache {
+    seed: Mutex<Option<ScanSeed>>,
+}
+
+impl SourceScanCache {
+    /// An empty cache; the first render's scan fills it.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The memoized scan state, if any render has stored one.
+    #[cfg(feature = "fancy-base")]
+    pub(crate) fn load(&self) -> Option<ScanSeed> {
+        *self.lock()
+    }
+
+    /// Memoize `seed` unless the cache already covers more of the source.
+    #[cfg(feature = "fancy-base")]
+    pub(crate) fn store(&self, seed: ScanSeed) {
+        let mut slot = self.lock();
+        if slot.is_none_or(|old| old.pos() < seed.pos()) {
+            *slot = Some(seed);
+        }
+    }
+
+    fn lock(&self) -> MutexGuard<'_, Option<ScanSeed>> {
+        // A poisoned lock only means another thread panicked mid-render; the
+        // slot itself always holds a coherent value.
+        self.seed.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl Clone for SourceScanCache {
+    /// Clones the memo, so the copy's first render also skips already-scanned
+    /// bytes.
+    fn clone(&self) -> Self {
+        Self { seed: Mutex::new(*self.lock()) }
+    }
+}
+
+/// A cache holds state derived from the source it is embedded in, so caches
+/// carry no identity of their own: they all compare equal, order as equal, and
+/// hash to nothing. This lets a type embed one — like
+/// [`NamedSource`](crate::NamedSource) does — while keeping its derived
+/// `PartialEq`/`Ord`/`Hash`, which then see every cache state as the same
+/// value.
+impl PartialEq for SourceScanCache {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for SourceScanCache {}
+
+impl PartialOrd for SourceScanCache {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SourceScanCache {
+    fn cmp(&self, _other: &Self) -> cmp::Ordering {
+        cmp::Ordering::Equal
+    }
+}
+
+impl Hash for SourceScanCache {
+    fn hash<H: Hasher>(&self, _state: &mut H) {}
 }
 
 /// A labeled [`SourceSpan`].

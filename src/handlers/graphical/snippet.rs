@@ -39,11 +39,14 @@ impl GraphicalReportHandler {
         // When the source exposes its backing buffer, share one forward scan
         // across every span lookup below (one per label plus one per merge
         // attempt); each `read_span` otherwise scans the source from byte 0
-        // again. The scanner bypasses the source's own `read_span`, so
-        // re-attach the source's name the way `NamedSource` would.
-        let mut scanner = source
-            .contiguous_bytes()
-            .map(|bytes| SpanScanner::new(bytes, self.context_lines, self.context_lines));
+        // again. A source with a scan cache also carries the scan across
+        // reports: this render's scan resumes where the last one stopped and
+        // memoizes where it stopped in turn. The scanner bypasses the
+        // source's own `read_span`, so re-attach the source's name the way
+        // `NamedSource` would.
+        let mut scanner = source.contiguous_bytes().map(|bytes| {
+            SpanScanner::new(bytes, self.context_lines, self.context_lines, source.scan_cache())
+        });
         let source_name = source.name();
         let mut read = |span: &SourceSpan| match scanner.as_mut() {
             Some(scanner) => scanner.read_span(*span).map(|contents| match source_name {

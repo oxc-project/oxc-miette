@@ -5,6 +5,8 @@ Default trait implementations for [`SourceCode`].
 use std::str::from_utf8;
 use std::{borrow::Cow, collections::VecDeque, fmt::Debug, sync::Arc};
 
+#[cfg(feature = "fancy-base")]
+use crate::SourceScanCache;
 use crate::{MietteError, MietteSpanContents, SourceCode, SourceSpan, SpanContents};
 
 #[derive(Clone, Copy)]
@@ -199,6 +201,45 @@ impl LeadingContext {
     }
 }
 
+/// Whether `pos` sits between the `\r` and `\n` of a CRLF pair — inside a
+/// logical break rather than on either side of one.
+fn splits_crlf_pair(input: &[u8], pos: usize) -> bool {
+    pos > 0 && input[pos - 1] == b'\r' && input.get(pos) == Some(&b'\n')
+}
+
+/// A prefix scan's state at a source position, compact enough to memoize.
+///
+/// Holds everything a later scan of the same source needs to continue from
+/// `pos` instead of byte 0: how many line breaks precede `pos` and where the
+/// last two lines start. Producers never extract one at a position that
+/// splits a `\r\n` pair, so resuming never double-counts a break.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(clippy::redundant_pub_crate, reason = "keeps the scan memo crate-private")]
+pub(crate) struct ScanSeed {
+    /// Bytes in `[0, pos)` are summarized by the fields below.
+    pos: usize,
+    /// Line breaks in `[0, pos)`.
+    line_count: usize,
+    /// Start of the line before the one containing `pos`. `None` while
+    /// `line_count` is 0, mirroring [`PrefixScan::one_context_line_resumed`].
+    previous_line_start: Option<usize>,
+    /// Start of the line containing `pos`.
+    current_line_start: usize,
+}
+
+impl ScanSeed {
+    /// The state of every scan before it has consumed any input.
+    const START: Self =
+        Self { pos: 0, line_count: 0, previous_line_start: None, current_line_start: 0 };
+
+    /// How much of the source this seed summarizes. A seed with a larger
+    /// position saves later scans more work.
+    #[cfg(feature = "fancy-base")]
+    pub(crate) fn pos(&self) -> usize {
+        self.pos
+    }
+}
+
 /// State produced by scanning the source prefix before a span.
 struct PrefixScan {
     line_count: usize,
@@ -207,12 +248,15 @@ struct PrefixScan {
 }
 
 impl PrefixScan {
-    /// Scan the prefix before a span, retaining only its leading context lines.
+    /// Scan the prefix before a span, retaining only its leading context
+    /// lines. A `seed` memoized by an earlier scan of the same source lets
+    /// the one-context-line scan read only `[seed.pos, end)`; other widths
+    /// ignore it.
     #[inline]
-    fn new(input: &[u8], end: usize, context_lines_before: usize) -> Self {
+    fn new(input: &[u8], end: usize, context_lines_before: usize, seed: Option<ScanSeed>) -> Self {
         let prefix = &input[..end];
         if context_lines_before == 1 {
-            return Self::one_context_line(prefix);
+            return Self::one_context_line_resumed(prefix, seed.unwrap_or(ScanSeed::START));
         }
 
         let mut scan = Self {
@@ -228,27 +272,47 @@ impl PrefixScan {
         scan
     }
 
-    /// The graphical handler's default. Keep the one retained line start in a
-    /// scalar while scanning instead of updating a `VecDeque` for every line.
-    fn one_context_line(prefix: &[u8]) -> Self {
-        let mut line_count = 0;
-        let mut current_line_start = 0;
-        let mut previous_line_start = None;
+    /// The graphical handler's default width, continued from `seed` so only
+    /// `prefix[seed.pos..]` is read (a fresh scan resumes from
+    /// [`ScanSeed::START`]). Most source files only use LF: count all breaks
+    /// in that delta with one SIMD pass, then recover the two line starts the
+    /// caller needs from its end. A delta containing `\r` walks its breaks
+    /// one by one instead, since `\n` counting would miss lone-`\r` breaks.
+    fn one_context_line_resumed(prefix: &[u8], seed: ScanSeed) -> Self {
+        // A seed from another source could be deeper than this prefix; treat
+        // it as absent rather than slicing out of bounds.
+        let seed = if seed.pos <= prefix.len() { seed } else { ScanSeed::START };
+        debug_assert!(
+            !splits_crlf_pair(prefix, seed.pos),
+            "a seed inside a CRLF pair would count its break twice"
+        );
+        let delta = &prefix[seed.pos..];
 
-        if memchr::memchr(b'\r', prefix).is_none() {
-            // Most source files only use LF. Count all breaks in one SIMD pass,
-            // then recover the two line starts the caller needs from the end.
-            line_count = bytecount::count(prefix, b'\n');
-            if let Some(last_break) = memchr::memrchr(b'\n', prefix) {
-                current_line_start = last_break + 1;
-                previous_line_start =
-                    Some(memchr::memrchr(b'\n', &prefix[..last_break]).map_or(0, |pos| pos + 1));
-            }
-        } else {
-            for line_break in LineBreaks::new(prefix) {
+        let mut line_count = seed.line_count;
+        let mut previous_line_start = seed.previous_line_start;
+        let mut current_line_start = seed.current_line_start;
+        if memchr::memchr(b'\r', delta).is_some() {
+            for line_break in LineBreaks::new(delta) {
                 line_count += 1;
                 previous_line_start = Some(current_line_start);
-                current_line_start = line_break.next_line_start();
+                current_line_start = seed.pos + line_break.next_line_start();
+            }
+        } else {
+            let breaks = bytecount::count(delta, b'\n');
+            if breaks > 0 {
+                let last_break =
+                    memchr::memrchr(b'\n', delta).expect("delta contains counted breaks");
+                previous_line_start = Some(if breaks == 1 {
+                    // The delta's only break: the line it ends was the seed's
+                    // current line (line 0 starting at 0 for a fresh scan).
+                    seed.current_line_start
+                } else {
+                    let second_to_last = memchr::memrchr(b'\n', &delta[..last_break])
+                        .expect("delta contains counted breaks");
+                    seed.pos + second_to_last + 1
+                });
+                current_line_start = seed.pos + last_break + 1;
+                line_count += breaks;
             }
         }
 
@@ -302,7 +366,7 @@ impl<'a> SpanReader<'a> {
     fn new(input: &'a [u8], request: SpanRequest, context: ContextLines) -> Self {
         let offset = request.prefix_end(input);
         let PrefixScan { line_count, leading, current_line_start } =
-            PrefixScan::new(input, offset, context.before);
+            PrefixScan::new(input, offset, context.before, None);
         Self {
             input,
             request,
@@ -467,16 +531,46 @@ impl<'a> LineIndex<'a> {
     }
 
     /// First query: retain the line starts in its leading context window and
-    /// use them as the origin of the reusable index.
-    fn init(&mut self, cut: usize, context_lines_before: usize) {
+    /// use them as the origin of the reusable index. A `seed` memoized by an
+    /// earlier scan of the same source lets the prefix scan read only
+    /// `[seed.pos, cut)` instead of starting at byte 0.
+    fn init(&mut self, cut: usize, context_lines_before: usize, seed: Option<ScanSeed>) {
         let PrefixScan { line_count, leading, current_line_start } =
-            PrefixScan::new(self.input, cut, context_lines_before);
+            PrefixScan::new(self.input, cut, context_lines_before, seed);
         debug_assert_eq!(leading.start_line + leading.len(), line_count);
         self.base_line = leading.start_line;
         self.line_starts.reserve(leading.len() + 8);
         leading.append_to(&mut self.line_starts);
         self.line_starts.push(current_line_start);
         self.frontier = cut;
+    }
+
+    /// The scan state at `frontier`, for memoization by [`ScanSeed`]: every
+    /// break in `[0, frontier)` is summed into `base_line` or recorded in
+    /// `line_starts`, whose last two entries are the line starts a seed
+    /// carries. `None` when the index does not determine one — nothing was
+    /// scanned, or a zero-width leading context retained a single start with
+    /// unrecorded lines before it.
+    fn seed(&self) -> Option<ScanSeed> {
+        debug_assert!(
+            !splits_crlf_pair(self.input, self.frontier),
+            "the frontier never splits a CRLF pair"
+        );
+        match self.line_starts.as_slice() {
+            [.., previous, current] => Some(ScanSeed {
+                pos: self.frontier,
+                line_count: self.base_line + self.line_starts.len() - 1,
+                previous_line_start: Some(*previous),
+                current_line_start: *current,
+            }),
+            [start] if self.base_line == 0 => Some(ScanSeed {
+                pos: self.frontier,
+                line_count: 0,
+                previous_line_start: None,
+                current_line_start: *start,
+            }),
+            _ => None,
+        }
     }
 
     /// Extend the index so every break in `[0, target)` is recorded, with one
@@ -692,18 +786,33 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
 pub(crate) struct SpanScanner<'a> {
     context: ContextLines,
     index: LineIndex<'a>,
+    /// The source's cross-report memo: the first query's prefix scan resumes
+    /// from it, and dropping the scanner stores `memo` back, so the next
+    /// scanner over the same source starts where this one's first scan
+    /// stopped.
+    cache: Option<&'a SourceScanCache>,
+    /// This scanner's own state at its first query's prefix cut. Memoizing
+    /// this position — not the deeper index frontier — keeps the memo usable
+    /// by a repeat of the same query, whose cut would fall short of the
+    /// frontier and force a fresh scan.
+    memo: Option<ScanSeed>,
 }
 
 #[cfg(feature = "fancy-base")]
 impl<'a> SpanScanner<'a> {
+    /// A scanner over `input`, resuming from and memoizing into `cache` when
+    /// the source carries one. The cache must belong to these bytes.
     pub(crate) fn new(
         input: &'a [u8],
         context_lines_before: usize,
         context_lines_after: usize,
+        cache: Option<&'a SourceScanCache>,
     ) -> Self {
         Self {
             context: ContextLines::new(context_lines_before, context_lines_after),
             index: LineIndex::new(input),
+            cache,
+            memo: None,
         }
     }
 
@@ -715,7 +824,19 @@ impl<'a> SpanScanner<'a> {
         let request = SpanRequest::new(span);
         let cut = request.prefix_end(self.index.input);
         if self.index.is_empty() {
-            self.index.init(cut, self.context.before);
+            // Only the one-context-line scan can resume from a seed; skip the
+            // lock for other widths.
+            let seed = if self.context.before == 1 {
+                self.cache.and_then(SourceScanCache::load)
+            } else {
+                None
+            };
+            self.index.init(cut, self.context.before, seed);
+            if self.cache.is_some() {
+                // The index still sits exactly at `cut`; later queries deepen
+                // it past positions a repeated query could resume from.
+                self.memo = self.index.seed();
+            }
         } else {
             if cut < self.index.origin().expect("a non-empty index has an origin") {
                 return self.read_unindexed(request);
@@ -733,6 +854,18 @@ impl<'a> SpanScanner<'a> {
 
     fn read_unindexed(&self, request: SpanRequest) -> Result<MietteSpanContents<'a>, MietteError> {
         SpanReader::new(self.index.input, request, self.context).read()
+    }
+}
+
+/// Memoize where this scanner's first prefix scan stopped, on whatever path
+/// the render exits through. The cache keeps the deepest state it is offered,
+/// so a scanner that scanned less than a previous one stores nothing.
+#[cfg(feature = "fancy-base")]
+impl Drop for SpanScanner<'_> {
+    fn drop(&mut self) {
+        if let (Some(cache), Some(seed)) = (self.cache, self.memo) {
+            cache.store(seed);
+        }
     }
 }
 
@@ -854,6 +987,10 @@ impl<T: ?Sized + SourceCode> SourceCode for Arc<T> {
     fn contiguous_bytes(&self) -> Option<&[u8]> {
         self.as_ref().contiguous_bytes()
     }
+
+    fn scan_cache(&self) -> Option<&crate::SourceScanCache> {
+        self.as_ref().scan_cache()
+    }
 }
 
 impl<T: ?Sized + SourceCode + ToOwned> SourceCode for Cow<'_, T>
@@ -881,6 +1018,10 @@ where
     fn contiguous_bytes(&self) -> Option<&[u8]> {
         self.as_ref().contiguous_bytes()
     }
+
+    fn scan_cache(&self) -> Option<&crate::SourceScanCache> {
+        self.as_ref().scan_cache()
+    }
 }
 
 #[cfg(test)]
@@ -892,12 +1033,59 @@ mod tests {
     fn lf_prefix_fast_path_matches_generic_path() {
         let input = b"zero\none\n\ntwo\nthree\n";
         for cut in 0..=input.len() {
-            let fast = PrefixScan::new(input, cut, 1);
-            let generic = PrefixScan::new(input, cut, 2);
+            let fast = PrefixScan::new(input, cut, 1, None);
+            let generic = PrefixScan::new(input, cut, 2, None);
             assert_eq!(fast.line_count, generic.line_count, "cut={cut}");
             assert_eq!(fast.current_line_start, generic.current_line_start, "cut={cut}");
             assert_eq!(fast.leading.first(), generic.leading.last(), "cut={cut}");
             assert_eq!(fast.leading.start_line, fast.line_count.saturating_sub(1), "cut={cut}");
+        }
+    }
+
+    /// A scan resumed from a memoized [`ScanSeed`] must match the scan that
+    /// starts at byte 0, for every (memo position, scan end) combination
+    /// across LF / CRLF / lone-CR / multibyte inputs. Seeds are a scan's own
+    /// state at its end, so the test rebuilds one from the fresh scan at each
+    /// position — skipping positions inside a `\r\n` pair, where no producer
+    /// creates one.
+    #[test]
+    fn resumed_prefix_scan_matches_fresh_scan() {
+        let inputs: &[&[u8]] = &[
+            b"",
+            b"a",
+            b"one line only",
+            b"zero\none\n\ntwo\nthree\n",
+            b"a\r\nb\r\nc",
+            b"a\rb\rc",
+            b"mixed\r\nlf\nlone\rend",
+            b"\n\n\n",
+            b"\r\r\r",
+            b"\r\n\r\n",
+            b"ends with pair\r\n",
+            "caf\u{e9}\nn\u{1f402}ext\n".as_bytes(),
+        ];
+        for &input in inputs {
+            for mid in 0..=input.len() {
+                if splits_crlf_pair(input, mid) {
+                    continue;
+                }
+                let at_mid = PrefixScan::new(input, mid, 1, None);
+                let seed = ScanSeed {
+                    pos: mid,
+                    line_count: at_mid.line_count,
+                    previous_line_start: at_mid.leading.last(),
+                    current_line_start: at_mid.current_line_start,
+                };
+                for cut in mid..=input.len() {
+                    let context = format!("input={input:?} mid={mid} cut={cut}");
+                    let resumed = PrefixScan::one_context_line_resumed(&input[..cut], seed);
+                    let fresh = PrefixScan::new(input, cut, 1, None);
+                    assert_eq!(resumed.line_count, fresh.line_count, "{context}");
+                    assert_eq!(resumed.current_line_start, fresh.current_line_start, "{context}");
+                    assert_eq!(resumed.leading.start_line, fresh.leading.start_line, "{context}");
+                    assert_eq!(resumed.leading.first(), fresh.leading.first(), "{context}");
+                }
+            }
         }
     }
 
@@ -1120,6 +1308,31 @@ mod scanner_tests {
         }
     }
 
+    /// Line-ending mixes the differential fuzzers sweep: LF-only, CRLF,
+    /// lone-CR, and multibyte text around all three.
+    const ALPHABETS: &[&[&str]] = &[
+        &["a", "\n"],
+        &["a", "b", "c", "\n"],
+        &["a", "b", "\r\n"],
+        &["a", "\r", "\n", "\r\n"],
+        &["x", "y", "\n", "é", "🦀", "\r\n"],
+    ];
+
+    /// A random source of up to 15 segments drawn from `alpha`.
+    fn random_input(rng: &mut Rng, alpha: &[&str]) -> String {
+        let n = rng.below(16);
+        let mut s = String::new();
+        for _ in 0..n {
+            s.push_str(alpha[rng.below(alpha.len())]);
+        }
+        s
+    }
+
+    /// A random span of any byte alignment, including past-EOF ones.
+    fn random_span(rng: &mut Rng, input_len: usize) -> (usize, usize) {
+        (rng.below(input_len + 3), [0, 1, 2, 5][rng.below(4)])
+    }
+
     /// Run one query against a (stateful) scanner and assert the result is
     /// identical to a fresh `SpanReader` — data, span, line, column, and
     /// `line_count` on success, `OutOfBounds` on failure. `history` is the
@@ -1173,33 +1386,21 @@ mod scanner_tests {
                   exercised under Miri by the normal snapshot tests"
     )]
     fn scanner_matches_span_reader_exhaustively() {
-        let alphabets: &[&[&str]] = &[
-            &["a", "\n"],
-            &["a", "b", "c", "\n"],
-            &["a", "b", "\r\n"],
-            &["a", "\r", "\n", "\r\n"],
-            &["x", "y", "\n", "é", "🦀", "\r\n"],
-        ];
         let mut rng = Rng(0xA076_1D64_78BD_642F);
         let mut checked = 0usize;
-        for alpha in alphabets {
+        for alpha in ALPHABETS {
             for _ in 0..700 {
-                let n = rng.below(16);
-                let mut s = String::new();
-                for _ in 0..n {
-                    s.push_str(alpha[rng.below(alpha.len())]);
-                }
+                let s = random_input(&mut rng, alpha);
                 let input = s.as_bytes();
                 for (before, after) in [(0, 0), (1, 1), (2, 2), (0, 2), (2, 0)] {
-                    let mut spans: Vec<(usize, usize)> = std::iter::repeat_with(|| {
-                        (rng.below(input.len() + 3), [0, 1, 2, 5][rng.below(4)])
-                    })
-                    .take(6)
-                    .collect();
+                    let mut spans: Vec<(usize, usize)> =
+                        std::iter::repeat_with(|| random_span(&mut rng, input.len()))
+                            .take(6)
+                            .collect();
 
                     // Random order: queries may jump backwards past the
                     // index origin.
-                    let mut scanner = SpanScanner::new(input, before, after);
+                    let mut scanner = SpanScanner::new(input, before, after, None);
                     for i in 0..spans.len() {
                         check(&mut scanner, input, spans[i], before, after, &spans[..i]);
                         checked += 1;
@@ -1212,7 +1413,7 @@ mod scanner_tests {
                     let first = spans[0].0;
                     let merged_end = spans.iter().map(|&(o, l)| o + l).max().unwrap();
                     spans.push((first, merged_end - first));
-                    let mut scanner = SpanScanner::new(input, before, after);
+                    let mut scanner = SpanScanner::new(input, before, after, None);
                     for i in 0..spans.len() {
                         check(&mut scanner, input, spans[i], before, after, &spans[..i]);
                         checked += 1;
@@ -1223,14 +1424,78 @@ mod scanner_tests {
         assert!(checked > 100_000, "expected a broad sweep, only checked {checked}");
     }
 
+    /// Differentially fuzz the memo hand-off: a scanner resuming from a
+    /// [`SourceScanCache`] filled by earlier scanners must answer every query
+    /// exactly like a fresh `SpanReader`, across scanner generations sharing
+    /// one cache (as reports against one source do) and context
+    /// configurations (memos are stored and consumed by handlers with
+    /// different context widths).
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "equivalence fuzzer over safe, bounds-checked code — Miri finds no UB here \
+                  and interprets it orders of magnitude slower; the seeded path is still \
+                  exercised under Miri by `resumed_prefix_scan_matches_fresh_scan` and the \
+                  render tests"
+    )]
+    fn seeded_scanner_matches_span_reader_exhaustively() {
+        let configs = [(1usize, 1usize), (1, 0), (0, 1), (2, 2)];
+        let mut rng = Rng(0x517C_C1B7_2722_0A95);
+        let mut resumed = 0usize;
+        for alpha in ALPHABETS {
+            for _ in 0..500 {
+                let s = random_input(&mut rng, alpha);
+                let input = s.as_bytes();
+                let cache = crate::SourceScanCache::new();
+                for _generation in 0..3 {
+                    let (before, after) = configs[rng.below(configs.len())];
+                    resumed += usize::from(before == 1 && cache.load().is_some());
+                    let mut scanner = SpanScanner::new(input, before, after, Some(&cache));
+                    let mut history = Vec::new();
+                    for _ in 0..4 {
+                        let span = random_span(&mut rng, input.len());
+                        check(&mut scanner, input, span, before, after, &history);
+                        history.push(span);
+                    }
+                }
+            }
+        }
+        assert!(resumed > 1_500, "expected the memoized path to engage, resumed {resumed}");
+    }
+
+    /// The cache keeps whichever memo covers more of the source — dropping a
+    /// scanner that scanned less must not regress it — and clones carry it.
+    #[test]
+    fn scan_cache_keeps_the_deepest_seed() {
+        let input = b"a\nb\nc\nd\n";
+        let cache = crate::SourceScanCache::new();
+        assert!(cache.load().is_none());
+
+        let mut scanner = SpanScanner::new(input, 1, 1, Some(&cache));
+        scanner.read_span((6, 1).into()).unwrap();
+        drop(scanner);
+        let deep = cache.load().expect("first render memoizes its scan");
+        // The memo records the query's prefix cut, so repeating the same
+        // query resumes with an empty delta.
+        assert_eq!(deep.pos(), 5);
+
+        let cloned = cache.clone();
+
+        let mut scanner = SpanScanner::new(input, 1, 1, Some(&cache));
+        scanner.read_span((2, 1).into()).unwrap();
+        drop(scanner);
+        assert_eq!(cache.load(), Some(deep));
+        assert_eq!(cloned.load(), Some(deep));
+    }
+
     /// The empty-source and just-past-EOF edge cases `SpanReader` special
     /// cases, issued through one scanner.
     #[test]
     fn zero_length_spans_at_eof() {
-        let mut scanner = SpanScanner::new(b"", 0, 0);
+        let mut scanner = SpanScanner::new(b"", 0, 0, None);
         check(&mut scanner, b"", (0, 0), 0, 0, &[]);
         check(&mut scanner, b"", (1, 0), 0, 0, &[(0, 0)]);
-        let mut scanner = SpanScanner::new(b"a", 1, 1);
+        let mut scanner = SpanScanner::new(b"a", 1, 1, None);
         check(&mut scanner, b"a", (1, 0), 1, 1, &[]);
         check(&mut scanner, b"a", (2, 0), 1, 1, &[(1, 0)]);
     }

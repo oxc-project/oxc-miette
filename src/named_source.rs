@@ -1,15 +1,21 @@
 use std::{borrow::Cow, fmt};
 
-use crate::{MietteError, MietteSpanContents, SourceCode, SpanContents};
+use crate::{MietteError, MietteSpanContents, SourceCode, SourceScanCache, SpanContents};
 
 /// Utility struct for when you have a regular [`SourceCode`] type that doesn't
 /// implement `name`. For example [`String`]. Or if you want to override the
 /// `name` returned by the `SourceCode`.
+///
+/// Embeds a [`SourceScanCache`], so rendering several diagnostics against one
+/// `NamedSource` scans its text once in total rather than once per report.
+/// The cache is derived state: comparisons, ordering, and hashing see every
+/// cache as equal, so they still use only the source, name, and language.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NamedSource<S: SourceCode + 'static> {
     source: S,
     name: String,
     language: Option<String>,
+    scan_cache: SourceScanCache,
 }
 
 impl<S: SourceCode> fmt::Debug for NamedSource<S> {
@@ -17,8 +23,8 @@ impl<S: SourceCode> fmt::Debug for NamedSource<S> {
         f.debug_struct("NamedSource")
             .field("name", &self.name)
             .field("source", &"<redacted>")
-            .field("language", &self.language);
-        Ok(())
+            .field("language", &self.language)
+            .finish_non_exhaustive()
     }
 }
 
@@ -30,7 +36,12 @@ impl<S: SourceCode + 'static> NamedSource<S> {
     where
         S: Send + Sync,
     {
-        Self { source, name: name.as_ref().to_string(), language: None }
+        Self {
+            source,
+            name: name.as_ref().to_string(),
+            language: None,
+            scan_cache: SourceScanCache::new(),
+        }
     }
 
     /// Gets the name of this `NamedSource`.
@@ -83,5 +94,9 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
 
     fn contiguous_bytes(&self) -> Option<&[u8]> {
         self.inner().contiguous_bytes()
+    }
+
+    fn scan_cache(&self) -> Option<&SourceScanCache> {
+        Some(&self.scan_cache)
     }
 }
