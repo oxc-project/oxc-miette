@@ -199,6 +199,45 @@ impl LeadingContext {
     }
 }
 
+/// Whether `pos` sits between the `\r` and `\n` of a CRLF pair.
+fn splits_crlf_pair(input: &[u8], pos: usize) -> bool {
+    pos > 0 && input[pos - 1] == b'\r' && input.get(pos) == Some(&b'\n')
+}
+
+/// Bulk newline count. Miri cannot interpret bytecount's architecture-specific
+/// SIMD implementation, so it uses the equivalent bytewise count.
+#[expect(
+    clippy::naive_bytecount,
+    reason = "the naive branch exists because bytecount is uninterpretable under Miri"
+)]
+fn count_newlines(haystack: &[u8]) -> usize {
+    if cfg!(miri) {
+        haystack.iter().filter(|&&byte| byte == b'\n').count()
+    } else {
+        bytecount::count(haystack, b'\n')
+    }
+}
+
+/// Compact state describing a completed source-prefix scan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(clippy::redundant_pub_crate, reason = "keeps the scan seed crate-private")]
+pub(crate) struct ScanSeed {
+    pos: usize,
+    line_count: usize,
+    previous_line_start: Option<usize>,
+    current_line_start: usize,
+}
+
+impl ScanSeed {
+    const START: Self =
+        Self { pos: 0, line_count: 0, previous_line_start: None, current_line_start: 0 };
+
+    #[cfg(all(test, feature = "fancy-base"))]
+    pub(crate) fn pos(&self) -> usize {
+        self.pos
+    }
+}
+
 /// State produced by scanning the source prefix before a span.
 struct PrefixScan {
     line_count: usize,
@@ -209,10 +248,10 @@ struct PrefixScan {
 impl PrefixScan {
     /// Scan the prefix before a span, retaining only its leading context lines.
     #[inline]
-    fn new(input: &[u8], end: usize, context_lines_before: usize) -> Self {
+    fn new(input: &[u8], end: usize, context_lines_before: usize, seed: Option<ScanSeed>) -> Self {
         let prefix = &input[..end];
         if context_lines_before == 1 {
-            return Self::one_context_line(prefix);
+            return Self::one_context_line_resumed(prefix, seed.unwrap_or(ScanSeed::START));
         }
 
         let mut scan = Self {
@@ -230,25 +269,34 @@ impl PrefixScan {
 
     /// The graphical handler's default. Keep the one retained line start in a
     /// scalar while scanning instead of updating a `VecDeque` for every line.
-    fn one_context_line(prefix: &[u8]) -> Self {
-        let mut line_count = 0;
-        let mut current_line_start = 0;
-        let mut previous_line_start = None;
+    fn one_context_line_resumed(prefix: &[u8], seed: ScanSeed) -> Self {
+        let seed = if seed.pos <= prefix.len() { seed } else { ScanSeed::START };
+        debug_assert!(!splits_crlf_pair(prefix, seed.pos));
+        let delta = &prefix[seed.pos..];
 
-        if memchr::memchr(b'\r', prefix).is_none() {
-            // Most source files only use LF. Count all breaks in one SIMD pass,
-            // then recover the two line starts the caller needs from the end.
-            line_count = bytecount::count(prefix, b'\n');
-            if let Some(last_break) = memchr::memrchr(b'\n', prefix) {
-                current_line_start = last_break + 1;
-                previous_line_start =
-                    Some(memchr::memrchr(b'\n', &prefix[..last_break]).map_or(0, |pos| pos + 1));
-            }
-        } else {
-            for line_break in LineBreaks::new(prefix) {
+        let mut line_count = seed.line_count;
+        let mut previous_line_start = seed.previous_line_start;
+        let mut current_line_start = seed.current_line_start;
+        if memchr::memchr(b'\r', delta).is_some() {
+            for line_break in LineBreaks::new(delta) {
                 line_count += 1;
                 previous_line_start = Some(current_line_start);
-                current_line_start = line_break.next_line_start();
+                current_line_start = seed.pos + line_break.next_line_start();
+            }
+        } else {
+            let breaks = count_newlines(delta);
+            if breaks > 0 {
+                let last_break =
+                    memchr::memrchr(b'\n', delta).expect("delta contains counted breaks");
+                previous_line_start = Some(if breaks == 1 {
+                    seed.current_line_start
+                } else {
+                    let second_to_last = memchr::memrchr(b'\n', &delta[..last_break])
+                        .expect("delta contains counted breaks");
+                    seed.pos + second_to_last + 1
+                });
+                current_line_start = seed.pos + last_break + 1;
+                line_count += breaks;
             }
         }
 
@@ -302,7 +350,7 @@ impl<'a> SpanReader<'a> {
     fn new(input: &'a [u8], request: SpanRequest, context: ContextLines) -> Self {
         let offset = request.prefix_end(input);
         let PrefixScan { line_count, leading, current_line_start } =
-            PrefixScan::new(input, offset, context.before);
+            PrefixScan::new(input, offset, context.before, None);
         Self {
             input,
             request,
@@ -468,15 +516,38 @@ impl<'a> LineIndex<'a> {
 
     /// First query: retain the line starts in its leading context window and
     /// use them as the origin of the reusable index.
-    fn init(&mut self, cut: usize, context_lines_before: usize) {
+    fn init(&mut self, cut: usize, context_lines_before: usize, seed: Option<ScanSeed>) {
         let PrefixScan { line_count, leading, current_line_start } =
-            PrefixScan::new(self.input, cut, context_lines_before);
+            PrefixScan::new(self.input, cut, context_lines_before, seed);
         debug_assert_eq!(leading.start_line + leading.len(), line_count);
         self.base_line = leading.start_line;
         self.line_starts.reserve(leading.len() + 8);
         leading.append_to(&mut self.line_starts);
         self.line_starts.push(current_line_start);
         self.frontier = cut;
+    }
+
+    /// The scan state at `frontier`, for memoization by [`ScanSeed`].
+    fn seed(&self) -> Option<ScanSeed> {
+        debug_assert!(
+            !splits_crlf_pair(self.input, self.frontier),
+            "the frontier never splits a CRLF pair"
+        );
+        match self.line_starts.as_slice() {
+            [.., previous, current] => Some(ScanSeed {
+                pos: self.frontier,
+                line_count: self.base_line + self.line_starts.len() - 1,
+                previous_line_start: Some(*previous),
+                current_line_start: *current,
+            }),
+            [start] if self.base_line == 0 => Some(ScanSeed {
+                pos: self.frontier,
+                line_count: 0,
+                previous_line_start: None,
+                current_line_start: *start,
+            }),
+            _ => None,
+        }
     }
 
     /// Extend the index so every break in `[0, target)` is recorded, with one
@@ -692,6 +763,11 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
 pub(crate) struct SpanScanner<'a> {
     context: ContextLines,
     index: LineIndex<'a>,
+    /// State memoized by an earlier scanner over the same bytes, consumed by
+    /// the first query's prefix scan.
+    resume: Option<ScanSeed>,
+    /// This scanner's state at its first query's prefix cut.
+    memo: Option<ScanSeed>,
 }
 
 #[cfg(feature = "fancy-base")]
@@ -700,11 +776,20 @@ impl<'a> SpanScanner<'a> {
         input: &'a [u8],
         context_lines_before: usize,
         context_lines_after: usize,
+        resume: Option<ScanSeed>,
     ) -> Self {
         Self {
             context: ContextLines::new(context_lines_before, context_lines_after),
             index: LineIndex::new(input),
+            resume,
+            memo: None,
         }
+    }
+
+    /// The state of this scanner's first prefix scan, suitable for resuming
+    /// another scanner over the same bytes.
+    pub(crate) fn memo(&self) -> Option<ScanSeed> {
+        self.memo
     }
 
     /// Read a span while scanning only source bytes no earlier query scanned.
@@ -715,7 +800,9 @@ impl<'a> SpanScanner<'a> {
         let request = SpanRequest::new(span);
         let cut = request.prefix_end(self.index.input);
         if self.index.is_empty() {
-            self.index.init(cut, self.context.before);
+            let seed = if self.context.before == 1 { self.resume.take() } else { None };
+            self.index.init(cut, self.context.before, seed);
+            self.memo = self.index.seed();
         } else {
             if cut < self.index.origin().expect("a non-empty index has an origin") {
                 return self.read_unindexed(request);
@@ -892,12 +979,49 @@ mod tests {
     fn lf_prefix_fast_path_matches_generic_path() {
         let input = b"zero\none\n\ntwo\nthree\n";
         for cut in 0..=input.len() {
-            let fast = PrefixScan::new(input, cut, 1);
-            let generic = PrefixScan::new(input, cut, 2);
+            let fast = PrefixScan::new(input, cut, 1, None);
+            let generic = PrefixScan::new(input, cut, 2, None);
             assert_eq!(fast.line_count, generic.line_count, "cut={cut}");
             assert_eq!(fast.current_line_start, generic.current_line_start, "cut={cut}");
             assert_eq!(fast.leading.first(), generic.leading.last(), "cut={cut}");
             assert_eq!(fast.leading.start_line, fast.line_count.saturating_sub(1), "cut={cut}");
+        }
+    }
+
+    #[test]
+    fn resumed_prefix_scan_matches_fresh_scan() {
+        let inputs: &[&[u8]] = &[
+            b"",
+            b"a",
+            b"zero\none\n\ntwo\nthree\n",
+            b"a\r\nb\r\nc",
+            b"a\rb\rc",
+            b"mixed\r\nlf\nlone\rend",
+            b"\r\n\r\n",
+            "caf\u{e9}\nn\u{1f402}ext\n".as_bytes(),
+        ];
+        for &input in inputs {
+            for mid in 0..=input.len() {
+                if splits_crlf_pair(input, mid) {
+                    continue;
+                }
+                let at_mid = PrefixScan::new(input, mid, 1, None);
+                let seed = ScanSeed {
+                    pos: mid,
+                    line_count: at_mid.line_count,
+                    previous_line_start: at_mid.leading.last(),
+                    current_line_start: at_mid.current_line_start,
+                };
+                for cut in mid..=input.len() {
+                    let context = format!("input={input:?} mid={mid} cut={cut}");
+                    let resumed = PrefixScan::new(input, cut, 1, Some(seed));
+                    let fresh = PrefixScan::new(input, cut, 1, None);
+                    assert_eq!(resumed.line_count, fresh.line_count, "{context}");
+                    assert_eq!(resumed.current_line_start, fresh.current_line_start, "{context}");
+                    assert_eq!(resumed.leading.start_line, fresh.leading.start_line, "{context}");
+                    assert_eq!(resumed.leading.first(), fresh.leading.first(), "{context}");
+                }
+            }
         }
     }
 
@@ -1199,7 +1323,7 @@ mod scanner_tests {
 
                     // Random order: queries may jump backwards past the
                     // index origin.
-                    let mut scanner = SpanScanner::new(input, before, after);
+                    let mut scanner = SpanScanner::new(input, before, after, None);
                     for i in 0..spans.len() {
                         check(&mut scanner, input, spans[i], before, after, &spans[..i]);
                         checked += 1;
@@ -1212,7 +1336,7 @@ mod scanner_tests {
                     let first = spans[0].0;
                     let merged_end = spans.iter().map(|&(o, l)| o + l).max().unwrap();
                     spans.push((first, merged_end - first));
-                    let mut scanner = SpanScanner::new(input, before, after);
+                    let mut scanner = SpanScanner::new(input, before, after, None);
                     for i in 0..spans.len() {
                         check(&mut scanner, input, spans[i], before, after, &spans[..i]);
                         checked += 1;
@@ -1223,14 +1347,44 @@ mod scanner_tests {
         assert!(checked > 100_000, "expected a broad sweep, only checked {checked}");
     }
 
+    #[test]
+    fn seeded_scanner_matches_span_reader() {
+        let inputs: &[&[u8]] =
+            &[b"a\nb\nc\nd\n", b"a\r\nb\r\nc\r\n", b"a\rb\rc\rd", "a\né\r\n🦀\rend\n".as_bytes()];
+        let spans = [(2, 1), (4, 1), (6, 1), (1, 0)];
+        for &input in inputs {
+            let mut seed = None;
+            for (generation, span) in spans.into_iter().enumerate() {
+                let mut scanner = SpanScanner::new(input, 1, 1, seed);
+                check(&mut scanner, input, span, 1, 1, &spans[..generation]);
+                seed = scanner.memo().or(seed);
+            }
+        }
+    }
+
+    #[test]
+    fn memo_records_the_first_querys_cut() {
+        let input = b"a\nb\nc\nd\n";
+
+        let mut scanner = SpanScanner::new(input, 1, 1, None);
+        assert!(scanner.memo().is_none());
+        scanner.read_span((6, 1).into()).unwrap();
+        let memo = scanner.memo().expect("the first query memoizes its scan");
+        assert_eq!(memo.pos(), 5);
+
+        let mut scanner = SpanScanner::new(input, 1, 1, Some(memo));
+        check(&mut scanner, input, (2, 1), 1, 1, &[]);
+        assert_eq!(scanner.memo().expect("the earlier query replaces the memo").pos(), 1);
+    }
+
     /// The empty-source and just-past-EOF edge cases `SpanReader` special
     /// cases, issued through one scanner.
     #[test]
     fn zero_length_spans_at_eof() {
-        let mut scanner = SpanScanner::new(b"", 0, 0);
+        let mut scanner = SpanScanner::new(b"", 0, 0, None);
         check(&mut scanner, b"", (0, 0), 0, 0, &[]);
         check(&mut scanner, b"", (1, 0), 0, 0, &[(0, 0)]);
-        let mut scanner = SpanScanner::new(b"a", 1, 1);
+        let mut scanner = SpanScanner::new(b"a", 1, 1, None);
         check(&mut scanner, b"a", (1, 0), 1, 1, &[]);
         check(&mut scanner, b"a", (2, 0), 1, 1, &[(1, 0)]);
     }

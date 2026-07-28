@@ -25,8 +25,8 @@ use criterion::{
     BatchSize, BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main,
 };
 use miette::{
-    Error, GraphicalReportHandler, GraphicalTheme, LabeledSpan, MietteDiagnostic, NamedSource,
-    Severity, SourceCode, SourceSpan,
+    Diagnostic, Error, GraphicalReportHandler, GraphicalTheme, LabeledSpan, MietteDiagnostic,
+    NamedSource, Severity, SourceCode, SourceSpan,
 };
 
 /// Pinned revision of <https://github.com/oxc-project/benchmark-files>, so the
@@ -267,6 +267,68 @@ fn bench(c: &mut Criterion) {
         }
         group.finish();
     }
+
+    // Oxlint sends all diagnostics for one file together. Measure the same
+    // reports rendered independently and through a temporary source batch,
+    // including reverse input order to exercise the batch's internal source
+    // ordering and output-order restoration.
+    let mut group = c.benchmark_group("render_batch/ci");
+    let handler = ci_handler();
+    for fixture in &fixtures {
+        for (order, reverse) in [("ascending", false), ("descending", true)] {
+            let mut diagnostics: Vec<Error> = (1..=16)
+                .map(|part| {
+                    let offset = fixture.source_len * part / 17;
+                    let span = identifier_span_at(fixture.source.inner(), offset);
+                    let diagnostic = lint_diagnostic(
+                        "Variable 'resolve' is declared but never used.",
+                        "Consider removing this declaration.",
+                    )
+                    .with_label(LabeledSpan::new_with_span(
+                        Some("'resolve' is declared here".to_string()),
+                        span,
+                    ));
+                    Error::new(diagnostic).with_source_code(Arc::clone(&fixture.source))
+                })
+                .collect();
+            if reverse {
+                diagnostics.reverse();
+            }
+            let diagnostics: Vec<&dyn Diagnostic> = diagnostics.iter().map(AsRef::as_ref).collect();
+
+            group.throughput(Throughput::Bytes(fixture.source_len as u64));
+            group.bench_function(
+                BenchmarkId::new(format!("standalone/{order}"), fixture.name),
+                |b| {
+                    b.iter(|| {
+                        diagnostics
+                            .iter()
+                            .map(|diagnostic| {
+                                let mut out = String::new();
+                                handler
+                                    .render_report(&mut out, black_box(*diagnostic))
+                                    .expect("render succeeds");
+                                out
+                            })
+                            .collect::<Vec<_>>()
+                    });
+                },
+            );
+            group.bench_function(BenchmarkId::new(format!("batched/{order}"), fixture.name), |b| {
+                b.iter(|| {
+                    handler
+                        .render_reports(fixture.source.as_ref(), black_box(&diagnostics))
+                        .into_iter()
+                        .map(|(result, rendered)| {
+                            result.expect("render succeeds");
+                            rendered
+                        })
+                        .collect::<Vec<_>>()
+                });
+            });
+        }
+    }
+    group.finish();
 }
 
 criterion_group!(

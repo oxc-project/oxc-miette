@@ -18,35 +18,66 @@ use super::{
     span::{FancySpan, LabelRenderMode},
 };
 use crate::{
-    Diagnostic, LabeledSpan, MietteSpanContents, SourceCode, SourceSpan, SpanContents,
-    source_impls::SpanScanner,
+    Diagnostic, LabeledSpan, Labels, MietteError, MietteSpanContents, SourceCode, SourceSpan,
+    SpanContents,
+    source_impls::{ScanSeed, SpanScanner},
 };
 
-impl GraphicalReportHandler {
-    pub(super) fn render_snippets(
-        &self,
-        f: &mut impl fmt::Write,
-        diagnostic: &dyn Diagnostic,
-        opt_source: Option<&dyn SourceCode>,
-    ) -> fmt::Result {
-        let Some(source) = opt_source else { return Ok(()) };
-        let mut labels = diagnostic.labels();
-        if labels.is_empty() {
-            return Ok(());
-        }
-        labels.sort_unstable_by_key(|l| l.inner().offset());
+/// Span-reading state shared by one or more rendered diagnostics.
+pub(super) struct SnippetState<'source> {
+    source: &'source dyn SourceCode,
+    source_name: Option<&'source str>,
+    scanner: Option<SpanScanner<'source>>,
+}
 
-        // When the source exposes its backing buffer, share one forward scan
-        // across every span lookup below (one per label plus one per merge
-        // attempt); each `read_span` otherwise scans the source from byte 0
-        // again. The scanner bypasses the source's own `read_span`, so
-        // re-attach the source's name the way `NamedSource` would.
-        let mut scanner = source
-            .contiguous_bytes()
-            .map(|bytes| SpanScanner::new(bytes, self.context_lines, self.context_lines));
-        let source_name = source.name();
-        let mut read = |span: &SourceSpan| match scanner.as_mut() {
-            Some(scanner) => scanner.read_span(*span).map(|contents| match source_name {
+impl<'source> SnippetState<'source> {
+    /// State for one independent report. The scanner keeps only the leading
+    /// context around its first query, minimizing temporary memory.
+    pub(super) fn new(
+        source: &'source dyn SourceCode,
+        context_lines_before: usize,
+        context_lines_after: usize,
+    ) -> Self {
+        Self {
+            source,
+            source_name: source.name(),
+            scanner: source.contiguous_bytes().map(|bytes| {
+                SpanScanner::new(bytes, context_lines_before, context_lines_after, None)
+            }),
+        }
+    }
+
+    /// State for one report in a batch, using the source metadata and
+    /// contiguous buffer captured when the batch began.
+    pub(super) fn resumed(
+        source: &'source dyn SourceCode,
+        source_name: Option<&'source str>,
+        source_bytes: Option<&'source [u8]>,
+        context_lines_before: usize,
+        context_lines_after: usize,
+        resume: Option<ScanSeed>,
+    ) -> Self {
+        Self {
+            source,
+            source_name,
+            scanner: source_bytes.map(|bytes| {
+                SpanScanner::new(bytes, context_lines_before, context_lines_after, resume)
+            }),
+        }
+    }
+
+    pub(super) fn memo(&self) -> Option<ScanSeed> {
+        self.scanner.as_ref().and_then(SpanScanner::memo)
+    }
+
+    fn read_span(
+        &mut self,
+        span: SourceSpan,
+        context_lines_before: usize,
+        context_lines_after: usize,
+    ) -> Result<MietteSpanContents<'source>, MietteError> {
+        match self.scanner.as_mut() {
+            Some(scanner) => scanner.read_span(span).map(|contents| match self.source_name {
                 Some(name) => MietteSpanContents::new_named(
                     Cow::Borrowed(name),
                     contents.data(),
@@ -57,17 +88,44 @@ impl GraphicalReportHandler {
                 ),
                 None => contents,
             }),
-            None => source.read_span(span, self.context_lines, self.context_lines),
-        };
+            None => self.source.read_span(&span, context_lines_before, context_lines_after),
+        }
+    }
+}
+
+impl GraphicalReportHandler {
+    pub(super) fn render_snippets_with(
+        &self,
+        f: &mut impl fmt::Write,
+        diagnostic: &dyn Diagnostic,
+        state: &mut SnippetState<'_>,
+    ) -> fmt::Result {
+        self.render_snippets_with_labels(f, diagnostic.labels(), state)
+    }
+
+    pub(super) fn render_snippets_with_labels(
+        &self,
+        f: &mut impl fmt::Write,
+        mut labels: Labels,
+        state: &mut SnippetState<'_>,
+    ) -> fmt::Result {
+        if labels.is_empty() {
+            return Ok(());
+        }
+        labels.sort_unstable_by_key(|l| l.inner().offset());
 
         if let [label] = labels.as_slice() {
-            let contents = read(label.inner()).map_err(|_| fmt::Error)?;
+            let contents = state
+                .read_span(*label.inner(), self.context_lines, self.context_lines)
+                .map_err(|_| fmt::Error)?;
             return self.render_context(f, label, &contents, &labels);
         }
 
         let mut contexts: Vec<(Cow<'_, LabeledSpan>, _)> = Vec::with_capacity(labels.len());
         for right in &labels {
-            let right_conts = read(right.inner()).map_err(|_| fmt::Error)?;
+            let right_conts = state
+                .read_span(*right.inner(), self.context_lines, self.context_lines)
+                .map_err(|_| fmt::Error)?;
 
             if contexts.is_empty() {
                 contexts.push((Cow::Borrowed(right), right_conts));
@@ -87,7 +145,9 @@ impl GraphicalReportHandler {
                     new_end - left.offset(),
                 );
                 // Check that the two contexts can be combined
-                if let Ok(new_conts) = read(new_span.inner()) {
+                if let Ok(new_conts) =
+                    state.read_span(*new_span.inner(), self.context_lines, self.context_lines)
+                {
                     contexts.pop();
                     contexts.push((Cow::Owned(new_span), new_conts));
                     continue;

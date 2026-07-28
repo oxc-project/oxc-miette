@@ -26,6 +26,7 @@ mod span;
 use std::fmt;
 
 pub use handler::GraphicalReportHandler;
+pub use report::GraphicalReportBatch;
 
 use crate::{Diagnostic, ReportHandler};
 

@@ -10,7 +10,13 @@
 //! one `SourceCode::read_span` call per label. Both paths must render
 //! byte-identical reports. See the test's own doc comment for the full matrix.
 
-use std::fmt;
+use std::{
+    fmt,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use miette::{
     Diagnostic, GraphicalReportHandler, GraphicalTheme, LabeledSpan, Labels, MietteError,
@@ -177,4 +183,105 @@ fn buffer_and_read_span_paths_render_identically() {
         }
     }
     assert!(checked >= 4000, "expected a broad sweep, only checked {checked}");
+}
+
+#[test]
+fn batch_matches_standalone_renders_in_any_order() {
+    let source =
+        Arc::new(NamedSource::new("shared.rs", "zero\none\ntwo\nthree\nfour\nfive\n".to_string()));
+    let diagnostics: Vec<TestDiag<Arc<NamedSource<String>>>> =
+        [(24u32, 4u32), (5, 3), (19, 4), (9, 3)]
+            .into_iter()
+            .map(|span| TestDiag {
+                src: Arc::clone(&source),
+                labels: vec![LabeledSpan::new_with_span(Some("here".into()), span)],
+            })
+            .collect();
+
+    let handler = GraphicalReportHandler::new_themed(GraphicalTheme::none());
+    let diagnostic_refs: Vec<&dyn Diagnostic> =
+        diagnostics.iter().map(|diagnostic| diagnostic as &dyn Diagnostic).collect();
+    let batched = handler.render_reports(source.as_ref(), &diagnostic_refs);
+    for (diagnostic, batched) in diagnostics.iter().zip(batched) {
+        let mut standalone = String::new();
+        let standalone_result = handler.render_report(&mut standalone, diagnostic);
+        assert_eq!(batched, (standalone_result, standalone));
+    }
+}
+
+#[derive(Debug)]
+struct SwitchingSource {
+    second: AtomicBool,
+}
+
+impl SwitchingSource {
+    const FIRST: &'static str = "zero\nfirst\nend\n";
+    const SECOND: &'static str = "zero\nsecond\nend\n";
+
+    fn current(&self) -> &'static str {
+        if self.second.load(Ordering::Relaxed) { Self::SECOND } else { Self::FIRST }
+    }
+}
+
+impl SourceCode for SwitchingSource {
+    fn read_span<'a>(
+        &'a self,
+        span: &SourceSpan,
+        context_lines_before: usize,
+        context_lines_after: usize,
+    ) -> Result<MietteSpanContents<'a>, MietteError> {
+        self.current().read_span(span, context_lines_before, context_lines_after)
+    }
+
+    fn name(&self) -> Option<&str> {
+        Some("switch.rs")
+    }
+
+    fn contiguous_bytes(&self) -> Option<&[u8]> {
+        Some(self.current().as_bytes())
+    }
+}
+
+#[derive(Debug)]
+struct SourceLessDiag {
+    labels: Vec<LabeledSpan>,
+}
+
+impl fmt::Display for SourceLessDiag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("test diagnostic")
+    }
+}
+
+impl std::error::Error for SourceLessDiag {}
+
+impl Diagnostic for SourceLessDiag {
+    fn labels(&self) -> Labels {
+        Labels::Many(self.labels.clone())
+    }
+}
+
+#[test]
+fn a_new_batch_observes_a_mutable_sources_current_buffer() {
+    let source = SwitchingSource { second: AtomicBool::new(false) };
+    let diagnostic =
+        SourceLessDiag { labels: vec![LabeledSpan::new_with_span(Some("here".into()), (5, 1))] };
+    let handler = GraphicalReportHandler::new_themed(GraphicalTheme::none());
+
+    {
+        let mut first_batch = handler.begin_batch(&source);
+        let mut first = String::new();
+        first_batch.render_report(&mut first, &diagnostic).unwrap();
+        assert!(first.contains("first"));
+
+        source.second.store(true, Ordering::Relaxed);
+        let mut same_batch = String::new();
+        first_batch.render_report(&mut same_batch, &diagnostic).unwrap();
+        assert!(same_batch.contains("first"), "a batch renders one coherent source snapshot");
+    }
+
+    let mut second_batch = handler.begin_batch(&source);
+    let mut second = String::new();
+    second_batch.render_report(&mut second, &diagnostic).unwrap();
+    assert!(second.contains("second"), "a later batch must not reuse stale scan state");
 }

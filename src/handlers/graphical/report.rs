@@ -12,10 +12,129 @@ use std::fmt::{self, Write};
 
 use owo_colors::OwoColorize;
 
-use super::handler::{GraphicalReportHandler, LinkStyle};
-use crate::{Diagnostic, Severity, SourceCode};
+use super::{
+    handler::{GraphicalReportHandler, LinkStyle},
+    snippet::SnippetState,
+};
+use crate::{Diagnostic, Labels, Severity, SourceCode, source_impls::ScanSeed};
+
+/// A temporary graphical rendering session for diagnostics over one source.
+///
+/// When available, the batch snapshots the source's current contiguous buffer
+/// once and carries only compact prefix-scan state between reports. It owns no
+/// source data and stores no state in the source.
+pub struct GraphicalReportBatch<'handler, 'source> {
+    handler: &'handler GraphicalReportHandler,
+    source: &'source dyn SourceCode,
+    source_name: Option<&'source str>,
+    source_bytes: Option<&'source [u8]>,
+    resume: Option<ScanSeed>,
+}
+
+impl GraphicalReportBatch<'_, '_> {
+    /// Render one diagnostic using this batch's source.
+    ///
+    /// The batch source is authoritative for the top-level diagnostic.
+    /// Related diagnostics that provide their own source use that source;
+    /// source-less related diagnostics inherit the batch source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing the rendered report fails or a labeled
+    /// span cannot be read from the batch source.
+    pub fn render_report(
+        &mut self,
+        f: &mut impl fmt::Write,
+        diagnostic: &dyn Diagnostic,
+    ) -> fmt::Result {
+        self.render_report_inner(f, diagnostic, None)
+    }
+
+    fn render_report_inner(
+        &mut self,
+        f: &mut impl fmt::Write,
+        diagnostic: &dyn Diagnostic,
+        labels: Option<Labels>,
+    ) -> fmt::Result {
+        let mut snippets = SnippetState::resumed(
+            self.source,
+            self.source_name,
+            self.source_bytes,
+            self.handler.context_lines,
+            self.handler.context_lines,
+            self.resume,
+        );
+        let result =
+            self.handler.render_report_with_state(f, diagnostic, Some(&mut snippets), labels);
+        self.resume = snippets.memo().or(self.resume);
+        result
+    }
+}
 
 impl GraphicalReportHandler {
+    /// Begin rendering a batch of diagnostics over `source`.
+    ///
+    /// When the source exposes a contiguous buffer, the returned batch borrows
+    /// that current buffer once. Reports rendered in source order resume their
+    /// prefix scan from the preceding report. A backwards jump remains correct
+    /// but starts its prefix scan over. Dropping the batch discards the compact
+    /// scan state; a later batch observes the source again from scratch.
+    pub fn begin_batch<'handler, 'source>(
+        &'handler self,
+        source: &'source dyn SourceCode,
+    ) -> GraphicalReportBatch<'handler, 'source> {
+        GraphicalReportBatch {
+            handler: self,
+            source,
+            source_name: source.name(),
+            source_bytes: source.contiguous_bytes(),
+            resume: None,
+        }
+    }
+
+    /// Render diagnostics over one source as a batch.
+    ///
+    /// Diagnostics are scanned in source order for performance and returned in
+    /// the caller's original order. When available, the batch borrows the
+    /// source's current contiguous buffer once, so mutable [`SourceCode`]
+    /// implementations produce one coherent render without any state cached
+    /// beyond this call. Sources without a contiguous buffer use their
+    /// ordinary [`SourceCode::read_span`] implementation for every span.
+    ///
+    /// The supplied source is authoritative for every top-level diagnostic.
+    /// Related diagnostics may still provide their own source.
+    pub fn render_reports(
+        &self,
+        source: &dyn SourceCode,
+        diagnostics: &[&dyn Diagnostic],
+    ) -> Vec<(fmt::Result, String)> {
+        let mut order: Vec<_> = diagnostics
+            .iter()
+            .enumerate()
+            .map(|(index, &diagnostic)| {
+                let labels = diagnostic.labels();
+                let offset = labels
+                    .as_slice()
+                    .iter()
+                    .map(crate::LabeledSpan::offset)
+                    .min()
+                    .unwrap_or(u32::MAX);
+                (offset, index, diagnostic, labels)
+            })
+            .collect();
+        order.sort_unstable_by_key(|&(offset, ..)| offset);
+
+        let mut reports: Vec<Option<(fmt::Result, String)>> = Vec::with_capacity(diagnostics.len());
+        reports.resize_with(diagnostics.len(), || None);
+        let mut batch = self.begin_batch(source);
+        for (_, index, diagnostic, labels) in order {
+            let mut rendered = String::new();
+            let result = batch.render_report_inner(&mut rendered, diagnostic, Some(labels));
+            reports[index] = Some((result, rendered));
+        }
+        reports.into_iter().flatten().collect()
+    }
+
     /// Render a [`Diagnostic`]. This function is mostly internal and meant to
     /// be called by the toplevel [`ReportHandler`](crate::ReportHandler)
     /// handler, but is made public to make it easier (possible) to test in
@@ -29,12 +148,29 @@ impl GraphicalReportHandler {
         f: &mut impl fmt::Write,
         diagnostic: &dyn Diagnostic,
     ) -> fmt::Result {
+        let mut snippets = diagnostic
+            .source_code()
+            .map(|source| SnippetState::new(source, self.context_lines, self.context_lines));
+        self.render_report_with_state(f, diagnostic, snippets.as_mut(), None)
+    }
+
+    fn render_report_with_state(
+        &self,
+        f: &mut impl fmt::Write,
+        diagnostic: &dyn Diagnostic,
+        mut snippets: Option<&mut SnippetState<'_>>,
+        labels: Option<Labels>,
+    ) -> fmt::Result {
         writeln!(f)?;
         self.render_causes(f, diagnostic)?;
-        let src = diagnostic.source_code();
-        self.render_snippets(f, diagnostic, src)?;
+        if let Some(state) = snippets.as_deref_mut() {
+            match labels {
+                Some(labels) => self.render_snippets_with_labels(f, labels, state)?,
+                None => self.render_snippets_with(f, diagnostic, state)?,
+            }
+        }
         self.render_footer(f, diagnostic)?;
-        self.render_related(f, diagnostic, src)?;
+        self.render_related(f, diagnostic, snippets)?;
         if let Some(footer) = &self.footer {
             writeln!(f)?;
             let width = self.termwidth.saturating_sub(4);
@@ -173,7 +309,7 @@ impl GraphicalReportHandler {
         &self,
         f: &mut impl fmt::Write,
         diagnostic: &dyn Diagnostic,
-        parent_src: Option<&dyn SourceCode>,
+        mut inherited: Option<&mut SnippetState<'_>>,
     ) -> fmt::Result {
         let related = diagnostic.related();
         if !related.is_empty() {
@@ -187,10 +323,20 @@ impl GraphicalReportHandler {
                 }
                 inner_renderer.render_header(f, rel)?;
                 inner_renderer.render_causes(f, rel)?;
-                let src = rel.source_code().or(parent_src);
-                inner_renderer.render_snippets(f, rel, src)?;
-                inner_renderer.render_footer(f, rel)?;
-                inner_renderer.render_related(f, rel, src)?;
+                if let Some(source) = rel.source_code() {
+                    let mut snippets =
+                        SnippetState::new(source, self.context_lines, self.context_lines);
+                    inner_renderer.render_snippets_with(f, rel, &mut snippets)?;
+                    inner_renderer.render_footer(f, rel)?;
+                    inner_renderer.render_related(f, rel, Some(&mut snippets))?;
+                } else if let Some(snippets) = inherited.as_deref_mut() {
+                    inner_renderer.render_snippets_with(f, rel, snippets)?;
+                    inner_renderer.render_footer(f, rel)?;
+                    inner_renderer.render_related(f, rel, Some(snippets))?;
+                } else {
+                    inner_renderer.render_footer(f, rel)?;
+                    inner_renderer.render_related(f, rel, None)?;
+                }
             }
         }
         Ok(())
