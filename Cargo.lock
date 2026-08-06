@@ -558,6 +558,7 @@ dependencies = [
  "owo-colors",
  "oxc-miette-derive",
  "regex",
+ "rustc-hash",
  "rustversion",
  "semver",
  "serde",

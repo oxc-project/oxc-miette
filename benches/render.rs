@@ -25,8 +25,8 @@ use criterion::{
     BatchSize, BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main,
 };
 use miette::{
-    Error, GraphicalReportHandler, GraphicalTheme, LabeledSpan, MietteDiagnostic, NamedSource,
-    Severity, SourceCode, SourceSpan,
+    Diagnostic, Error, GraphicalReportHandler, GraphicalTheme, LabeledSpan, MietteDiagnostic,
+    NamedSource, Severity, SourceCode, SourceSpan,
 };
 
 /// Pinned revision of <https://github.com/oxc-project/benchmark-files>, so the
@@ -45,6 +45,8 @@ const FIXTURES: &[&str] = &[
 const SPAN_FRACTION: f64 = 0.9;
 /// Distance between the declaration and assignment labels.
 const RELATED_SPAN_DELTA: usize = 250;
+/// Number of reports sharing one source in the batch comparison.
+const BATCH_SIZE: usize = 32;
 
 struct Fixture {
     name: &'static str,
@@ -187,6 +189,32 @@ fn assigned_diagnostic(fixture: &Fixture) -> Error {
     Error::new(diagnostic).with_source_code(Arc::clone(&fixture.source))
 }
 
+/// Build reverse-ordered diagnostics spread across one shared source. This
+/// exercises the batch scanner's ability to reuse its retained prefix for
+/// arbitrary input order.
+fn batch_diagnostics(fixture: &Fixture) -> Vec<Error> {
+    (0..BATCH_SIZE)
+        .rev()
+        .map(|index| {
+            let offset = fixture.source_len * (index + 1) / (BATCH_SIZE + 1);
+            let span = identifier_span_at(fixture.source.inner(), offset);
+            let diagnostic = lint_diagnostic(
+                "Variable is declared but never used.",
+                "Consider removing this declaration.",
+            )
+            .with_label(LabeledSpan::new_with_span(
+                Some("variable is declared here".to_string()),
+                span,
+            ));
+            Error::new(diagnostic).with_source_code(Arc::clone(&fixture.source))
+        })
+        .collect()
+}
+
+fn as_diagnostic(error: &Error) -> &dyn Diagnostic {
+    error.as_ref()
+}
+
 /// Add the rule metadata that `LintContext` attaches to every oxlint diagnostic.
 fn lint_diagnostic(message: &str, help: &str) -> MietteDiagnostic {
     MietteDiagnostic::new(message)
@@ -264,6 +292,57 @@ fn bench(c: &mut Criterion) {
                     });
                 });
             }
+        }
+        group.finish();
+    }
+
+    // Compare the existing one-scanner-per-report mechanism with batch-local
+    // indexing. Inputs are deliberately reverse ordered; both paths must emit
+    // the reports in that same order, while the batch scans each source prefix
+    // only once.
+    for (mode, handler) in [("terminal", terminal_handler()), ("ci", ci_handler())] {
+        let mut group = c.benchmark_group(format!("render_batch/{mode}"));
+        group.throughput(Throughput::Elements(BATCH_SIZE as u64));
+        for fixture in &fixtures {
+            let diagnostics = batch_diagnostics(fixture);
+
+            let mut individual_output = String::new();
+            for diagnostic in &diagnostics {
+                handler
+                    .render_report(&mut individual_output, as_diagnostic(diagnostic))
+                    .expect("render succeeds");
+            }
+            let mut batch_output = String::new();
+            handler
+                .render_reports(&mut batch_output, diagnostics.iter().map(as_diagnostic))
+                .expect("batch render succeeds");
+            assert_eq!(individual_output, batch_output);
+
+            group.bench_function(BenchmarkId::new("individual", fixture.name), |b| {
+                b.iter(|| {
+                    let mut output = String::new();
+                    for diagnostic in &diagnostics {
+                        handler
+                            .render_report(&mut output, black_box(as_diagnostic(diagnostic)))
+                            .expect("render succeeds");
+                    }
+                    black_box(output);
+                });
+            });
+            group.bench_function(BenchmarkId::new("batch", fixture.name), |b| {
+                b.iter(|| {
+                    let mut output = String::new();
+                    handler
+                        .render_reports(
+                            &mut output,
+                            diagnostics
+                                .iter()
+                                .map(|diagnostic| black_box(as_diagnostic(diagnostic))),
+                        )
+                        .expect("batch render succeeds");
+                    black_box(output);
+                });
+            });
         }
         group.finish();
     }

@@ -12,7 +12,10 @@ use std::fmt::{self, Write};
 
 use owo_colors::OwoColorize;
 
-use super::handler::{GraphicalReportHandler, LinkStyle};
+use super::{
+    handler::{GraphicalReportHandler, LinkStyle},
+    snippet::SpanScannerCache,
+};
 use crate::{Diagnostic, Severity, SourceCode};
 
 impl GraphicalReportHandler {
@@ -29,12 +32,61 @@ impl GraphicalReportHandler {
         f: &mut impl fmt::Write,
         diagnostic: &dyn Diagnostic,
     ) -> fmt::Result {
+        self.render_report_inner(f, diagnostic, None)
+    }
+
+    /// Render several [`Diagnostic`]s in iterator order while sharing source
+    /// indexing work between reports backed by the same contiguous buffer.
+    ///
+    /// The rendered output is byte-for-byte equivalent to calling
+    /// [`render_report`](Self::render_report) for every diagnostic. Sources
+    /// that do not expose a contiguous buffer continue to use
+    /// [`SourceCode::read_span`](crate::SourceCode::read_span).
+    ///
+    /// Batch rendering retains a temporary line-start index from the beginning
+    /// of each shared source through its furthest queried span. This lets
+    /// diagnostics arrive in any order without repeatedly scanning source
+    /// prefixes; the indexes are dropped when this method returns.
+    ///
+    /// ```
+    /// use miette::{Diagnostic, GraphicalReportHandler, Report};
+    ///
+    /// let reports = [Report::msg("first"), Report::msg("second")];
+    /// let mut output = String::new();
+    /// GraphicalReportHandler::new().render_reports(
+    ///     &mut output,
+    ///     reports.iter().map(|report| report.as_ref() as &dyn Diagnostic),
+    /// )?;
+    /// # Ok::<(), core::fmt::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing a rendered report fails.
+    pub fn render_reports<'a>(
+        &self,
+        f: &mut impl fmt::Write,
+        diagnostics: impl IntoIterator<Item = &'a dyn Diagnostic>,
+    ) -> fmt::Result {
+        let mut scanner_cache = SpanScannerCache::new(self.context_lines);
+        for diagnostic in diagnostics {
+            self.render_report_inner(f, diagnostic, Some(&mut scanner_cache))?;
+        }
+        Ok(())
+    }
+
+    fn render_report_inner<'a>(
+        &self,
+        f: &mut impl fmt::Write,
+        diagnostic: &'a dyn Diagnostic,
+        mut scanner_cache: Option<&mut SpanScannerCache<'a>>,
+    ) -> fmt::Result {
         writeln!(f)?;
         self.render_causes(f, diagnostic)?;
         let src = diagnostic.source_code();
-        self.render_snippets(f, diagnostic, src)?;
+        self.render_snippets(f, diagnostic, src, scanner_cache.as_deref_mut())?;
         self.render_footer(f, diagnostic)?;
-        self.render_related(f, diagnostic, src)?;
+        self.render_related(f, diagnostic, src, scanner_cache)?;
         if let Some(footer) = &self.footer {
             writeln!(f)?;
             let width = self.termwidth.saturating_sub(4);
@@ -169,11 +221,12 @@ impl GraphicalReportHandler {
         Ok(())
     }
 
-    fn render_related(
+    fn render_related<'a>(
         &self,
         f: &mut impl fmt::Write,
-        diagnostic: &dyn Diagnostic,
-        parent_src: Option<&dyn SourceCode>,
+        diagnostic: &'a dyn Diagnostic,
+        parent_src: Option<&'a dyn SourceCode>,
+        mut scanner_cache: Option<&mut SpanScannerCache<'a>>,
     ) -> fmt::Result {
         let related = diagnostic.related();
         if !related.is_empty() {
@@ -188,9 +241,9 @@ impl GraphicalReportHandler {
                 inner_renderer.render_header(f, rel)?;
                 inner_renderer.render_causes(f, rel)?;
                 let src = rel.source_code().or(parent_src);
-                inner_renderer.render_snippets(f, rel, src)?;
+                inner_renderer.render_snippets(f, rel, src, scanner_cache.as_deref_mut())?;
                 inner_renderer.render_footer(f, rel)?;
-                inner_renderer.render_related(f, rel, src)?;
+                inner_renderer.render_related(f, rel, src, scanner_cache.as_deref_mut())?;
             }
         }
         Ok(())

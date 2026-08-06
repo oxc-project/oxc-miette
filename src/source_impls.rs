@@ -479,6 +479,26 @@ impl<'a> LineIndex<'a> {
         self.frontier = cut;
     }
 
+    /// First batch query: retain every line start from the beginning of the
+    /// source so later queries can move backwards without rescanning.
+    fn init_from_start(&mut self, cut: usize) {
+        let prefix = &self.input[..cut];
+        if memchr::memchr(b'\r', prefix).is_none() {
+            // Reserve exactly once before retaining LF-only line starts. The
+            // extra SIMD counting pass is cheaper than repeatedly growing and
+            // copying the index for large source files.
+            let line_count = bytecount::count(prefix, b'\n');
+            self.line_starts.reserve(line_count + 1);
+            self.line_starts.push(0);
+            self.line_starts.extend(memchr::memchr_iter(b'\n', prefix).map(|pos| pos + 1));
+            self.frontier = cut;
+            return;
+        }
+
+        self.line_starts.push(0);
+        self.cover(cut);
+    }
+
     /// Extend the index so every break in `[0, target)` is recorded, with one
     /// bulk `memchr` pass. (A `read_span`-shaped `target` never splits a
     /// `\r\n` pair, but hold the pair back a byte if one would be.)
@@ -692,6 +712,7 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
 pub(crate) struct SpanScanner<'a> {
     context: ContextLines,
     index: LineIndex<'a>,
+    retain_prefix: bool,
 }
 
 #[cfg(feature = "fancy-base")]
@@ -704,6 +725,22 @@ impl<'a> SpanScanner<'a> {
         Self {
             context: ContextLines::new(context_lines_before, context_lines_after),
             index: LineIndex::new(input),
+            retain_prefix: false,
+        }
+    }
+
+    /// Create a scanner for rendering a batch of reports. Unlike [`Self::new`],
+    /// this retains the full scanned prefix so queries may arrive in any order
+    /// without rescanning source bytes.
+    pub(crate) fn new_batch(
+        input: &'a [u8],
+        context_lines_before: usize,
+        context_lines_after: usize,
+    ) -> Self {
+        Self {
+            context: ContextLines::new(context_lines_before, context_lines_after),
+            index: LineIndex::new(input),
+            retain_prefix: true,
         }
     }
 
@@ -715,7 +752,11 @@ impl<'a> SpanScanner<'a> {
         let request = SpanRequest::new(span);
         let cut = request.prefix_end(self.index.input);
         if self.index.is_empty() {
-            self.index.init(cut, self.context.before);
+            if self.retain_prefix {
+                self.index.init_from_start(cut);
+            } else {
+                self.index.init(cut, self.context.before);
+            }
         } else {
             if cut < self.index.origin().expect("a non-empty index has an origin") {
                 return self.read_unindexed(request);
@@ -1163,8 +1204,9 @@ mod scanner_tests {
     /// queries, so single-shot checks would miss its interesting bugs. Covers
     /// LF / CRLF / lone-CR and multibyte sources; spans of any alignment
     /// (byte offsets, not char boundaries — neither function cares) including
-    /// past-EOF ones; queries in random order (which exercises the
-    /// out-of-index fallbacks) and in the renderer's sorted-then-merge order.
+    /// past-EOF ones; queries in random order through both the context-window
+    /// and full-prefix batch indexes, and in the renderer's sorted-then-merge
+    /// order.
     #[test]
     #[cfg_attr(
         miri,
@@ -1200,6 +1242,15 @@ mod scanner_tests {
                     // Random order: queries may jump backwards past the
                     // index origin.
                     let mut scanner = SpanScanner::new(input, before, after);
+                    for i in 0..spans.len() {
+                        check(&mut scanner, input, spans[i], before, after, &spans[..i]);
+                        checked += 1;
+                    }
+
+                    // The batch renderer preserves input order. Its scanner
+                    // retains the complete prefix so the same random jumps do
+                    // not need the unindexed fallback.
+                    let mut scanner = SpanScanner::new_batch(input, before, after);
                     for i in 0..spans.len() {
                         check(&mut scanner, input, spans[i], before, after, &spans[..i]);
                         checked += 1;

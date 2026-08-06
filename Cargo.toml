@@ -158,6 +158,7 @@ cfg-if = "1"
 
 bytecount = "0.6.9"
 memchr = "2"
+rustc-hash = { version = "2", optional = true }
 unicode-width = "0.2.0"
 unicode-segmentation = "1.12.0"
 
@@ -192,6 +193,7 @@ derive = ["oxc-miette-derive"]
 no-format-args-capture = []
 fancy-base = [
     "owo-colors",
+    "rustc-hash",
     "textwrap",
 ]
 fancy-no-syscall = [

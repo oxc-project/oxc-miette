@@ -11,6 +11,7 @@
 use std::{borrow::Cow, cmp::max, fmt};
 
 use owo_colors::OwoColorize;
+use rustc_hash::FxHashMap;
 
 use super::{
     handler::GraphicalReportHandler,
@@ -22,12 +23,42 @@ use crate::{
     source_impls::SpanScanner,
 };
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct SourceKey {
+    pointer: *const u8,
+    length: usize,
+}
+
+impl SourceKey {
+    fn new(bytes: &[u8]) -> Self {
+        Self { pointer: bytes.as_ptr(), length: bytes.len() }
+    }
+}
+
+pub(super) struct SpanScannerCache<'a> {
+    context_lines: usize,
+    scanners: FxHashMap<SourceKey, SpanScanner<'a>>,
+}
+
+impl<'a> SpanScannerCache<'a> {
+    pub(super) fn new(context_lines: usize) -> Self {
+        Self { context_lines, scanners: FxHashMap::default() }
+    }
+
+    fn scanner(&mut self, bytes: &'a [u8]) -> &mut SpanScanner<'a> {
+        self.scanners.entry(SourceKey::new(bytes)).or_insert_with(|| {
+            SpanScanner::new_batch(bytes, self.context_lines, self.context_lines)
+        })
+    }
+}
+
 impl GraphicalReportHandler {
-    pub(super) fn render_snippets(
+    pub(super) fn render_snippets<'a>(
         &self,
         f: &mut impl fmt::Write,
-        diagnostic: &dyn Diagnostic,
-        opt_source: Option<&dyn SourceCode>,
+        diagnostic: &'a dyn Diagnostic,
+        opt_source: Option<&'a dyn SourceCode>,
+        scanner_cache: Option<&mut SpanScannerCache<'a>>,
     ) -> fmt::Result {
         let Some(source) = opt_source else { return Ok(()) };
         let mut labels = diagnostic.labels();
@@ -36,37 +67,62 @@ impl GraphicalReportHandler {
         }
         labels.sort_unstable_by_key(|l| l.inner().offset());
 
-        // When the source exposes its backing buffer, share one forward scan
-        // across every span lookup below (one per label plus one per merge
-        // attempt); each `read_span` otherwise scans the source from byte 0
-        // again. The scanner bypasses the source's own `read_span`, so
-        // re-attach the source's name the way `NamedSource` would.
-        let mut scanner = source
-            .contiguous_bytes()
-            .map(|bytes| SpanScanner::new(bytes, self.context_lines, self.context_lines));
         let source_name = source.name();
-        let mut read = |span: &SourceSpan| match scanner.as_mut() {
-            Some(scanner) => scanner.read_span(*span).map(|contents| match source_name {
-                Some(name) => MietteSpanContents::new_named(
-                    Cow::Borrowed(name),
-                    contents.data(),
-                    *contents.span(),
-                    contents.line(),
-                    contents.column(),
-                    contents.line_count(),
-                ),
-                None => contents,
-            }),
-            None => source.read_span(span, self.context_lines, self.context_lines),
-        };
+        if let Some(bytes) = source.contiguous_bytes() {
+            if let Some(scanner_cache) = scanner_cache {
+                let scanner = scanner_cache.scanner(bytes);
+                return self.render_snippets_with(f, &labels, |span| {
+                    scanner
+                        .read_span(*span)
+                        .map(|contents| Self::attach_source_name(contents, source_name))
+                });
+            }
 
-        if let [label] = labels.as_slice() {
+            // A single report still shares one forward scan across all of its
+            // labels and merge attempts, without retaining a batch cache.
+            let mut scanner = SpanScanner::new(bytes, self.context_lines, self.context_lines);
+            return self.render_snippets_with(f, &labels, |span| {
+                scanner
+                    .read_span(*span)
+                    .map(|contents| Self::attach_source_name(contents, source_name))
+            });
+        }
+
+        self.render_snippets_with(f, &labels, |span| {
+            source.read_span(span, self.context_lines, self.context_lines)
+        })
+    }
+
+    fn attach_source_name<'a>(
+        contents: MietteSpanContents<'a>,
+        source_name: Option<&'a str>,
+    ) -> MietteSpanContents<'a> {
+        match source_name {
+            Some(name) => MietteSpanContents::new_named(
+                Cow::Borrowed(name),
+                contents.data(),
+                *contents.span(),
+                contents.line(),
+                contents.column(),
+                contents.line_count(),
+            ),
+            None => contents,
+        }
+    }
+
+    fn render_snippets_with<'a>(
+        &self,
+        f: &mut impl fmt::Write,
+        labels: &[LabeledSpan],
+        mut read: impl FnMut(&SourceSpan) -> Result<MietteSpanContents<'a>, crate::MietteError>,
+    ) -> fmt::Result {
+        if let [label] = labels {
             let contents = read(label.inner()).map_err(|_| fmt::Error)?;
-            return self.render_context(f, label, &contents, &labels);
+            return self.render_context(f, label, &contents, labels);
         }
 
         let mut contexts: Vec<(Cow<'_, LabeledSpan>, _)> = Vec::with_capacity(labels.len());
-        for right in &labels {
+        for right in labels {
             let right_conts = read(right.inner()).map_err(|_| fmt::Error)?;
 
             if contexts.is_empty() {
@@ -97,7 +153,7 @@ impl GraphicalReportHandler {
             contexts.push((Cow::Borrowed(right), right_conts));
         }
         for (ctx, conts) in contexts {
-            self.render_context(f, &ctx, &conts, &labels[..])?;
+            self.render_context(f, &ctx, &conts, labels)?;
         }
 
         Ok(())
