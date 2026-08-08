@@ -80,10 +80,9 @@ impl GraphicalTheme {
     }
 
     /// A "basic" graphical theme that skips colors and unicode characters and
-    /// just does monochrome ascii art. If you want a completely non-graphical
-    /// rendering of your [`Diagnostic`](crate::Diagnostic)s, check out
-    /// [`NarratableReportHandler`](crate::NarratableReportHandler), or write
-    /// your own [`ReportHandler`](crate::ReportHandler)
+    /// just does monochrome ascii art. For a different rendering of your
+    /// [`Diagnostic`](crate::Diagnostic)s, write your own
+    /// [`ReportHandler`](crate::ReportHandler).
     #[must_use]
     pub fn none() -> Self {
         Self { characters: ThemeCharacters::ascii(), styles: ThemeStyles::none() }
