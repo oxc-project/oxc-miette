@@ -95,7 +95,6 @@ struct CharWidthIterator<'a> {
     current_grapheme_idx: usize,
     column: usize,
     escaped: bool,
-    tab_width: usize,
 }
 
 impl Iterator for CharWidthIterator<'_> {
@@ -105,7 +104,7 @@ impl Iterator for CharWidthIterator<'_> {
         let (byte_pos, c) = self.chars.next()?;
 
         let width = match (self.escaped, c) {
-            (false, '\t') => self.tab_width - self.column % self.tab_width,
+            (false, '\t') => 4 - self.column % 4,
             (false, '\x1b') => {
                 self.escaped = true;
                 0
@@ -141,10 +140,7 @@ impl Iterator for CharWidthIterator<'_> {
 
 impl GraphicalReportHandler {
     /// Returns an iterator over the visual width of each character in a line.
-    pub(super) fn line_visual_char_width<'a>(
-        &self,
-        text: &'a str,
-    ) -> impl Iterator<Item = usize> + 'a + use<'a> {
+    pub(super) fn line_visual_char_width(text: &str) -> impl Iterator<Item = usize> + '_ + use<'_> {
         // Only compute grapheme boundaries for non-ASCII text
         let grapheme_boundaries = if text.is_ascii() {
             None
@@ -163,7 +159,6 @@ impl GraphicalReportHandler {
             current_grapheme_idx: 0,
             column: 0,
             escaped: false,
-            tab_width: self.tab_width,
         }
     }
 
@@ -172,7 +167,7 @@ impl GraphicalReportHandler {
     /// If the offset occurs in the middle of a character, the returned column
     /// corresponds to that character's first column in `start` is true, or its
     /// last column if `start` is false.
-    pub(super) fn visual_offset(&self, line: &Line<'_>, offset: usize, start: bool) -> usize {
+    pub(super) fn visual_offset(line: &Line<'_>, offset: usize, start: bool) -> usize {
         let line_range = line.offset..=(line.offset + line.length);
         assert!(line_range.contains(&offset));
 
@@ -190,7 +185,7 @@ impl GraphicalReportHandler {
             if text.is_ascii() && memchr::memchr2(b'\t', b'\x1b', text.as_bytes()).is_none() {
                 text.len()
             } else {
-                self.line_visual_char_width(text).sum()
+                Self::line_visual_char_width(text).sum()
             };
         if text_index > line.text.len() {
             // Spans extending past the end of the line are always rendered as

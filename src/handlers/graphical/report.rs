@@ -3,17 +3,16 @@
 //! [`render_report`](GraphicalReportHandler::render_report) is the entry point.
 //! It renders the title/causes, hands off to
 //! [`render_snippets`](GraphicalReportHandler::render_snippets), then renders
-//! the help/note footer, any related diagnostics, and the handler's global
-//! footer. Each block of prose is wrapped to the terminal width using the
-//! shared [`wrap_options`](GraphicalReportHandler::wrap_options) /
-//! [`wrap`](GraphicalReportHandler::wrap) helpers.
+//! the help/note footer. Each block of prose is wrapped to the terminal width
+//! using the shared [`wrap_options`](GraphicalReportHandler::wrap_options)
+//! helper.
 
-use std::fmt::{self, Write};
+use std::fmt;
 
 use owo_colors::OwoColorize;
 
 use super::handler::{GraphicalReportHandler, LinkStyle};
-use crate::{Diagnostic, Severity, SourceCode};
+use crate::{Diagnostic, Severity};
 
 impl GraphicalReportHandler {
     /// Render a [`Diagnostic`].
@@ -31,51 +30,6 @@ impl GraphicalReportHandler {
         let src = diagnostic.source_code();
         self.render_snippets(f, diagnostic, src)?;
         self.render_footer(f, diagnostic)?;
-        self.render_related(f, diagnostic, src)?;
-        if let Some(footer) = &self.footer {
-            writeln!(f)?;
-            let width = self.termwidth.saturating_sub(4);
-            let opts = self.wrap_options(width, "  ", "  ");
-            self.write_wrap(f, footer, opts)?;
-            f.write_char('\n')?;
-        }
-        Ok(())
-    }
-
-    fn render_header(&self, f: &mut impl fmt::Write, diagnostic: &dyn Diagnostic) -> fmt::Result {
-        let severity_style = match diagnostic.severity() {
-            Some(Severity::Error) | None => self.theme.styles.error,
-            Some(Severity::Warning) => self.theme.styles.warning,
-            Some(Severity::Advice) => self.theme.styles.advice,
-        };
-        let mut header = String::new();
-        if self.links == LinkStyle::Link && diagnostic.url().is_some() {
-            let url = diagnostic.url().unwrap(); // safe
-            let code = match diagnostic.code() {
-                Some(code) => {
-                    format!("{code} ")
-                }
-                _ => String::new(),
-            };
-            let display_text = self.link_display_text.as_deref().unwrap_or("(link)");
-            let link = format!(
-                "\u{1b}]8;;{}\u{1b}\\{}{}\u{1b}]8;;\u{1b}\\",
-                url,
-                code.style(severity_style),
-                display_text.style(self.theme.styles.link)
-            );
-            write!(header, "{link}")?;
-            writeln!(f, "{header}")?;
-            writeln!(f)?;
-        } else if let Some(code) = diagnostic.code() {
-            write!(header, "{}", code.style(severity_style))?;
-            if self.links == LinkStyle::Text && diagnostic.url().is_some() {
-                let url = diagnostic.url().unwrap(); // safe
-                write!(header, " ({})", url.style(self.theme.styles.link))?;
-            }
-            writeln!(f, "{header}")?;
-            writeln!(f)?;
-        }
         Ok(())
     }
 
@@ -125,7 +79,7 @@ impl GraphicalReportHandler {
                     format!("  {} ", self.theme.characters.vbar.style(severity_style)),
                 )
             };
-            let opts = self.wrap_options(width, &initial_indent, &rest_indent);
+            let opts = Self::wrap_options(width, &initial_indent, &rest_indent);
             Self::write_fill(f, &title, opts)?;
         }
         f.write_char('\n')?;
@@ -137,8 +91,7 @@ impl GraphicalReportHandler {
         if let Some(help) = diagnostic.help() {
             const PREFIX: &str = "  help: ";
             let width = self.termwidth.saturating_sub(4);
-            if self.wrap_lines
-                && memchr::memchr(b'\n', help.as_bytes()).is_none()
+            if memchr::memchr(b'\n', help.as_bytes()).is_none()
                 && PREFIX.len().saturating_add(help.len()) <= width
             {
                 if self.theme.styles.help.is_plain() {
@@ -149,8 +102,8 @@ impl GraphicalReportHandler {
                 f.write_str(help.trim_end_matches(' '))?;
             } else {
                 let initial_indent = PREFIX.style(self.theme.styles.help).to_string();
-                let opts = self.wrap_options(width, &initial_indent, "        ");
-                self.write_wrap(f, &help, opts)?;
+                let opts = Self::wrap_options(width, &initial_indent, "        ");
+                Self::write_fill(f, &help, opts)?;
             }
             f.write_char('\n')?;
         }
@@ -159,107 +112,22 @@ impl GraphicalReportHandler {
             //   note: This is a note about the error
             let width = self.termwidth.saturating_sub(4);
             let initial_indent = "  note: ".style(self.theme.styles.note).to_string();
-            let opts = self.wrap_options(width, &initial_indent, "           ");
-            self.write_wrap(f, &note, opts)?;
+            let opts = Self::wrap_options(width, &initial_indent, "           ");
+            Self::write_fill(f, &note, opts)?;
             f.write_char('\n')?;
         }
         Ok(())
     }
 
-    fn render_related(
-        &self,
-        f: &mut impl fmt::Write,
-        diagnostic: &dyn Diagnostic,
-        parent_src: Option<&dyn SourceCode>,
-    ) -> fmt::Result {
-        let related = diagnostic.related();
-        if !related.is_empty() {
-            let inner_renderer = self.clone();
-            writeln!(f)?;
-            for rel in related.iter().copied() {
-                match rel.severity() {
-                    Some(Severity::Error) | None => write!(f, "Error: ")?,
-                    Some(Severity::Warning) => write!(f, "Warning: ")?,
-                    Some(Severity::Advice) => write!(f, "Advice: ")?,
-                }
-                inner_renderer.render_header(f, rel)?;
-                inner_renderer.render_causes(f, rel)?;
-                let src = rel.source_code().or(parent_src);
-                inner_renderer.render_snippets(f, rel, src)?;
-                inner_renderer.render_footer(f, rel)?;
-                inner_renderer.render_related(f, rel, src)?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Builds the [`textwrap::Options`] shared by every wrapped block — the
-    /// title/causes, the help and note footers, and the global footer. Applies
-    /// the handler's `break_words` setting plus any configured word separator
-    /// and splitter, so those options stay consistent across all of them.
+    /// Builds the [`textwrap::Options`] shared by every wrapped block.
     fn wrap_options<'a>(
-        &self,
         width: usize,
         initial_indent: &'a str,
         subsequent_indent: &'a str,
     ) -> textwrap::Options<'a> {
-        let mut opts = textwrap::Options::new(width)
+        textwrap::Options::new(width)
             .initial_indent(initial_indent)
             .subsequent_indent(subsequent_indent)
-            .break_words(self.break_words);
-        if let Some(word_separator) = self.word_separator {
-            opts = opts.word_separator(word_separator);
-        }
-        if let Some(word_splitter) = self.word_splitter.clone() {
-            opts = opts.word_splitter(word_splitter);
-        }
-        opts
-    }
-
-    fn wrap(&self, text: &str, opts: textwrap::Options<'_>) -> String {
-        if self.wrap_lines {
-            Self::fill(text, opts)
-        } else {
-            // Format without wrapping, but retain the indentation options
-            // Implementation based on `textwrap::indent`
-            let mut result = String::with_capacity(2 * text.len());
-            let trimmed_indent = opts.subsequent_indent.trim_end();
-            for (idx, line) in text.split_terminator('\n').enumerate() {
-                if idx > 0 {
-                    result.push('\n');
-                }
-                if idx == 0 {
-                    if line.trim().is_empty() {
-                        result.push_str(opts.initial_indent.trim_end());
-                    } else {
-                        result.push_str(opts.initial_indent);
-                    }
-                } else if line.trim().is_empty() {
-                    result.push_str(trimmed_indent);
-                } else {
-                    result.push_str(opts.subsequent_indent);
-                }
-                result.push_str(line);
-            }
-            if text.ends_with('\n') {
-                // split_terminator will have eaten the final '\n'.
-                result.push('\n');
-            }
-            result
-        }
-    }
-
-    fn write_wrap(
-        &self,
-        f: &mut impl fmt::Write,
-        text: &str,
-        opts: textwrap::Options<'_>,
-    ) -> fmt::Result {
-        if self.wrap_lines {
-            Self::write_fill(f, text, opts)
-        } else {
-            f.write_str(&self.wrap(text, opts))
-        }
     }
 
     fn write_fill(f: &mut impl fmt::Write, text: &str, opts: textwrap::Options<'_>) -> fmt::Result {
@@ -274,6 +142,7 @@ impl GraphicalReportHandler {
     /// Skip word separation and optimal-fit layout when the text demonstrably
     /// fits on its first line. `textwrap` only provides this fast path without
     /// indentation, while every diagnostic block has an initial indent.
+    #[cfg(test)]
     fn fill(text: &str, opts: textwrap::Options<'_>) -> String {
         if Self::fits_on_line(text, &opts) {
             let text = text.trim_end_matches(' ');

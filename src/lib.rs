@@ -10,7 +10,6 @@ pub use handlers::*;
 pub use named_source::*;
 pub use protocol::*;
 
-mod diagnostic_chain;
 mod error;
 mod handlers;
 mod named_source;

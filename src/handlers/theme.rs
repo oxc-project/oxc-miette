@@ -53,12 +53,6 @@ impl GraphicalTheme {
         }
     }
 
-    /// ASCII-art-based graphical drawing, with ANSI styling.
-    #[must_use]
-    pub fn ascii() -> Self {
-        Self { characters: ThemeCharacters::ascii(), styles: ThemeStyles::ansi() }
-    }
-
     /// Graphical theme that draws using both ansi colors and unicode
     /// characters.
     ///
@@ -133,25 +127,6 @@ impl ThemeStyles {
                 style().fg_rgb::<246, 87, 248>(),
                 style().fg_rgb::<30, 201, 212>(),
                 style().fg_rgb::<145, 246, 111>(),
-            ],
-        }
-    }
-
-    /// ANSI color-based styles.
-    #[must_use]
-    pub fn ansi() -> Self {
-        Self {
-            error: style().red(),
-            warning: style().yellow(),
-            advice: style().cyan(),
-            help: style().cyan(),
-            note: style().cyan(),
-            link: style().cyan().underline().bold(),
-            linum: style().dimmed(),
-            highlights: vec![
-                style().magenta().bold(),
-                style().yellow().bold(),
-                style().green().bold(),
             ],
         }
     }
@@ -236,34 +211,6 @@ impl ThemeCharacters {
             error: "×".into(),
             warning: "⚠".into(),
             advice: "☞".into(),
-        }
-    }
-
-    /// Emoji-heavy unicode characters.
-    #[must_use]
-    pub fn emoji() -> Self {
-        Self {
-            hbar: '─',
-            vbar: '│',
-            xbar: '┼',
-            vbar_break: '·',
-            uarrow: '▲',
-            rarrow: '▶',
-            ltop: '╭',
-            mtop: '┬',
-            rtop: '╮',
-            lbot: '╰',
-            mbot: '┴',
-            rbot: '╯',
-            lbox: '[',
-            rbox: ']',
-            lcross: '├',
-            rcross: '┤',
-            underbar: '┬',
-            underline: '─',
-            error: "💥".into(),
-            warning: "⚠️".into(),
-            advice: "💡".into(),
         }
     }
 

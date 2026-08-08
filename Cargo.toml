@@ -143,7 +143,6 @@ test = false
 workspace = true
 
 [dependencies]
-thiserror = "2"
 owo-colors = "4"
 
 bytecount = "0.6.9"

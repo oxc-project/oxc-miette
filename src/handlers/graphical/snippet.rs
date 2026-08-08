@@ -41,9 +41,7 @@ impl GraphicalReportHandler {
         // attempt); each `read_span` otherwise scans the source from byte 0
         // again. The scanner bypasses the source's own `read_span`, so
         // re-attach the source's name the way `NamedSource` would.
-        let mut scanner = source
-            .contiguous_bytes()
-            .map(|bytes| SpanScanner::new(bytes, self.context_lines, self.context_lines));
+        let mut scanner = source.contiguous_bytes().map(|bytes| SpanScanner::new(bytes, 1, 1));
         let source_name = source.name();
         let mut read = |span: &SourceSpan| match scanner.as_mut() {
             Some(scanner) => scanner.read_span(*span).map(|contents| match source_name {
@@ -57,7 +55,7 @@ impl GraphicalReportHandler {
                 ),
                 None => contents,
             }),
-            None => source.read_span(span, self.context_lines, self.context_lines),
+            None => source.read_span(span, 1, 1),
         };
 
         if let [label] = labels.as_slice() {
@@ -192,7 +190,7 @@ impl GraphicalReportHandler {
             self.render_line_gutter(f, max_gutter, line, &labels)?;
 
             // And _now_ we can print out the line text itself!
-            self.render_line_text(f, line.text)?;
+            Self::render_line_text(f, line.text)?;
 
             // Next, we write all the highlights that apply to this particular line.
             let (single_line, multi_line): (Vec<_>, Vec<_>) = labels
@@ -233,13 +231,13 @@ impl GraphicalReportHandler {
     }
 
     /// Renders a line to the output formatter, replacing tabs with spaces.
-    pub(super) fn render_line_text(&self, f: &mut impl fmt::Write, text: &str) -> fmt::Result {
+    pub(super) fn render_line_text(f: &mut impl fmt::Write, text: &str) -> fmt::Result {
         if !text.contains('\t') {
             f.write_str(text)?;
             return f.write_char('\n');
         }
 
-        for (c, width) in text.chars().zip(self.line_visual_char_width(text)) {
+        for (c, width) in text.chars().zip(Self::line_visual_char_width(text)) {
             if c == '\t' {
                 for _ in 0..width {
                     f.write_char(' ')?;

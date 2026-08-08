@@ -76,9 +76,8 @@ impl<S: SourceCode + fmt::Debug> Diagnostic for TestDiag<S> {
     }
 }
 
-fn render(diagnostic: &dyn Diagnostic, context_lines: usize) -> (fmt::Result, String) {
-    let handler = GraphicalReportHandler::new_themed(GraphicalTheme::none())
-        .with_context_lines(context_lines);
+fn render(diagnostic: &dyn Diagnostic) -> (fmt::Result, String) {
+    let handler = GraphicalReportHandler::new_themed(GraphicalTheme::none());
     let mut out = String::new();
     let result = handler.render_report(&mut out, diagnostic);
     (result, out)
@@ -90,7 +89,7 @@ fn render(diagnostic: &dyn Diagnostic, context_lines: usize) -> (fmt::Result, St
 /// lookup otherwise. Rendering the same diagnostic through both must
 /// produce byte-identical reports (or fail identically, for labels past
 /// the end of the source), across LF / CRLF / lone-CR and multibyte
-/// sources, 1–4 labels of every overlap shape, and all context sizes.
+/// sources and 1–4 labels of every overlap shape.
 #[test]
 #[cfg_attr(
     miri,
@@ -124,56 +123,42 @@ fn buffer_and_read_span_paths_render_identically() {
                 }
                 byte
             };
-            for context_lines in 0..=2 {
-                let labels: Vec<LabeledSpan> = (0..=rng.below(4))
-                    .map(|i| {
-                        // One in six labels lands just past EOF, making
-                        // the whole render fail; both paths must agree on
-                        // that too.
-                        let offset = if rng.below(6) == 0 {
-                            src.len() + 1
-                        } else {
-                            floor(rng.below(src.len() + 1))
-                        };
-                        let mut len =
-                            floor(offset + [0, 1, 2, 6][rng.below(4)]).saturating_sub(offset);
-                        // A zero-length span at offset 0 with zero
-                        // context makes `read_span` return the window
-                        // `[0, 1)` (a pre-existing quirk of its
-                        // saturating span-end arithmetic), which need not
-                        // be valid UTF-8 — rendering panics on both paths
-                        // alike. Widen such spans to the first char.
-                        if context_lines == 0 && offset == 0 && len == 0 {
-                            len = src.chars().next().map_or(0, char::len_utf8);
-                        }
-                        let label = Some(format!("label {i}"));
-                        let span = (offset as u32, len as u32);
-                        if rng.below(4) == 0 {
-                            LabeledSpan::new_primary_with_span(label, span)
-                        } else {
-                            LabeledSpan::new_with_span(label, span)
-                        }
-                    })
-                    .collect();
+            let labels: Vec<LabeledSpan> = (0..=rng.below(4))
+                .map(|i| {
+                    // One in six labels lands just past EOF, making
+                    // the whole render fail; both paths must agree on
+                    // that too.
+                    let offset = if rng.below(6) == 0 {
+                        src.len() + 1
+                    } else {
+                        floor(rng.below(src.len() + 1))
+                    };
+                    let len = floor(offset + [0, 1, 2, 6][rng.below(4)]).saturating_sub(offset);
+                    let label = Some(format!("label {i}"));
+                    let span = (offset as u32, len as u32);
+                    if rng.below(4) == 0 {
+                        LabeledSpan::new_primary_with_span(label, span)
+                    } else {
+                        LabeledSpan::new_with_span(label, span)
+                    }
+                })
+                .collect();
 
-                let with_buffer = TestDiag {
-                    src: NamedSource::new("fuzz.rs", src.clone()),
-                    labels: labels.clone(),
-                };
-                let without_buffer = TestDiag {
-                    src: Opaque(NamedSource::new("fuzz.rs", src.clone())),
-                    labels: labels.clone(),
-                };
-                let (buffer_result, buffer_out) = render(&with_buffer, context_lines);
-                let (read_span_result, read_span_out) = render(&without_buffer, context_lines);
-                assert_eq!(
-                    (buffer_result, &buffer_out),
-                    (read_span_result, &read_span_out),
-                    "diverged for src={src:?} context_lines={context_lines} labels={labels:?}"
-                );
-                checked += 1;
-            }
+            let with_buffer =
+                TestDiag { src: NamedSource::new("fuzz.rs", src.clone()), labels: labels.clone() };
+            let without_buffer = TestDiag {
+                src: Opaque(NamedSource::new("fuzz.rs", src.clone())),
+                labels: labels.clone(),
+            };
+            let (buffer_result, buffer_out) = render(&with_buffer);
+            let (read_span_result, read_span_out) = render(&without_buffer);
+            assert_eq!(
+                (buffer_result, &buffer_out),
+                (read_span_result, &read_span_out),
+                "diverged for src={src:?} labels={labels:?}"
+            );
+            checked += 1;
         }
     }
-    assert!(checked >= 4000, "expected a broad sweep, only checked {checked}");
+    assert!(checked >= 1400, "expected a broad sweep, only checked {checked}");
 }

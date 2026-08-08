@@ -1,7 +1,6 @@
 //! The [`GraphicalReportHandler`] type and its builder API.
 //!
-//! This module holds the handler's configuration (theme, terminal width, link
-//! style, wrapping options, …) and the `new`/`with_*` builders that set it. The
+//! This module holds the handler's theme, terminal width, and link style. The
 //! actual rendering lives in the sibling modules (`report`, `snippet`, …).
 
 use std::io::{self, IsTerminal};
@@ -20,28 +19,6 @@ pub struct GraphicalReportHandler {
     pub(crate) termwidth: usize,
     /// How to style reports
     pub(crate) theme: GraphicalTheme,
-    pub(crate) footer: Option<String>,
-    /// Number of source lines to render before/after the line(s) covered by errors.
-    ///
-    /// Default: `1`
-    pub(crate) context_lines: usize,
-    /// Tab print width
-    ///
-    /// Default: `4`
-    pub(crate) tab_width: usize,
-    /// Whether to wrap lines to fit the width.
-    ///
-    /// Default: `true`
-    pub(crate) wrap_lines: bool,
-    /// Whether to break words during wrapping.
-    ///
-    /// When `false`, line breaks will happen before the first word that would overflow `termwidth`.
-    ///
-    /// Default: `true`
-    pub(crate) break_words: bool,
-    pub(crate) word_separator: Option<textwrap::WordSeparator>,
-    pub(crate) word_splitter: Option<textwrap::WordSplitter>,
-    pub(crate) link_display_text: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,40 +38,13 @@ impl GraphicalReportHandler {
             links: if is_terminal { LinkStyle::Link } else { LinkStyle::Text },
             termwidth: 400,
             theme: GraphicalTheme::new(is_terminal),
-            footer: None,
-            context_lines: 1,
-            tab_width: 4,
-            wrap_lines: true,
-            break_words: true,
-            word_separator: None,
-            word_splitter: None,
-            link_display_text: None,
         }
     }
 
     /// Create a new `GraphicalReportHandler` with a given [`GraphicalTheme`].
     #[must_use]
     pub fn new_themed(theme: GraphicalTheme) -> Self {
-        Self {
-            links: LinkStyle::Link,
-            termwidth: 200,
-            theme,
-            footer: None,
-            context_lines: 1,
-            tab_width: 4,
-            wrap_lines: true,
-            break_words: true,
-            word_separator: None,
-            word_splitter: None,
-            link_display_text: None,
-        }
-    }
-
-    /// Set the displayed tab width in spaces.
-    #[must_use]
-    pub fn tab_width(mut self, width: usize) -> Self {
-        self.tab_width = width;
-        self
+        Self { links: LinkStyle::Link, termwidth: 200, theme }
     }
 
     /// Whether to enable error code linkification using [`Diagnostic::url()`](crate::Diagnostic::url).
@@ -115,56 +65,6 @@ impl GraphicalReportHandler {
     #[must_use]
     pub fn with_width(mut self, width: usize) -> Self {
         self.termwidth = width;
-        self
-    }
-
-    /// Enables or disables wrapping of lines to fit the width.
-    #[must_use]
-    pub fn with_wrap_lines(mut self, wrap_lines: bool) -> Self {
-        self.wrap_lines = wrap_lines;
-        self
-    }
-
-    /// Enables or disables breaking of words during wrapping.
-    #[must_use]
-    pub fn with_break_words(mut self, break_words: bool) -> Self {
-        self.break_words = break_words;
-        self
-    }
-
-    /// Sets the word separator to use when wrapping.
-    #[must_use]
-    pub fn with_word_separator(mut self, word_separator: textwrap::WordSeparator) -> Self {
-        self.word_separator = Some(word_separator);
-        self
-    }
-
-    /// Sets the word splitter to use when wrapping.
-    #[must_use]
-    pub fn with_word_splitter(mut self, word_splitter: textwrap::WordSplitter) -> Self {
-        self.word_splitter = Some(word_splitter);
-        self
-    }
-
-    /// Sets the 'global' footer for this handler.
-    #[must_use]
-    pub fn with_footer(mut self, footer: String) -> Self {
-        self.footer = Some(footer);
-        self
-    }
-
-    /// Sets the number of lines of context to show around each error.
-    #[must_use]
-    pub fn with_context_lines(mut self, lines: usize) -> Self {
-        self.context_lines = lines;
-        self
-    }
-
-    /// Sets the display text for links.
-    /// Miette displays `(link)` if this option is not set.
-    #[must_use]
-    pub fn with_link_display_text(mut self, text: impl Into<String>) -> Self {
-        self.link_display_text = Some(text.into());
         self
     }
 }

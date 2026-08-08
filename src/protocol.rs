@@ -6,9 +6,8 @@ full reporting and such features.
 use std::{
     borrow::Cow,
     error::Error,
-    fs, mem,
+    mem,
     ops::{Deref, DerefMut, Range},
-    panic::Location,
     slice::{Iter, IterMut},
 };
 
@@ -65,116 +64,6 @@ pub trait Diagnostic: Error {
     /// avoids the boxed-iterator allocation the previous signature required.
     fn labels(&self) -> crate::Labels {
         crate::Labels::None
-    }
-
-    /// Additional related `Diagnostic`s.
-    ///
-    /// Returns the owned [`Related`] container. For the common one/two-related
-    /// case this is allocation-free, and it avoids the boxed-iterator
-    /// allocation the previous signature required.
-    fn related(&self) -> Related<'_> {
-        Related::None
-    }
-
-    /// The cause of the error.
-    fn diagnostic_source(&self) -> Option<&dyn Diagnostic> {
-        None
-    }
-}
-
-/// Container for a [`Diagnostic`]'s related diagnostics.
-///
-/// Most diagnostics carry only one or two related entries, so those cases are
-/// stored inline without a heap allocation. Three or more spill to a [`Vec`].
-#[derive(Default)]
-pub enum Related<'a> {
-    /// No related diagnostics.
-    #[default]
-    None,
-    /// A single related diagnostic, stored inline.
-    One([&'a dyn Diagnostic; 1]),
-    /// Two related diagnostics, stored inline.
-    Two([&'a dyn Diagnostic; 2]),
-    /// Three or more related diagnostics, stored on the heap.
-    Many(Vec<&'a dyn Diagnostic>),
-}
-
-impl<'a> Related<'a> {
-    /// Returns the related diagnostics as a contiguous slice.
-    #[must_use]
-    pub fn as_slice(&self) -> &[&'a dyn Diagnostic] {
-        match self {
-            Related::None => &[],
-            Related::One(related) => related,
-            Related::Two(related) => related,
-            Related::Many(related) => related,
-        }
-    }
-
-    /// Returns `true` if there are no related diagnostics.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        matches!(self, Related::None)
-    }
-
-    /// Returns the number of related diagnostics.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.as_slice().len()
-    }
-
-    /// Appends a related diagnostic, keeping the storage inline while possible.
-    pub fn push(&mut self, related: &'a dyn Diagnostic) {
-        if let Related::Many(items) = self {
-            items.push(related);
-            return;
-        }
-        *self = match mem::take(self) {
-            Related::None => Related::One([related]),
-            Related::One([a]) => Related::Two([a, related]),
-            Related::Two([a, b]) => Related::Many(vec![a, b, related]),
-            Related::Many(_) => unreachable!("handled by the fast path above"),
-        };
-    }
-}
-
-impl<'a> Deref for Related<'a> {
-    type Target = [&'a dyn Diagnostic];
-
-    fn deref(&self) -> &Self::Target {
-        self.as_slice()
-    }
-}
-
-impl<'a> Extend<&'a dyn Diagnostic> for Related<'a> {
-    fn extend<I: IntoIterator<Item = &'a dyn Diagnostic>>(&mut self, iter: I) {
-        let mut iter = iter.into_iter();
-        while !matches!(self, Related::Many(_)) {
-            match iter.next() {
-                Some(related) => self.push(related),
-                None => return,
-            }
-        }
-        if let Related::Many(items) = self {
-            items.reserve(iter.size_hint().0);
-            items.extend(iter);
-        }
-    }
-}
-
-impl<'a> FromIterator<&'a dyn Diagnostic> for Related<'a> {
-    fn from_iter<I: IntoIterator<Item = &'a dyn Diagnostic>>(iter: I) -> Self {
-        let mut iter = iter.into_iter();
-        if iter.size_hint().0 > 2 {
-            return Related::Many(iter.collect());
-        }
-        let Some(a) = iter.next() else { return Related::None };
-        let Some(b) = iter.next() else { return Related::One([a]) };
-        let Some(c) = iter.next() else { return Related::Two([a, b]) };
-        let mut items = Vec::with_capacity(3 + iter.size_hint().0);
-        items.extend([a, b, c]);
-        items.extend(iter);
-        Related::Many(items)
     }
 }
 
@@ -442,11 +331,6 @@ impl LabeledSpan {
         Self { label, span: span.into(), primary: true }
     }
 
-    /// Change the text of the label
-    pub fn set_label(&mut self, label: Option<String>) {
-        self.label = label;
-    }
-
     /// Change the offset of the span
     pub fn set_span_offset(&mut self, offset: ByteOffset) {
         self.span.offset = SourceOffset(offset);
@@ -468,24 +352,6 @@ impl LabeledSpan {
     #[must_use]
     pub fn at(span: impl Into<SourceSpan>, label: impl Into<String>) -> Self {
         Self::new_with_span(Some(label.into()), span)
-    }
-
-    /// Makes a new label that points at a specific offset.
-    ///
-    /// # Examples
-    /// ```
-    /// use miette::LabeledSpan;
-    ///
-    /// let source = "(2 + 2";
-    /// let label = LabeledSpan::at_offset(4, "expected a closing parenthesis");
-    /// assert_eq!(
-    ///     label,
-    ///     LabeledSpan::new(Some("expected a closing parenthesis".to_string()), 4, 0)
-    /// )
-    /// ```
-    #[must_use]
-    pub fn at_offset(offset: ByteOffset, label: impl Into<String>) -> Self {
-        Self::new(Some(label.into()), offset, 0)
     }
 
     /// Makes a new label without text, that underlines a specific span.
@@ -562,15 +428,6 @@ pub trait SpanContents<'a> {
     fn column(&self) -> usize;
     /// Total number of lines covered by this `SpanContents`.
     fn line_count(&self) -> usize;
-
-    /// Optional method. The language name for this source code, if any.
-    /// This is used to drive syntax highlighting.
-    ///
-    /// Examples: Rust, TOML, C
-    ///
-    fn language(&self) -> Option<&str> {
-        None
-    }
 }
 
 /**
@@ -590,8 +447,6 @@ pub struct MietteSpanContents<'a> {
     line_count: usize,
     // Optional filename
     name: Option<Cow<'a, str>>,
-    // Optional language
-    language: Option<Cow<'a, str>>,
 }
 
 impl<'a> MietteSpanContents<'a> {
@@ -604,7 +459,7 @@ impl<'a> MietteSpanContents<'a> {
         column: usize,
         line_count: usize,
     ) -> MietteSpanContents<'a> {
-        MietteSpanContents { data, span, line, column, line_count, name: None, language: None }
+        MietteSpanContents { data, span, line, column, line_count, name: None }
     }
 
     /// Make a new [`MietteSpanContents`] object, with a name for its 'file'.
@@ -617,22 +472,7 @@ impl<'a> MietteSpanContents<'a> {
         column: usize,
         line_count: usize,
     ) -> MietteSpanContents<'a> {
-        MietteSpanContents {
-            data,
-            span,
-            line,
-            column,
-            line_count,
-            name: Some(name),
-            language: None,
-        }
-    }
-
-    /// Sets the `language` for syntax highlighting.
-    #[must_use]
-    pub fn with_language(mut self, language: impl Into<Cow<'a, str>>) -> Self {
-        self.language = Some(language.into());
-        self
+        MietteSpanContents { data, span, line, column, line_count, name: Some(name) }
     }
 }
 
@@ -659,10 +499,6 @@ impl<'a> SpanContents<'a> for MietteSpanContents<'a> {
 
     fn name(&self) -> Option<&str> {
         self.name.as_deref()
-    }
-
-    fn language(&self) -> Option<&str> {
-        self.language.as_deref()
     }
 }
 
@@ -755,57 +591,6 @@ impl SourceOffset {
     #[expect(clippy::trivially_copy_pass_by_ref, reason = "retained for public API compatibility")]
     pub const fn offset(&self) -> ByteOffset {
         self.0
-    }
-
-    /// Little utility to help convert 1-based line/column locations into
-    /// miette-compatible Spans
-    ///
-    /// This function is infallible: Giving an out-of-range line/column pair
-    /// will return the offset of the last byte in the source.
-    #[must_use]
-    pub fn from_location(source: impl AsRef<str>, loc_line: usize, loc_col: usize) -> Self {
-        let mut line = 0usize;
-        let mut col = 0usize;
-        let mut offset = 0usize;
-        for char in source.as_ref().chars() {
-            if line + 1 >= loc_line && col + 1 >= loc_col {
-                break;
-            }
-            if char == '\n' {
-                col = 0;
-                line += 1;
-            } else {
-                col += 1;
-            }
-            offset += char.len_utf8();
-        }
-
-        SourceOffset(u32::try_from(offset).unwrap_or(u32::MAX))
-    }
-
-    /// Returns an offset for the _file_ location of wherever this function is
-    /// called. If you want to get _that_ caller's location, mark this
-    /// function's caller with `#[track_caller]` (and so on and so forth).
-    ///
-    /// Returns both the filename that was given and the offset of the caller
-    /// as a [`SourceOffset`].
-    ///
-    /// Keep in mind that this will only work if the file your Rust source
-    /// file was compiled from is actually available at that location. If
-    /// you're shipping binaries for your application, you'll want to ignore
-    /// the Err case or otherwise report it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the caller's source file cannot be read.
-    #[track_caller]
-    pub fn from_current_location() -> Result<(String, Self), MietteError> {
-        let loc = Location::caller();
-        Ok((
-            loc.file().into(),
-            fs::read_to_string(loc.file())
-                .map(|txt| Self::from_location(txt, loc.line() as usize, loc.column() as usize))?,
-        ))
     }
 }
 
