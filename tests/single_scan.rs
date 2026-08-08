@@ -12,8 +12,8 @@
 use std::fmt;
 
 use miette::{
-    Diagnostic, GraphicalReportHandler, GraphicalTheme, LabeledSpan, Labels, MietteError,
-    MietteSpanContents, NamedSource, SourceCode, SourceSpan,
+    Diagnostic, GraphicalReportHandler, GraphicalTheme, LabeledSpan, Labels, NamedSource,
+    SourceCode, SourceSpan, SpanContents,
 };
 
 /// Deterministic xorshift so any failure reproduces from a fixed seed.
@@ -43,7 +43,7 @@ impl SourceCode for Opaque {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
+    ) -> Option<SpanContents<'a>> {
         self.0.read_span(span, context_lines_before, context_lines_after)
     }
 

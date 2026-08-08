@@ -18,8 +18,7 @@ use super::{
     span::{FancySpan, LabelRenderMode},
 };
 use crate::{
-    Diagnostic, LabeledSpan, MietteSpanContents, SourceCode, SourceSpan, SpanContents,
-    source_impls::SpanScanner,
+    Diagnostic, LabeledSpan, SourceCode, SourceSpan, SpanContents, source_impls::SpanScanner,
 };
 
 impl GraphicalReportHandler {
@@ -45,7 +44,7 @@ impl GraphicalReportHandler {
         let source_name = source.name();
         let mut read = |span: &SourceSpan| match scanner.as_mut() {
             Some(scanner) => scanner.read_span(*span).map(|contents| match source_name {
-                Some(name) => MietteSpanContents::new_named(
+                Some(name) => SpanContents::new_named(
                     Cow::Borrowed(name),
                     contents.data(),
                     *contents.span(),
@@ -59,13 +58,13 @@ impl GraphicalReportHandler {
         };
 
         if let [label] = labels.as_slice() {
-            let contents = read(label.inner()).map_err(|_| fmt::Error)?;
+            let contents = read(label.inner()).ok_or(fmt::Error)?;
             return self.render_context(f, label, &contents, &labels);
         }
 
         let mut contexts: Vec<(Cow<'_, LabeledSpan>, _)> = Vec::with_capacity(labels.len());
         for right in &labels {
-            let right_conts = read(right.inner()).map_err(|_| fmt::Error)?;
+            let right_conts = read(right.inner()).ok_or(fmt::Error)?;
 
             if contexts.is_empty() {
                 contexts.push((Cow::Borrowed(right), right_conts));
@@ -85,7 +84,7 @@ impl GraphicalReportHandler {
                     new_end - left.offset(),
                 );
                 // Check that the two contexts can be combined
-                if let Ok(new_conts) = read(new_span.inner()) {
+                if let Some(new_conts) = read(new_span.inner()) {
                     contexts.pop();
                     contexts.push((Cow::Owned(new_span), new_conts));
                     continue;
@@ -105,7 +104,7 @@ impl GraphicalReportHandler {
         &self,
         f: &mut impl fmt::Write,
         context: &LabeledSpan,
-        contents: &MietteSpanContents<'_>,
+        contents: &SpanContents<'_>,
         labels: &[LabeledSpan],
     ) -> fmt::Result {
         let lines = self.get_lines(contents);
