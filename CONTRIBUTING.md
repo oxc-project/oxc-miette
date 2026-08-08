@@ -88,11 +88,9 @@ If you want to go the usual route and run the project locally, though:
 
 Then in your terminal:
 * `cd path/to/your/clone`
-* `cargo test --features fancy`
+* `cargo test`
 
 And you should be ready to go!
-
-**Note:** If you don't include the "fancy" feature, one of the doc-tests will fail.
 
 ## Contribute Documentation
 
@@ -254,4 +252,3 @@ Admin/Owner | Granted to people ultimately responsible for the project, its comm
 ## Attribution
 
 This guide was generated using the WeAllJS `CONTRIBUTING.md` generator. [Make your own](https://npm.im/weallcontribute)!
-

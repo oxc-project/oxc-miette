@@ -1,22 +1,41 @@
-# `oxc_miette`
+# oxc-miette
 
-Fork of https://github.com/zkat/miette
+`oxc-miette` provides the diagnostic protocol and renderers used by Oxc.
 
-### License
+The crate contains:
 
-`miette` is released to the Rust community under the [Apache license 2.0](./LICENSE).
+- `Diagnostic` and `SourceCode` traits
+- source spans, labels, severities, and named sources
+- graphical and JSON diagnostic renderers
 
-It also includes code taken from [`eyre`](https://github.com/yaahc/eyre),
-and some from [`thiserror`](https://github.com/dtolnay/thiserror), also
-under the Apache License. Some code is taken from
-[`ariadne`](https://github.com/zesterer/ariadne), which is MIT licensed.
+It intentionally does not provide an application error container or implicit
+global rendering. Applications own diagnostics directly—typically as
+`Box<dyn Diagnostic + Send + Sync>`—and select a renderer explicitly.
 
-[`miette!`]: https://docs.rs/miette/latest/miette/macro.miette.html
+```rust
+use std::fmt;
 
-# [Sponsored By](https://oxc.rs/sponsor)
+use miette::{Diagnostic, GraphicalReportHandler, GraphicalTheme};
 
-<p align="center">
-  <a href="https://oxc.rs/sponsor">
-    <img src="https://raw.githubusercontent.com/oxc-project/sponsors/main/sponsors.svg" alt="Our sponsors" />
-  </a>
-</p>
+#[derive(Debug)]
+struct Example;
+
+impl fmt::Display for Example {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("something went wrong")
+    }
+}
+
+impl std::error::Error for Example {}
+impl Diagnostic for Example {}
+
+let mut output = String::new();
+GraphicalReportHandler::new_themed(GraphicalTheme::none())
+    .render_report(&mut output, &Example)
+    .unwrap();
+assert!(output.contains("something went wrong"));
+```
+
+## License
+
+Apache-2.0

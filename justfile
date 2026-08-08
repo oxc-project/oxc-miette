@@ -23,14 +23,14 @@ ready:
   cargo fmt
   cargo check
   cargo clippy
-  cargo test --features fancy
-  cargo check --benches --features fancy
+  cargo test
+  cargo check --benches
   cargo doc
   git status
 
 # Run the benchmarks (fixtures are downloaded from benchmark-files on first run)
 bench:
-  cargo bench --features fancy
+  cargo bench
 
 watch *args='':
   watchexec {{args}}

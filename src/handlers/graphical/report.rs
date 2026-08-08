@@ -16,10 +16,7 @@ use super::handler::{GraphicalReportHandler, LinkStyle};
 use crate::{Diagnostic, Severity, SourceCode};
 
 impl GraphicalReportHandler {
-    /// Render a [`Diagnostic`]. This function is mostly internal and meant to
-    /// be called by the toplevel [`ReportHandler`](crate::ReportHandler)
-    /// handler, but is made public to make it easier (possible) to test in
-    /// isolation from global state.
+    /// Render a [`Diagnostic`].
     ///
     /// # Errors
     ///

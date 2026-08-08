@@ -1,7 +1,3 @@
-[workspace]
-resolver = "3"
-members = ["miette-derive"]
-
 [workspace.package]
 authors = ["Boshen", "Kat Marchán <kzm@zkat.tech>"]
 categories = ["rust-patterns"]
@@ -131,7 +127,7 @@ repository.workspace = true
 license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-exclude = ["images/", "tests/", "miette-derive/"]
+exclude = ["images/", "tests/"]
 
 [lib]
 name = "miette"
@@ -142,81 +138,30 @@ harness = false
 # Downloads fixtures on first run, so keep it out of `cargo test` (which would
 # run it once). It is still built by the benchmark workflow and `just bench`.
 test = false
-required-features = ["fancy"]
 
 [lints]
 workspace = true
 
 [dependencies]
-oxc-miette-derive = { path = "miette-derive", version = "=3.0.1", optional = true }
-
-# Relaxed version so the user can decide which version to use.
 thiserror = "2"
-serde = { version = "1", features = ["derive"], optional = true }
-owo-colors = { version = "4", optional = true }
-cfg-if = "1"
+owo-colors = "4"
 
 bytecount = "0.6.9"
 memchr = "2"
 unicode-width = "0.2.0"
 unicode-segmentation = "1.12.0"
 
-textwrap = { version = "0.16.2", optional = true }
-supports-hyperlinks = { version = "3.1.0", optional = true }
-supports-color = { version = "3.0.2", optional = true }
-supports-unicode = { version = "3.0.0", optional = true }
-backtrace = { version = "0.3.74", optional = true }
-terminal_size = { version = "0.4.2", optional = true }
-backtrace-ext = { version = "0.2.1", optional = true }
+textwrap = "0.16.2"
 
 [dev-dependencies]
-semver = "1.0.26"
-
-# Eyre devdeps
-futures = { version = "0.3", default-features = false }
-indenter = "0.3.3"
-rustversion = "1.0"
-trybuild = { version = "1.0.104", features = ["diff"] }
-regex = "1.11"
-
-serde_json = "1.0.140"
-insta = "1.46.1"
-
-# Benchmark deps
 criterion2 = { version = "3", default-features = false }
 ureq = "3"
 
 [features]
-default = ["derive"]
-derive = ["oxc-miette-derive"]
-no-format-args-capture = []
-fancy-base = [
-    "owo-colors",
-    "textwrap",
-]
-fancy-no-syscall = [
-    "fancy-base",
-]
-fancy-no-backtrace = [
-    "fancy-base",
-    "terminal_size",
-    "supports-hyperlinks",
-    "supports-color",
-    "supports-unicode",
-]
-fancy = ["fancy-no-backtrace", "backtrace", "backtrace-ext"]
-# Enables CodSpeed's instrumented harness for `cargo codspeed`. Pulls in `fancy`
-# because the benchmark renders diagnostics via `GraphicalReportHandler`.
-codspeed = ["criterion2/codspeed", "fancy"]
+codspeed = ["criterion2/codspeed"]
 
 [package.metadata.docs.rs]
 all-features = true
-
-[profile.dev.package]
-# Compile insta and its dependencies in release mode for faster snapshot tests
-# See: https://insta.rs/docs/quickstart/#optional-faster-runs
-insta.opt-level = 3
-similar.opt-level = 3
 
 [profile.bench]
 lto = true

@@ -23,18 +23,4 @@ mod report;
 mod snippet;
 mod span;
 
-use std::fmt;
-
 pub use handler::GraphicalReportHandler;
-
-use crate::{Diagnostic, ReportHandler};
-
-impl ReportHandler for GraphicalReportHandler {
-    fn debug(&self, diagnostic: &dyn Diagnostic, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if f.alternate() {
-            return fmt::Debug::fmt(diagnostic, f);
-        }
-
-        self.render_report(f, diagnostic)
-    }
-}
