@@ -3,7 +3,7 @@ Default trait implementations for [`SourceCode`].
 */
 #[cfg(test)]
 use std::str::from_utf8;
-use std::{borrow::Cow, collections::VecDeque, fmt::Debug, sync::Arc};
+use std::{collections::VecDeque, sync::Arc};
 
 use crate::{MietteError, MietteSpanContents, SourceCode, SourceSpan, SpanContents};
 
@@ -738,36 +738,6 @@ impl SourceCode for [u8] {
     }
 }
 
-impl SourceCode for &[u8] {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
-        <[u8] as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
-    }
-
-    fn contiguous_bytes(&self) -> Option<&[u8]> {
-        Some(self)
-    }
-}
-
-impl SourceCode for Vec<u8> {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
-        <[u8] as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
-    }
-
-    fn contiguous_bytes(&self) -> Option<&[u8]> {
-        Some(self)
-    }
-}
-
 impl SourceCode for str {
     fn read_span<'a>(
         &'a self,
@@ -820,33 +790,6 @@ impl SourceCode for String {
 }
 
 impl<T: ?Sized + SourceCode> SourceCode for Arc<T> {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
-        self.as_ref().read_span(span, context_lines_before, context_lines_after)
-    }
-
-    fn name(&self) -> Option<&str> {
-        self.as_ref().name()
-    }
-
-    fn contiguous_bytes(&self) -> Option<&[u8]> {
-        self.as_ref().contiguous_bytes()
-    }
-}
-
-impl<T: ?Sized + SourceCode + ToOwned> SourceCode for Cow<'_, T>
-where
-    // The minimal bounds are used here.
-    // `T::Owned` need not be
-    // `SourceCode`, because `&T`
-    // can always be obtained from
-    // `Cow<'_, T>`.
-    T::Owned: Debug + Send + Sync,
-{
     fn read_span<'a>(
         &'a self,
         span: &SourceSpan,

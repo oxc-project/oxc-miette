@@ -129,11 +129,11 @@ impl GraphicalReportHandler {
         for &hl in single_liners {
             let byte_start = hl.offset();
             let byte_end = hl.offset() + hl.len();
-            let start = self.visual_offset(line, byte_start, true).max(highest);
+            let start = Self::visual_offset(line, byte_start, true).max(highest);
             let end = if hl.len() == 0 {
                 start + 1
             } else {
-                self.visual_offset(line, byte_end, false).max(start + 1)
+                Self::visual_offset(line, byte_end, false).max(start + 1)
             };
 
             let vbar_offset = usize::midpoint(start, end);

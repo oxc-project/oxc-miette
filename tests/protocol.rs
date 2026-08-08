@@ -1,6 +1,6 @@
 use std::fmt;
 
-use miette::{Diagnostic, LabeledSpan, Labels, SourceOffset, SourceSpan};
+use miette::{Diagnostic, LabeledSpan, Labels, SourceSpan};
 
 #[derive(Debug)]
 struct TestDiagnostic;
@@ -30,7 +30,6 @@ fn spans_convert_from_offsets_and_ranges() {
     assert_eq!(SourceSpan::from((3, 4)).offset(), 3);
     assert_eq!(SourceSpan::from((3, 4)).len(), 4);
     assert_eq!(SourceSpan::from(3..7), SourceSpan::from((3, 4)));
-    assert_eq!(SourceOffset::from_location("a\nb", 2, 1).offset(), 2);
 }
 
 #[test]

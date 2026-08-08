@@ -1,8 +1,6 @@
 use std::fmt::{self, Write};
 
-use crate::{
-    Severity, SourceCode, SpanContents, diagnostic_chain::DiagnosticChain, protocol::Diagnostic,
-};
+use crate::{Severity, SourceCode, SpanContents, protocol::Diagnostic};
 
 /**
 Renders diagnostics as machine-readable JSON.
@@ -65,15 +63,6 @@ impl JSONReportHandler {
         f: &mut impl fmt::Write,
         diagnostic: &dyn Diagnostic,
     ) -> fmt::Result {
-        self.render_report_inner(f, diagnostic, None)
-    }
-
-    fn render_report_inner(
-        &self,
-        f: &mut impl fmt::Write,
-        diagnostic: &dyn Diagnostic,
-        parent_src: Option<&dyn SourceCode>,
-    ) -> fmt::Result {
         write!(f, r#"{{"message": "{}","#, escape(&diagnostic.to_string()))?;
         if let Some(code) = diagnostic.code() {
             write!(f, r#""code": "{}","#, escape(&code))?;
@@ -84,25 +73,7 @@ impl JSONReportHandler {
             Some(Severity::Advice) => "advice",
         };
         write!(f, r#""severity": "{severity:}","#)?;
-        if let Some(cause_iter) = diagnostic
-            .diagnostic_source()
-            .map(DiagnosticChain::from_diagnostic)
-            .or_else(|| diagnostic.source().map(DiagnosticChain::from_stderror))
-        {
-            write!(f, r#""causes": ["#)?;
-            let mut add_comma = false;
-            for error in cause_iter {
-                if add_comma {
-                    write!(f, ",")?;
-                } else {
-                    add_comma = true;
-                }
-                write!(f, r#""{}""#, escape(&error.to_string()))?;
-            }
-            write!(f, "],")?;
-        } else {
-            write!(f, r#""causes": [],"#)?;
-        }
+        write!(f, r#""causes": [],"#)?;
         if let Some(url) = diagnostic.url() {
             write!(f, r#""url": "{url}","#)?;
         }
@@ -112,8 +83,7 @@ impl JSONReportHandler {
         if let Some(note) = diagnostic.note() {
             write!(f, r#""note": "{}","#, escape(&note))?;
         }
-        let src = diagnostic.source_code().or(parent_src);
-        if let Some(src) = src {
+        if let Some(src) = diagnostic.source_code() {
             self.render_snippets(f, diagnostic, src)?;
         }
         {
@@ -133,10 +103,8 @@ impl JSONReportHandler {
                 write!(f, r#""offset": {},"#, label.offset())?;
                 write!(f, r#""length": {},"#, label.len())?;
 
-                if let Some(Ok(location)) = diagnostic
-                    .source_code()
-                    .or(parent_src)
-                    .map(|src| src.read_span(label.inner(), 0, 0))
+                if let Some(Ok(location)) =
+                    diagnostic.source_code().map(|source| source.read_span(label.inner(), 0, 0))
                 {
                     write!(f, r#""line": {},"#, location.line() + 1)?;
                     write!(f, r#""column": {}"#, location.column() + 1)?;
@@ -148,22 +116,7 @@ impl JSONReportHandler {
             }
             write!(f, "],")?;
         }
-        let relates = diagnostic.related();
-        if relates.is_empty() {
-            write!(f, r#""related": []"#)?;
-        } else {
-            write!(f, r#""related": ["#)?;
-            let mut add_comma = false;
-            for related in relates.iter().copied() {
-                if add_comma {
-                    write!(f, ",")?;
-                } else {
-                    add_comma = true;
-                }
-                self.render_report_inner(f, related, src)?;
-            }
-            write!(f, "]")?;
-        }
+        write!(f, r#""related": []"#)?;
         write!(f, "}}")
     }
 

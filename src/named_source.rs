@@ -9,15 +9,11 @@ use crate::{MietteError, MietteSpanContents, SourceCode, SpanContents};
 pub struct NamedSource<S: SourceCode + 'static> {
     source: S,
     name: String,
-    language: Option<String>,
 }
 
 impl<S: SourceCode> fmt::Debug for NamedSource<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("NamedSource")
-            .field("name", &self.name)
-            .field("source", &"<redacted>")
-            .field("language", &self.language);
+        f.debug_struct("NamedSource").field("name", &self.name).field("source", &"<redacted>");
         Ok(())
     }
 }
@@ -30,7 +26,7 @@ impl<S: SourceCode + 'static> NamedSource<S> {
     where
         S: Send + Sync,
     {
-        Self { source, name: name.as_ref().to_string(), language: None }
+        Self { source, name: name.as_ref().to_string() }
     }
 
     /// Gets the name of this `NamedSource`.
@@ -45,13 +41,6 @@ impl<S: SourceCode + 'static> NamedSource<S> {
     pub fn inner(&self) -> &S {
         &self.source
     }
-
-    /// Sets the [`language`](SpanContents::language) for this source code.
-    #[must_use]
-    pub fn with_language(mut self, language: impl Into<String>) -> Self {
-        self.language = Some(language.into());
-        self
-    }
 }
 
 impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
@@ -63,7 +52,7 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
     ) -> Result<MietteSpanContents<'a>, MietteError> {
         let inner_contents =
             self.inner().read_span(span, context_lines_before, context_lines_after)?;
-        let mut contents = MietteSpanContents::new_named(
+        let contents = MietteSpanContents::new_named(
             Cow::Borrowed(self.name.as_str()),
             inner_contents.data(),
             *inner_contents.span(),
@@ -71,9 +60,6 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
             inner_contents.column(),
             inner_contents.line_count(),
         );
-        if let Some(language) = &self.language {
-            contents = contents.with_language(language);
-        }
         Ok(contents)
     }
 
