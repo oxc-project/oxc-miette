@@ -4,22 +4,18 @@ traits that you can implement to get access to miette's (and related library's)
 full reporting and such features.
 */
 use std::{
-    borrow::{Borrow, Cow},
+    borrow::Cow,
     error::Error,
-    fmt::{self, Display},
     fs, mem,
-    ops::{Deref, Range},
+    ops::{Deref, DerefMut, Range},
     panic::Location,
+    slice::{Iter, IterMut},
 };
-
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
 use crate::MietteError;
 
 /// Adds rich metadata to your Error that can be used by
-/// [`Report`](crate::Report) to print really nice and human-friendly error
-/// messages.
+/// Rich metadata that renderers use to produce human-friendly error messages.
 pub trait Diagnostic: Error {
     /// Unique diagnostic code that can be used to look up more information
     /// about this `Diagnostic`. Ideally also globally unique, and documented
@@ -31,8 +27,7 @@ pub trait Diagnostic: Error {
     }
 
     /// Diagnostic severity. This may be used by
-    /// [`ReportHandler`](crate::ReportHandler)s to change the display format
-    /// of this diagnostic.
+    /// Renderers may use this to change the display format of this diagnostic.
     ///
     /// If `None`, reporters should treat this as [`Severity::Error`].
     fn severity(&self) -> Option<Severity> {
@@ -183,134 +178,177 @@ impl<'a> FromIterator<&'a dyn Diagnostic> for Related<'a> {
     }
 }
 
-macro_rules! box_error_impls {
-    ($($box_type:ty),*) => {
-        $(
-            impl Error for $box_type {
-                fn source(&self) -> Option<&(dyn Error + 'static)> {
-                    (**self).source()
-                }
-
-                fn cause(&self) -> Option<&dyn Error> {
-                    self.source()
-                }
-            }
-        )*
+impl Error for Box<dyn Diagnostic + Send + Sync> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        (**self).source()
     }
-}
 
-box_error_impls! {
-    Box<dyn Diagnostic>,
-    Box<dyn Diagnostic + Send>,
-    Box<dyn Diagnostic + Send + Sync>
-}
-
-macro_rules! box_borrow_impls {
-    ($($box_type:ty),*) => {
-        $(
-            impl Borrow<dyn Diagnostic> for $box_type {
-                fn borrow(&self) -> &(dyn Diagnostic + 'static) {
-                    self.as_ref()
-                }
-            }
-        )*
+    fn cause(&self) -> Option<&dyn Error> {
+        self.source()
     }
-}
-
-box_borrow_impls! {
-    Box<dyn Diagnostic + Send>,
-    Box<dyn Diagnostic + Send + Sync>
 }
 
 impl<T: Diagnostic + Send + Sync + 'static> From<T>
     for Box<dyn Diagnostic + Send + Sync + 'static>
 {
-    fn from(diag: T) -> Self {
-        Box::new(diag)
+    fn from(diagnostic: T) -> Self {
+        Box::new(diagnostic)
     }
 }
 
-impl<T: Diagnostic + Send + Sync + 'static> From<T> for Box<dyn Diagnostic + Send + 'static> {
-    fn from(diag: T) -> Self {
-        Box::<dyn Diagnostic + Send + Sync>::from(diag)
-    }
+/// Owned labels attached to a [`Diagnostic`].
+///
+/// The common one- and two-label cases are stored inline.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum Labels {
+    /// No labels.
+    #[default]
+    None,
+    /// A single label.
+    One([LabeledSpan; 1]),
+    /// Two labels.
+    Two([LabeledSpan; 2]),
+    /// Three or more labels.
+    Many(Vec<LabeledSpan>),
 }
 
-impl<T: Diagnostic + Send + Sync + 'static> From<T> for Box<dyn Diagnostic + 'static> {
-    fn from(diag: T) -> Self {
-        Box::<dyn Diagnostic + Send + Sync>::from(diag)
-    }
-}
-
-impl From<&str> for Box<dyn Diagnostic> {
-    fn from(s: &str) -> Self {
-        From::from(String::from(s))
-    }
-}
-
-impl From<&str> for Box<dyn Diagnostic + Send + Sync + '_> {
-    fn from(s: &str) -> Self {
-        From::from(String::from(s))
-    }
-}
-
-impl From<String> for Box<dyn Diagnostic> {
-    fn from(s: String) -> Self {
-        let err1: Box<dyn Diagnostic + Send + Sync> = From::from(s);
-        let err2: Box<dyn Diagnostic> = err1;
-        err2
-    }
-}
-
-impl From<String> for Box<dyn Diagnostic + Send + Sync> {
-    fn from(s: String) -> Self {
-        struct StringError(String);
-
-        impl Error for StringError {}
-        impl Diagnostic for StringError {}
-
-        impl Display for StringError {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                Display::fmt(&self.0, f)
-            }
+impl Labels {
+    /// Returns the labels as a slice.
+    pub fn as_slice(&self) -> &[LabeledSpan] {
+        match self {
+            Self::None => &[],
+            Self::One(labels) => labels,
+            Self::Two(labels) => labels,
+            Self::Many(labels) => labels,
         }
+    }
 
-        // Purposefully skip printing "StringError(..)"
-        impl fmt::Debug for StringError {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                fmt::Debug::fmt(&self.0, f)
-            }
+    /// Returns the labels as a mutable slice.
+    pub fn as_mut_slice(&mut self) -> &mut [LabeledSpan] {
+        match self {
+            Self::None => &mut [],
+            Self::One(labels) => labels,
+            Self::Two(labels) => labels,
+            Self::Many(labels) => labels,
         }
+    }
 
-        Box::new(StringError(s))
+    /// Returns whether there are no labels.
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    /// Returns the number of labels.
+    pub fn len(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    /// Appends a label.
+    pub fn push(&mut self, label: LabeledSpan) {
+        if let Self::Many(labels) = self {
+            labels.push(label);
+            return;
+        }
+        *self = match mem::take(self) {
+            Self::None => Self::One([label]),
+            Self::One([a]) => Self::Two([a, label]),
+            Self::Two([a, b]) => Self::Many(vec![a, b, label]),
+            Self::Many(_) => unreachable!("handled above"),
+        };
     }
 }
 
-impl From<Box<dyn Error + Send + Sync>> for Box<dyn Diagnostic + Send + Sync> {
-    fn from(s: Box<dyn Error + Send + Sync>) -> Self {
-        #[derive(thiserror::Error)]
-        #[error(transparent)]
-        struct BoxedDiagnostic(Box<dyn Error + Send + Sync>);
-        impl fmt::Debug for BoxedDiagnostic {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                fmt::Debug::fmt(&self.0, f)
-            }
+impl Deref for Labels {
+    type Target = [LabeledSpan];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl DerefMut for Labels {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
+    }
+}
+
+impl<'a> IntoIterator for &'a Labels {
+    type Item = &'a LabeledSpan;
+    type IntoIter = Iter<'a, LabeledSpan>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Labels {
+    type Item = &'a mut LabeledSpan;
+    type IntoIter = IterMut<'a, LabeledSpan>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
+    }
+}
+
+impl Extend<LabeledSpan> for Labels {
+    fn extend<I: IntoIterator<Item = LabeledSpan>>(&mut self, iter: I) {
+        let mut iter = iter.into_iter();
+        while !matches!(self, Self::Many(_)) {
+            let Some(label) = iter.next() else { return };
+            self.push(label);
         }
+        if let Self::Many(labels) = self {
+            labels.reserve(iter.size_hint().0);
+            labels.extend(iter);
+        }
+    }
+}
 
-        impl Diagnostic for BoxedDiagnostic {}
+impl FromIterator<LabeledSpan> for Labels {
+    fn from_iter<I: IntoIterator<Item = LabeledSpan>>(iter: I) -> Self {
+        let mut iter = iter.into_iter();
+        if iter.size_hint().0 > 2 {
+            return Self::Many(iter.collect());
+        }
+        let Some(a) = iter.next() else { return Self::None };
+        let Some(b) = iter.next() else { return Self::One([a]) };
+        let Some(c) = iter.next() else { return Self::Two([a, b]) };
+        let mut labels = Vec::with_capacity(3 + iter.size_hint().0);
+        labels.extend([a, b, c]);
+        labels.extend(iter);
+        Self::Many(labels)
+    }
+}
 
-        Box::new(BoxedDiagnostic(s))
+impl From<Vec<LabeledSpan>> for Labels {
+    fn from(labels: Vec<LabeledSpan>) -> Self {
+        if labels.len() <= 2 { labels.into_iter().collect() } else { Self::Many(labels) }
+    }
+}
+
+impl From<LabeledSpan> for Labels {
+    fn from(label: LabeledSpan) -> Self {
+        Self::One([label])
+    }
+}
+
+impl From<[LabeledSpan; 1]> for Labels {
+    fn from(labels: [LabeledSpan; 1]) -> Self {
+        Self::One(labels)
+    }
+}
+
+impl From<[LabeledSpan; 2]> for Labels {
+    fn from(labels: [LabeledSpan; 2]) -> Self {
+        Self::Two(labels)
     }
 }
 
 /**
-[`Diagnostic`] severity. Intended to be used by
-[`ReportHandler`](crate::ReportHandler)s to change the way different
-[`Diagnostic`]s are displayed. Defaults to [`Severity::Error`].
+[`Diagnostic`] severity. Renderers use this to change the way diagnostics are
+displayed. Defaults to [`Severity::Error`].
 */
-#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Default)]
+#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Default)]
 pub enum Severity {
     /// Just some help. Here's how you could be doing it better.
     Advice,
@@ -379,9 +417,7 @@ pub trait SourceCode: Send + Sync {
 
 /// A labeled [`SourceSpan`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LabeledSpan {
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     label: Option<String>,
     span: SourceSpan,
     primary: bool,
@@ -632,7 +668,6 @@ impl<'a> SpanContents<'a> for MietteSpanContents<'a> {
 
 /// Span within a [`SourceCode`]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SourceSpan {
     /// The start of the span.
     offset: SourceOffset,
@@ -712,7 +747,6 @@ pub type ByteOffset = u32;
 Newtype that represents the [`ByteOffset`] from the beginning of a [`SourceCode`]
 */
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SourceOffset(ByteOffset);
 
 impl SourceOffset {

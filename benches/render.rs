@@ -19,15 +19,17 @@
 //! revision). They are downloaded once and cached under `target/` so that
 //! neither the repository nor the published crate carries multi-megabyte blobs.
 
-use std::{fs, path::PathBuf, sync::Arc, time::Duration};
+use std::{borrow::Cow, fmt, fs, path::PathBuf, sync::Arc, time::Duration};
 
 use criterion::{
     BatchSize, BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main,
 };
 use miette::{
-    Error, GraphicalReportHandler, GraphicalTheme, LabeledSpan, MietteDiagnostic, NamedSource,
-    Severity, SourceCode, SourceSpan,
+    Diagnostic, GraphicalReportHandler, GraphicalTheme, LabeledSpan, Labels, NamedSource, Severity,
+    SourceCode, SourceSpan,
 };
+
+type Error = Box<dyn Diagnostic + Send + Sync>;
 
 /// Pinned revision of <https://github.com/oxc-project/benchmark-files>, so the
 /// inputs (and therefore CodSpeed instruction counts) stay reproducible.
@@ -57,6 +59,50 @@ struct Fixture {
 struct DiagnosticCase {
     name: &'static str,
     build: fn(&Fixture) -> Error,
+}
+
+#[derive(Debug)]
+struct LintDiagnostic {
+    message: &'static str,
+    help: &'static str,
+    labels: Labels,
+    source: Arc<NamedSource<String>>,
+}
+
+impl fmt::Display for LintDiagnostic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.message)
+    }
+}
+
+impl std::error::Error for LintDiagnostic {}
+
+impl Diagnostic for LintDiagnostic {
+    fn code(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("eslint(no-unused-vars)"))
+    }
+
+    fn severity(&self) -> Option<Severity> {
+        Some(Severity::Warning)
+    }
+
+    fn help(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed(self.help))
+    }
+
+    fn url(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed(
+            "https://oxc.rs/docs/guide/usage/linter/rules/eslint/no-unused-vars.html",
+        ))
+    }
+
+    fn labels(&self) -> Labels {
+        self.labels.clone()
+    }
+
+    fn source_code(&self) -> Option<&dyn SourceCode> {
+        Some(&self.source)
+    }
 }
 
 const DIAGNOSTIC_CASES: &[DiagnosticCase] = &[
@@ -155,45 +201,36 @@ fn cold_declared_diagnostic(fixture: &Fixture) -> Error {
 }
 
 fn declared_diagnostic_with_source(fixture: &Fixture, source: Arc<NamedSource<String>>) -> Error {
-    let diagnostic = lint_diagnostic(
-        "Variable 'resolve' is declared but never used.",
-        "Consider removing this declaration.",
-    )
-    .with_label(LabeledSpan::new_with_span(
-        Some("'resolve' is declared here".to_string()),
-        fixture.declaration_span,
-    ));
-
-    Error::new(diagnostic).with_source_code(source)
+    Box::new(LintDiagnostic {
+        message: "Variable 'resolve' is declared but never used.",
+        help: "Consider removing this declaration.",
+        labels: LabeledSpan::new_with_span(
+            Some("'resolve' is declared here".to_string()),
+            fixture.declaration_span,
+        )
+        .into(),
+        source,
+    })
 }
 
 /// The two-label form emitted when `no-unused-vars` sees a later assignment.
 fn assigned_diagnostic(fixture: &Fixture) -> Error {
-    let diagnostic = lint_diagnostic(
-        "Variable 'resolve' is assigned a value but never used.",
-        "Did you mean to use this variable?",
-    )
-    .with_labels([
-        LabeledSpan::new_with_span(
-            Some("'resolve' is declared here".to_string()),
-            fixture.declaration_span,
-        ),
-        LabeledSpan::new_with_span(
-            Some("it was last assigned here".to_string()),
-            fixture.assignment_span,
-        ),
-    ]);
-
-    Error::new(diagnostic).with_source_code(Arc::clone(&fixture.source))
-}
-
-/// Add the rule metadata that `LintContext` attaches to every oxlint diagnostic.
-fn lint_diagnostic(message: &str, help: &str) -> MietteDiagnostic {
-    MietteDiagnostic::new(message)
-        .with_severity(Severity::Warning)
-        .with_code("eslint(no-unused-vars)")
-        .with_url("https://oxc.rs/docs/guide/usage/linter/rules/eslint/no-unused-vars.html")
-        .with_help(help)
+    Box::new(LintDiagnostic {
+        message: "Variable 'resolve' is assigned a value but never used.",
+        help: "Did you mean to use this variable?",
+        labels: [
+            LabeledSpan::new_with_span(
+                Some("'resolve' is declared here".to_string()),
+                fixture.declaration_span,
+            ),
+            LabeledSpan::new_with_span(
+                Some("it was last assigned here".to_string()),
+                fixture.assignment_span,
+            ),
+        ]
+        .into(),
+        source: Arc::clone(&fixture.source),
+    })
 }
 
 fn bench(c: &mut Criterion) {
@@ -246,8 +283,7 @@ fn bench(c: &mut Criterion) {
     }
     group.finish();
 
-    // Full `render_report`, using the same report/source wrapper and the two
-    // diagnostic shapes used by oxlint.
+    // Full `render_report` using the two diagnostic shapes used by oxlint.
     for (mode, handler) in [("terminal", terminal_handler()), ("ci", ci_handler())] {
         let mut group = c.benchmark_group(format!("render/{mode}"));
         for case in DIAGNOSTIC_CASES {

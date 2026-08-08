@@ -1,4 +1,3 @@
-#![cfg(feature = "fancy-no-backtrace")]
 #![expect(
     clippy::cast_possible_truncation,
     reason = "deterministic fuzz inputs are tightly bounded"

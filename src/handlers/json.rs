@@ -1,12 +1,11 @@
 use std::fmt::{self, Write};
 
 use crate::{
-    ReportHandler, Severity, SourceCode, SpanContents, diagnostic_chain::DiagnosticChain,
-    protocol::Diagnostic,
+    Severity, SourceCode, SpanContents, diagnostic_chain::DiagnosticChain, protocol::Diagnostic,
 };
 
 /**
-[`ReportHandler`] that renders JSON output. It's a machine-readable output.
+Renders diagnostics as machine-readable JSON.
 */
 #[derive(Debug, Clone)]
 pub struct JSONReportHandler;
@@ -56,9 +55,7 @@ const fn escape(input: &'_ str) -> Escape<'_> {
 }
 
 impl JSONReportHandler {
-    /// Render a [`Diagnostic`]. This function is mostly internal and meant to
-    /// be called by the toplevel [`ReportHandler`] handler, but is made public
-    /// to make it easier (possible) to test in isolation from global state.
+    /// Render a [`Diagnostic`].
     ///
     /// # Errors
     ///
@@ -184,12 +181,6 @@ impl JSONReportHandler {
             }
         }
         write!(f, r#""filename": "","#)
-    }
-}
-
-impl ReportHandler for JSONReportHandler {
-    fn debug(&self, diagnostic: &dyn Diagnostic, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.render_report(f, diagnostic)
     }
 }
 

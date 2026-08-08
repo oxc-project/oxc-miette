@@ -56,13 +56,11 @@ impl SpanRequest {
 /// CRLF, allowing all scanners to share the same newline handling.
 #[derive(Clone, Copy)]
 struct LineBreak {
-    #[cfg(feature = "fancy-base")]
     start: usize,
     end: usize,
 }
 
 impl LineBreak {
-    #[cfg(feature = "fancy-base")]
     fn ending_at(input: &[u8], end: usize) -> Self {
         let start =
             if end > 0 && input[end] == b'\n' && input[end - 1] == b'\r' { end - 1 } else { end };
@@ -73,7 +71,6 @@ impl LineBreak {
         self.end + 1
     }
 
-    #[cfg(feature = "fancy-base")]
     const fn shifted(self, offset: usize) -> Self {
         Self { start: self.start + offset, end: self.end + offset }
     }
@@ -107,11 +104,7 @@ impl Iterator for LineBreaks<'_> {
             } else {
                 start
             };
-            return Some(LineBreak {
-                #[cfg(feature = "fancy-base")]
-                start,
-                end,
-            });
+            return Some(LineBreak { start, end });
         }
     }
 }
@@ -146,7 +139,6 @@ impl LeadingContext {
         Self { limit: 1, start_line, line_starts: RetainedLineStarts::One(line_start) }
     }
 
-    #[cfg(feature = "fancy-base")]
     fn len(&self) -> usize {
         match &self.line_starts {
             RetainedLineStarts::One(line_start) => usize::from(line_start.is_some()),
@@ -190,7 +182,6 @@ impl LeadingContext {
         self.first().unwrap_or(if self.limit == 0 { span_offset } else { 0 })
     }
 
-    #[cfg(feature = "fancy-base")]
     fn append_to(self, target: &mut Vec<usize>) {
         match self.line_starts {
             RetainedLineStarts::One(line_start) => target.extend(line_start),
@@ -401,7 +392,6 @@ impl MietteSpanContents<'_> {
     /// primitive so a long (e.g. minified) line stays cheap.
     // Only the `fancy` graphical renderer consumes this today; without it the
     // method is dead in a lib-only build (CI lints `-D warnings`).
-    #[cfg_attr(all(not(feature = "fancy-base"), not(test)), expect(dead_code))]
     pub(crate) fn line_column_at(&self, offset: usize) -> Option<(usize, usize)> {
         let data = self.data();
         let base = self.span().offset() as usize;
@@ -437,7 +427,6 @@ impl MietteSpanContents<'_> {
 }
 
 /// Lazily built line-start index over a contiguous source buffer.
-#[cfg(feature = "fancy-base")]
 struct LineIndex<'a> {
     input: &'a [u8],
     /// Starts (byte offsets) of consecutive lines, the first of which is line
@@ -452,7 +441,6 @@ struct LineIndex<'a> {
     frontier: usize,
 }
 
-#[cfg(feature = "fancy-base")]
 impl<'a> LineIndex<'a> {
     fn new(input: &'a [u8]) -> Self {
         Self { input, line_starts: Vec::new(), base_line: 0, frontier: 0 }
@@ -542,14 +530,12 @@ impl<'a> LineIndex<'a> {
 }
 
 /// Leading-context state reconstructed from a [`LineIndex`].
-#[cfg(feature = "fancy-base")]
 struct IndexedLeadingContext {
     limit: usize,
     start_line: usize,
     len: usize,
 }
 
-#[cfg(feature = "fancy-base")]
 impl IndexedLeadingContext {
     fn new(current_line: usize, limit: usize) -> Self {
         let start_line = current_line - limit.min(current_line);
@@ -576,7 +562,6 @@ impl IndexedLeadingContext {
 }
 
 /// One span query replayed against a reusable [`LineIndex`].
-#[cfg(feature = "fancy-base")]
 struct IndexedReader<'index, 'source> {
     index: &'index mut LineIndex<'source>,
     request: SpanRequest,
@@ -588,7 +573,6 @@ struct IndexedReader<'index, 'source> {
     position: usize,
 }
 
-#[cfg(feature = "fancy-base")]
 impl<'index, 'source> IndexedReader<'index, 'source> {
     fn new(
         index: &'index mut LineIndex<'source>,
@@ -687,14 +671,12 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
 ///
 /// [`read_span`]: crate::SourceCode::read_span
 /// [`GraphicalReportHandler`]: crate::handlers::GraphicalReportHandler
-#[cfg(feature = "fancy-base")]
 #[expect(clippy::redundant_pub_crate, reason = "keeps the renderer fast path crate-private")]
 pub(crate) struct SpanScanner<'a> {
     context: ContextLines,
     index: LineIndex<'a>,
 }
 
-#[cfg(feature = "fancy-base")]
 impl<'a> SpanScanner<'a> {
     pub(crate) fn new(
         input: &'a [u8],
@@ -1095,7 +1077,7 @@ mod line_column_tests {
     }
 }
 
-#[cfg(all(test, feature = "fancy-base"))]
+#[cfg(test)]
 mod scanner_tests {
     #![expect(
         clippy::cast_possible_truncation,
