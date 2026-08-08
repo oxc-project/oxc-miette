@@ -29,41 +29,39 @@ impl GraphicalReportHandler {
         opt_source: Option<&dyn SourceCode>,
     ) -> fmt::Result {
         let Some(source) = opt_source else { return Ok(()) };
-        let mut labels = diagnostic.labels();
+        let labels = diagnostic.labels();
         if labels.is_empty() {
             return Ok(());
         }
-        labels.sort_unstable_by_key(|l| l.inner().offset());
 
         // When the source exposes its backing buffer, share one forward scan
         // across every span lookup below (one per label plus one per merge
         // attempt); each `read_span` otherwise scans the source from byte 0
-        // again. The scanner bypasses the source's own `read_span`, so
-        // re-attach the source's name the way `NamedSource` would.
+        // again.
         let mut scanner = source.contiguous_bytes().map(|bytes| SpanScanner::new(bytes, 1, 1));
         let source_name = source.name();
         let mut read = |span: &SourceSpan| match scanner.as_mut() {
-            Some(scanner) => scanner.read_span(*span).map(|contents| match source_name {
-                Some(name) => SpanContents::new_named(
-                    Cow::Borrowed(name),
-                    contents.data(),
-                    *contents.span(),
-                    contents.line(),
-                    contents.column(),
-                    contents.line_count(),
-                ),
-                None => contents,
-            }),
+            Some(scanner) => scanner.read_span(*span),
             None => source.read_span(span, 1, 1),
         };
 
-        if let [label] = labels.as_slice() {
+        if let [label] = labels {
             let contents = read(label.inner()).ok_or(fmt::Error)?;
-            return self.render_context(f, label, &contents, &labels);
+            return self.render_context(f, label, &contents, &[label], source_name);
         }
 
+        let mut inline_labels = [&labels[0], &labels[1]];
+        let mut heap_labels = Vec::new();
+        let labels = if labels.len() == 2 {
+            inline_labels.sort_unstable_by_key(|label| label.offset());
+            inline_labels.as_slice()
+        } else {
+            heap_labels.extend(labels);
+            heap_labels.sort_unstable_by_key(|label| label.offset());
+            heap_labels.as_slice()
+        };
         let mut contexts: Vec<(Cow<'_, LabeledSpan>, _)> = Vec::with_capacity(labels.len());
-        for right in &labels {
+        for &right in labels {
             let right_conts = read(right.inner()).ok_or(fmt::Error)?;
 
             if contexts.is_empty() {
@@ -94,7 +92,7 @@ impl GraphicalReportHandler {
             contexts.push((Cow::Borrowed(right), right_conts));
         }
         for (ctx, conts) in contexts {
-            self.render_context(f, &ctx, &conts, &labels[..])?;
+            self.render_context(f, &ctx, &conts, labels, source_name)?;
         }
 
         Ok(())
@@ -105,7 +103,8 @@ impl GraphicalReportHandler {
         f: &mut impl fmt::Write,
         context: &LabeledSpan,
         contents: &SpanContents<'_>,
-        labels: &[LabeledSpan],
+        labels: &[&LabeledSpan],
+        source_name: Option<&str>,
     ) -> fmt::Result {
         let lines = self.get_lines(contents);
 
@@ -121,6 +120,7 @@ impl GraphicalReportHandler {
         // sorting is your friend
         let labels = labels
             .iter()
+            .copied()
             .zip(self.theme.styles.highlights.iter().copied().cycle())
             .map(|(label, st)| FancySpan::new(label.label(), *label.inner(), st))
             .collect::<Vec<_>>();
@@ -163,7 +163,7 @@ impl GraphicalReportHandler {
             None => (contents.line(), contents.column()),
         };
 
-        match contents.name() {
+        match source_name {
             Some(source_name) => {
                 let source_name = source_name.style(self.theme.styles.link);
                 writeln!(f, "[{}:{}:{}]", source_name, primary_line + 1, primary_column + 1)?;

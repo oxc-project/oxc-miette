@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
 use crate::{SourceCode, SpanContents};
 
@@ -28,13 +28,6 @@ impl<S: SourceCode + 'static> NamedSource<S> {
     {
         Self { source, name: name.as_ref().to_string() }
     }
-
-    /// Returns a reference the inner [`SourceCode`] type for this
-    /// `NamedSource`.
-    #[must_use]
-    pub fn inner(&self) -> &S {
-        &self.source
-    }
 }
 
 impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
@@ -44,17 +37,7 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
         context_lines_before: usize,
         context_lines_after: usize,
     ) -> Option<SpanContents<'a>> {
-        let inner_contents =
-            self.inner().read_span(span, context_lines_before, context_lines_after)?;
-        let contents = SpanContents::new_named(
-            Cow::Borrowed(self.name.as_str()),
-            inner_contents.data(),
-            *inner_contents.span(),
-            inner_contents.line(),
-            inner_contents.column(),
-            inner_contents.line_count(),
-        );
-        Some(contents)
+        self.source.read_span(span, context_lines_before, context_lines_after)
     }
 
     fn name(&self) -> Option<&str> {
@@ -62,6 +45,6 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
     }
 
     fn contiguous_bytes(&self) -> Option<&[u8]> {
-        self.inner().contiguous_bytes()
+        self.source.contiguous_bytes()
     }
 }

@@ -1,6 +1,6 @@
 use std::fmt::{self, Write};
 
-use crate::{Severity, SourceCode, protocol::Diagnostic};
+use crate::{Severity, protocol::Diagnostic};
 
 /**
 Renders diagnostics as machine-readable JSON.
@@ -58,6 +58,7 @@ impl JSONReportHandler {
     /// # Errors
     ///
     /// Returns an error when writing the rendered report fails.
+    #[expect(clippy::unused_self, reason = "keeps a consistent renderer API")]
     pub fn render_report(
         &self,
         f: &mut impl fmt::Write,
@@ -83,13 +84,13 @@ impl JSONReportHandler {
         if let Some(note) = diagnostic.note() {
             write!(f, r#""note": "{}","#, escape(&note))?;
         }
-        if let Some(src) = diagnostic.source_code() {
-            self.render_snippets(f, diagnostic, src)?;
+        if let Some(source) = diagnostic.source_code() {
+            write!(f, r#""filename": "{}","#, escape(source.name().unwrap_or_default()))?;
         }
         {
             write!(f, r#""labels": ["#)?;
             let mut add_comma = false;
-            for label in &diagnostic.labels() {
+            for label in diagnostic.labels() {
                 if add_comma {
                     write!(f, ",")?;
                 } else {
@@ -119,22 +120,6 @@ impl JSONReportHandler {
         }
         write!(f, r#""related": []"#)?;
         write!(f, "}}")
-    }
-
-    #[expect(clippy::unused_self, reason = "kept as a renderer method for call-site consistency")]
-    fn render_snippets(
-        &self,
-        f: &mut impl fmt::Write,
-        diagnostic: &dyn Diagnostic,
-        source: &dyn SourceCode,
-    ) -> fmt::Result {
-        if let Some(label) = diagnostic.labels().first() {
-            if let Some(span_content) = source.read_span(label.inner(), 0, 0) {
-                let filename = span_content.name().unwrap_or_default();
-                return write!(f, r#""filename": "{}","#, escape(filename));
-            }
-        }
-        write!(f, r#""filename": "","#)
     }
 }
 
