@@ -5,23 +5,13 @@ use std::{
 
 use owo_colors::Style;
 
-/**
-Theme used by [`GraphicalReportHandler`](crate::GraphicalReportHandler) to
-render fancy [`Diagnostic`](crate::Diagnostic) reports.
-
-A theme consists of two things: the set of characters to be used for drawing,
-and the
-[`owo_colors::Style`](https://docs.rs/owo-colors/latest/owo_colors/struct.Style.html)s to be used to paint various items.
-
-You can create your own custom graphical theme using this type, or you can use
-one of the predefined ones using the methods below.
-*/
+/// Theme used by [`GraphicalReportHandler`](crate::GraphicalReportHandler).
+///
+/// Use one of the predefined constructors below.
 #[derive(Debug, Clone)]
 pub struct GraphicalTheme {
-    /// Characters to be used for drawing.
-    pub characters: ThemeCharacters,
-    /// Styles to be used for painting.
-    pub styles: ThemeStyles,
+    pub(crate) characters: ThemeCharacters,
+    pub(crate) styles: ThemeStyles,
 }
 
 fn force_color() -> bool {
@@ -31,23 +21,19 @@ fn force_color() -> bool {
 
 impl Default for GraphicalTheme {
     fn default() -> Self {
-        Self::detect(|| io::stdout().is_terminal() && io::stderr().is_terminal())
+        Self::new(io::stdout().is_terminal() && io::stderr().is_terminal())
     }
 }
 
 impl GraphicalTheme {
     /// Chooses a graphical theme based on terminal and environment support.
     #[must_use]
-    pub fn new(is_terminal: bool) -> Self {
-        Self::detect(|| is_terminal)
-    }
-
-    fn detect(is_terminal: impl FnOnce() -> bool) -> Self {
+    pub(crate) fn new(is_terminal: bool) -> Self {
         if force_color() {
             return Self::unicode();
         }
         match env::var("NO_COLOR") {
-            _ if !is_terminal() => Self::none(),
+            _ if !is_terminal => Self::none(),
             Ok(string) if string != "0" => Self::unicode_nocolor(),
             _ => Self::unicode(),
         }
@@ -79,31 +65,25 @@ impl GraphicalTheme {
     pub fn none() -> Self {
         Self { characters: ThemeCharacters::ascii(), styles: ThemeStyles::none() }
     }
+
+    /// Style used for warning text.
+    #[must_use]
+    pub const fn warning_style(&self) -> Style {
+        self.styles.warning
+    }
 }
 
-/**
-Styles for various parts of graphical rendering for the
-[`GraphicalReportHandler`](crate::GraphicalReportHandler).
-*/
 #[derive(Debug, Clone)]
-pub struct ThemeStyles {
-    /// Style to apply to things highlighted as "error".
-    pub error: Style,
-    /// Style to apply to things highlighted as "warning".
-    pub warning: Style,
-    /// Style to apply to things highlighted as "advice".
-    pub advice: Style,
-    /// Style to apply to the help text.
-    pub help: Style,
-    /// Style to apply to the note text.
-    pub note: Style,
-    /// Style to apply to filenames/links/URLs.
-    pub link: Style,
-    /// Style to apply to line numbers.
-    pub linum: Style,
-    /// Styles to cycle through (using `.iter().cycle()`), to render the lines
-    /// and text for diagnostic highlights.
-    pub highlights: Vec<Style>,
+#[expect(clippy::redundant_pub_crate, reason = "prevents public glob re-export")]
+pub(crate) struct ThemeStyles {
+    pub(crate) error: Style,
+    pub(crate) warning: Style,
+    pub(crate) advice: Style,
+    pub(crate) help: Style,
+    pub(crate) note: Style,
+    pub(crate) link: Style,
+    pub(crate) linum: Style,
+    pub(crate) highlights: [Style; 3],
 }
 
 fn style() -> Style {
@@ -111,10 +91,7 @@ fn style() -> Style {
 }
 
 impl ThemeStyles {
-    /// Nice RGB colors.
-    /// [Credit](http://terminal.sexy/#FRUV0NDQFRUVrEFCkKlZ9L91ap-1qnWfdbWq0NDQUFBQrEFCkKlZ9L91ap-1qnWfdbWq9fX1).
-    #[must_use]
-    pub fn rgb() -> Self {
+    fn rgb() -> Self {
         Self {
             error: style().fg_rgb::<225, 80, 80>().bold(), // CHANGED: <255, 30, 30>
             warning: style().fg_rgb::<244, 191, 117>().bold(),
@@ -123,7 +100,7 @@ impl ThemeStyles {
             note: style().fg_rgb::<106, 159, 181>(),
             link: style().fg_rgb::<92, 157, 255>().bold(),
             linum: style().dimmed(),
-            highlights: vec![
+            highlights: [
                 style().fg_rgb::<246, 87, 248>(),
                 style().fg_rgb::<30, 201, 212>(),
                 style().fg_rgb::<145, 246, 111>(),
@@ -131,9 +108,7 @@ impl ThemeStyles {
         }
     }
 
-    /// No styling. Just regular ol' monochrome.
-    #[must_use]
-    pub fn none() -> Self {
+    fn none() -> Self {
         Self {
             error: style(),
             warning: style(),
@@ -142,7 +117,7 @@ impl ThemeStyles {
             note: style(),
             link: style(),
             linum: style(),
-            highlights: vec![style()],
+            highlights: [style(); 3],
         }
     }
 }
@@ -151,94 +126,66 @@ impl ThemeStyles {
 // Most of these characters were taken from
 // https://github.com/zesterer/ariadne/blob/e3cb394cb56ecda116a0a1caecd385a49e7f6662/src/draw.rs
 
-/// Characters to be used when drawing when using
-/// [`GraphicalReportHandler`](crate::GraphicalReportHandler).
-#[expect(missing_docs)]
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ThemeCharacters {
-    pub hbar: char,
-    pub vbar: char,
-    pub xbar: char,
-    pub vbar_break: char,
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[expect(clippy::redundant_pub_crate, reason = "prevents public glob re-export")]
+pub(crate) struct ThemeCharacters {
+    pub(crate) hbar: char,
+    pub(crate) vbar: char,
+    pub(crate) vbar_break: char,
 
-    pub uarrow: char,
-    pub rarrow: char,
+    pub(crate) uarrow: char,
+    pub(crate) rarrow: char,
 
-    pub ltop: char,
-    pub mtop: char,
-    pub rtop: char,
-    pub lbot: char,
-    pub rbot: char,
-    pub mbot: char,
+    pub(crate) ltop: char,
+    pub(crate) lbot: char,
 
-    pub lbox: char,
-    pub rbox: char,
+    pub(crate) lcross: char,
+    pub(crate) rcross: char,
 
-    pub lcross: char,
-    pub rcross: char,
+    pub(crate) underbar: char,
+    pub(crate) underline: char,
 
-    pub underbar: char,
-    pub underline: char,
-
-    pub error: String,
-    pub warning: String,
-    pub advice: String,
+    pub(crate) error: &'static str,
+    pub(crate) warning: &'static str,
+    pub(crate) advice: &'static str,
 }
 
 impl ThemeCharacters {
-    /// Fancy unicode-based graphical elements.
-    #[must_use]
-    pub fn unicode() -> Self {
+    const fn unicode() -> Self {
         Self {
             hbar: '─',
             vbar: '│',
-            xbar: '┼',
             vbar_break: '·',
             uarrow: '▲',
             rarrow: '▶',
             ltop: '╭',
-            mtop: '┬',
-            rtop: '╮',
             lbot: '╰',
-            mbot: '┴',
-            rbot: '╯',
-            lbox: '[',
-            rbox: ']',
             lcross: '├',
             rcross: '┤',
             underbar: '┬',
             underline: '─',
-            error: "×".into(),
-            warning: "⚠".into(),
-            advice: "☞".into(),
+            error: "×",
+            warning: "⚠",
+            advice: "☞",
         }
     }
 
-    /// ASCII-art-based graphical elements. Works well on older terminals.
-    #[must_use]
-    pub fn ascii() -> Self {
+    const fn ascii() -> Self {
         Self {
             hbar: '-',
             vbar: '|',
-            xbar: '+',
             vbar_break: ':',
             uarrow: '^',
             rarrow: '>',
             ltop: ',',
-            mtop: 'v',
-            rtop: '.',
             lbot: '`',
-            mbot: '^',
-            rbot: '\'',
-            lbox: '[',
-            rbox: ']',
             lcross: '|',
             rcross: '|',
             underbar: '|',
             underline: '^',
-            error: "x".into(),
-            warning: "!".into(),
-            advice: ">".into(),
+            error: "x",
+            warning: "!",
+            advice: ">",
         }
     }
 }

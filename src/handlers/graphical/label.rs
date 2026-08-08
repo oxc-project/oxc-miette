@@ -19,7 +19,7 @@ use super::{
     line::Line,
     span::{FancySpan, LabelRenderMode},
 };
-use crate::ThemeCharacters;
+use crate::handlers::theme::ThemeCharacters;
 
 struct Underline {
     padding: usize,

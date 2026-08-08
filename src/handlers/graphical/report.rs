@@ -1,7 +1,7 @@
 //! Diagnostic-level rendering: everything except the source snippets.
 //!
 //! [`render_report`](GraphicalReportHandler::render_report) is the entry point.
-//! It renders the title/causes, hands off to
+//! It renders the title, hands off to
 //! [`render_snippets`](GraphicalReportHandler::render_snippets), then renders
 //! the help/note footer. Each block of prose is wrapped to the terminal width
 //! using the shared [`wrap_options`](GraphicalReportHandler::wrap_options)
@@ -26,14 +26,14 @@ impl GraphicalReportHandler {
         diagnostic: &dyn Diagnostic,
     ) -> fmt::Result {
         writeln!(f)?;
-        self.render_causes(f, diagnostic)?;
+        self.render_title(f, diagnostic)?;
         let src = diagnostic.source_code();
         self.render_snippets(f, diagnostic, src)?;
         self.render_footer(f, diagnostic)?;
         Ok(())
     }
 
-    fn render_causes(&self, f: &mut impl fmt::Write, diagnostic: &dyn Diagnostic) -> fmt::Result {
+    fn render_title(&self, f: &mut impl fmt::Write, diagnostic: &dyn Diagnostic) -> fmt::Result {
         let (severity_style, severity_icon) = match diagnostic.severity() {
             Some(Severity::Error) | None => (self.theme.styles.error, &self.theme.characters.error),
             Some(Severity::Warning) => (self.theme.styles.warning, &self.theme.characters.warning),
