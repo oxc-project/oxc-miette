@@ -12,8 +12,8 @@
 use std::fmt;
 
 use miette::{
-    Diagnostic, GraphicalReportHandler, GraphicalTheme, LabeledSpan, Labels, NamedSource,
-    SourceCode, SourceSpan, SpanContents,
+    Diagnostic, GraphicalReportHandler, GraphicalTheme, LabeledSpan, NamedSource, SourceCode,
+    SourceSpan, SpanContents,
 };
 
 /// Deterministic xorshift so any failure reproduces from a fixed seed.
@@ -71,8 +71,8 @@ impl<S: SourceCode + fmt::Debug> Diagnostic for TestDiag<S> {
         Some(&self.src)
     }
 
-    fn labels(&self) -> Labels {
-        Labels::Many(self.labels.clone())
+    fn labels(&self) -> &[LabeledSpan] {
+        &self.labels
     }
 }
 

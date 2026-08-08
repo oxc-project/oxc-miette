@@ -3,13 +3,7 @@ This module defines the core of the miette protocol: a series of types and
 traits that you can implement to get access to miette's (and related library's)
 full reporting and such features.
 */
-use std::{
-    borrow::Cow,
-    error::Error,
-    mem,
-    ops::{Deref, DerefMut, Range},
-    slice::{Iter, IterMut},
-};
+use std::{borrow::Cow, error::Error, ops::Range};
 
 /// Adds rich metadata to your Error that can be used by
 /// Rich metadata that renderers use to produce human-friendly error messages.
@@ -57,177 +51,10 @@ pub trait Diagnostic: Error {
 
     /// Labels to apply to this `Diagnostic`'s [`Diagnostic::source_code`]
     ///
-    /// Returns the owned [`Labels`] container. For the common one/two-label
-    /// case this is allocation-free (the labels are stored inline), and it
-    /// avoids the boxed-iterator allocation the previous signature required.
-    fn labels(&self) -> crate::Labels {
-        crate::Labels::None
-    }
-}
-
-impl Error for Box<dyn Diagnostic + Send + Sync> {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        (**self).source()
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        self.source()
-    }
-}
-
-impl<T: Diagnostic + Send + Sync + 'static> From<T>
-    for Box<dyn Diagnostic + Send + Sync + 'static>
-{
-    fn from(diagnostic: T) -> Self {
-        Box::new(diagnostic)
-    }
-}
-
-/// Owned labels attached to a [`Diagnostic`].
-///
-/// The common one- and two-label cases are stored inline.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum Labels {
-    /// No labels.
-    #[default]
-    None,
-    /// A single label.
-    One([LabeledSpan; 1]),
-    /// Two labels.
-    Two([LabeledSpan; 2]),
-    /// Three or more labels.
-    Many(Vec<LabeledSpan>),
-}
-
-impl Labels {
-    /// Returns the labels as a slice.
-    pub fn as_slice(&self) -> &[LabeledSpan] {
-        match self {
-            Self::None => &[],
-            Self::One(labels) => labels,
-            Self::Two(labels) => labels,
-            Self::Many(labels) => labels,
-        }
-    }
-
-    /// Returns the labels as a mutable slice.
-    pub fn as_mut_slice(&mut self) -> &mut [LabeledSpan] {
-        match self {
-            Self::None => &mut [],
-            Self::One(labels) => labels,
-            Self::Two(labels) => labels,
-            Self::Many(labels) => labels,
-        }
-    }
-
-    /// Returns whether there are no labels.
-    pub fn is_empty(&self) -> bool {
-        matches!(self, Self::None)
-    }
-
-    /// Returns the number of labels.
-    pub fn len(&self) -> usize {
-        self.as_slice().len()
-    }
-
-    /// Appends a label.
-    pub fn push(&mut self, label: LabeledSpan) {
-        if let Self::Many(labels) = self {
-            labels.push(label);
-            return;
-        }
-        *self = match mem::take(self) {
-            Self::None => Self::One([label]),
-            Self::One([a]) => Self::Two([a, label]),
-            Self::Two([a, b]) => Self::Many(vec![a, b, label]),
-            Self::Many(_) => unreachable!("handled above"),
-        };
-    }
-}
-
-impl Deref for Labels {
-    type Target = [LabeledSpan];
-
-    fn deref(&self) -> &Self::Target {
-        self.as_slice()
-    }
-}
-
-impl DerefMut for Labels {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.as_mut_slice()
-    }
-}
-
-impl<'a> IntoIterator for &'a Labels {
-    type Item = &'a LabeledSpan;
-    type IntoIter = Iter<'a, LabeledSpan>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a mut Labels {
-    type Item = &'a mut LabeledSpan;
-    type IntoIter = IterMut<'a, LabeledSpan>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
-    }
-}
-
-impl Extend<LabeledSpan> for Labels {
-    fn extend<I: IntoIterator<Item = LabeledSpan>>(&mut self, iter: I) {
-        let mut iter = iter.into_iter();
-        while !matches!(self, Self::Many(_)) {
-            let Some(label) = iter.next() else { return };
-            self.push(label);
-        }
-        if let Self::Many(labels) = self {
-            labels.reserve(iter.size_hint().0);
-            labels.extend(iter);
-        }
-    }
-}
-
-impl FromIterator<LabeledSpan> for Labels {
-    fn from_iter<I: IntoIterator<Item = LabeledSpan>>(iter: I) -> Self {
-        let mut iter = iter.into_iter();
-        if iter.size_hint().0 > 2 {
-            return Self::Many(iter.collect());
-        }
-        let Some(a) = iter.next() else { return Self::None };
-        let Some(b) = iter.next() else { return Self::One([a]) };
-        let Some(c) = iter.next() else { return Self::Two([a, b]) };
-        let mut labels = Vec::with_capacity(3 + iter.size_hint().0);
-        labels.extend([a, b, c]);
-        labels.extend(iter);
-        Self::Many(labels)
-    }
-}
-
-impl From<Vec<LabeledSpan>> for Labels {
-    fn from(labels: Vec<LabeledSpan>) -> Self {
-        if labels.len() <= 2 { labels.into_iter().collect() } else { Self::Many(labels) }
-    }
-}
-
-impl From<LabeledSpan> for Labels {
-    fn from(label: LabeledSpan) -> Self {
-        Self::One([label])
-    }
-}
-
-impl From<[LabeledSpan; 1]> for Labels {
-    fn from(labels: [LabeledSpan; 1]) -> Self {
-        Self::One(labels)
-    }
-}
-
-impl From<[LabeledSpan; 2]> for Labels {
-    fn from(labels: [LabeledSpan; 2]) -> Self {
-        Self::Two(labels)
+    /// The diagnostic retains ownership of the labels; renderers only borrow
+    /// them for the duration of a report.
+    fn labels(&self) -> &[LabeledSpan] {
+        &[]
     }
 }
 
@@ -311,8 +138,8 @@ pub struct LabeledSpan {
 impl LabeledSpan {
     /// Makes a new labeled span.
     #[must_use]
-    pub const fn new(label: Option<String>, offset: ByteOffset, len: u32) -> Self {
-        Self { label, span: SourceSpan::new(SourceOffset(offset), len), primary: false }
+    pub const fn new(label: Option<String>, offset: u32, len: u32) -> Self {
+        Self { label, span: SourceSpan { offset, length: len }, primary: false }
     }
 
     /// Makes a new labeled span using an existing span.
@@ -328,8 +155,8 @@ impl LabeledSpan {
     }
 
     /// Change the offset of the span.
-    pub fn set_span_offset(&mut self, offset: ByteOffset) {
-        self.span.offset = SourceOffset(offset);
+    pub fn set_span_offset(&mut self, offset: u32) {
+        self.span.offset = offset;
     }
 
     /// Makes a new label at specified span
@@ -379,7 +206,7 @@ impl LabeledSpan {
 
     /// Returns the 0-based starting byte offset.
     #[must_use]
-    pub const fn offset(&self) -> ByteOffset {
+    pub const fn offset(&self) -> u32 {
         self.span.offset()
     }
 
@@ -417,8 +244,6 @@ pub struct SpanContents<'a> {
     column: usize,
     // Number of line in this snippet.
     line_count: usize,
-    // Optional filename
-    name: Option<Cow<'a, str>>,
 }
 
 impl<'a> SpanContents<'a> {
@@ -431,20 +256,7 @@ impl<'a> SpanContents<'a> {
         column: usize,
         line_count: usize,
     ) -> Self {
-        Self { data, span, line, column, line_count, name: None }
-    }
-
-    /// Make a new [`SpanContents`] object, with a name for its file.
-    #[must_use]
-    pub const fn new_named(
-        name: Cow<'a, str>,
-        data: &'a [u8],
-        span: SourceSpan,
-        line: usize,
-        column: usize,
-        line_count: usize,
-    ) -> Self {
-        Self { data, span, line, column, line_count, name: Some(name) }
+        Self { data, span, line, column, line_count }
     }
 
     /// Reference to the covered source data, in bytes.
@@ -471,34 +283,23 @@ impl<'a> SpanContents<'a> {
     pub const fn line_count(&self) -> usize {
         self.line_count
     }
-
-    /// The source name, if one is available.
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
 }
 
 /// Span within a [`SourceCode`]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SourceSpan {
     /// The start of the span.
-    offset: SourceOffset,
+    offset: u32,
     /// The total length of the span, in bytes.
     length: u32,
 }
 
 impl SourceSpan {
-    /// Create a new [`SourceSpan`].
-    #[must_use]
-    pub const fn new(start: SourceOffset, length: u32) -> Self {
-        Self { offset: start, length }
-    }
-
     /// The absolute offset, in bytes, from the beginning of a [`SourceCode`].
     #[must_use]
     #[expect(clippy::trivially_copy_pass_by_ref, reason = "retained for public API compatibility")]
-    pub const fn offset(&self) -> ByteOffset {
-        self.offset.offset()
+    pub const fn offset(&self) -> u32 {
+        self.offset
     }
 
     /// Total length of the [`SourceSpan`], in bytes.
@@ -517,61 +318,17 @@ impl SourceSpan {
     }
 }
 
-impl From<(ByteOffset, u32)> for SourceSpan {
-    fn from((start, len): (ByteOffset, u32)) -> Self {
-        Self { offset: start.into(), length: len }
+impl From<(u32, u32)> for SourceSpan {
+    fn from((start, len): (u32, u32)) -> Self {
+        Self { offset: start, length: len }
     }
 }
 
-impl From<(SourceOffset, u32)> for SourceSpan {
-    fn from((start, len): (SourceOffset, u32)) -> Self {
-        Self::new(start, len)
-    }
-}
-
-impl From<Range<ByteOffset>> for SourceSpan {
-    fn from(range: Range<ByteOffset>) -> Self {
+impl From<Range<u32>> for SourceSpan {
+    fn from(range: Range<u32>) -> Self {
         // `Range::len` returns `0` for empty/reversed ranges, matching the
         // previous behavior and avoiding underflow.
         let length = u32::try_from(range.len()).unwrap_or(u32::MAX);
-        Self { offset: range.start.into(), length }
-    }
-}
-
-impl From<SourceOffset> for SourceSpan {
-    fn from(offset: SourceOffset) -> Self {
-        Self { offset, length: 0 }
-    }
-}
-
-impl From<ByteOffset> for SourceSpan {
-    fn from(offset: ByteOffset) -> Self {
-        Self { offset: offset.into(), length: 0 }
-    }
-}
-
-/**
-"Raw" type for the byte offset from the beginning of a [`SourceCode`].
-*/
-pub type ByteOffset = u32;
-
-/**
-Newtype that represents the [`ByteOffset`] from the beginning of a [`SourceCode`]
-*/
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct SourceOffset(ByteOffset);
-
-impl SourceOffset {
-    /// Actual byte offset.
-    #[must_use]
-    #[expect(clippy::trivially_copy_pass_by_ref, reason = "retained for public API compatibility")]
-    pub const fn offset(&self) -> ByteOffset {
-        self.0
-    }
-}
-
-impl From<ByteOffset> for SourceOffset {
-    fn from(bytes: ByteOffset) -> Self {
-        SourceOffset(bytes)
+        Self { offset: range.start, length }
     }
 }

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use miette::{Diagnostic, LabeledSpan, Labels, SourceSpan};
+use miette::{Diagnostic, SourceSpan};
 
 #[derive(Debug)]
 struct TestDiagnostic;
@@ -15,17 +15,6 @@ impl std::error::Error for TestDiagnostic {}
 impl Diagnostic for TestDiagnostic {}
 
 #[test]
-fn labels_store_small_collections_inline() {
-    let mut labels = Labels::default();
-    labels.push(LabeledSpan::at(1..2, "first"));
-    assert!(matches!(labels, Labels::One(_)));
-    labels.push(LabeledSpan::at(3..4, "second"));
-    assert!(matches!(labels, Labels::Two(_)));
-    labels.push(LabeledSpan::at(5..6, "third"));
-    assert!(matches!(labels, Labels::Many(_)));
-}
-
-#[test]
 fn spans_convert_from_offsets_and_ranges() {
     assert_eq!(SourceSpan::from((3, 4)).offset(), 3);
     assert_eq!(SourceSpan::from((3, 4)).len(), 4);
@@ -34,6 +23,6 @@ fn spans_convert_from_offsets_and_ranges() {
 
 #[test]
 fn diagnostics_can_be_owned_as_trait_objects() {
-    let diagnostic: Box<dyn Diagnostic + Send + Sync> = TestDiagnostic.into();
+    let diagnostic: Box<dyn Diagnostic + Send + Sync> = Box::new(TestDiagnostic);
     assert_eq!(diagnostic.to_string(), "broken");
 }

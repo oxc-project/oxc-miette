@@ -25,7 +25,7 @@ use criterion::{
     BatchSize, BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main,
 };
 use miette::{
-    Diagnostic, GraphicalReportHandler, GraphicalTheme, LabeledSpan, Labels, NamedSource, Severity,
+    Diagnostic, GraphicalReportHandler, GraphicalTheme, LabeledSpan, NamedSource, Severity,
     SourceCode, SourceSpan,
 };
 
@@ -65,7 +65,7 @@ struct DiagnosticCase {
 struct LintDiagnostic {
     message: &'static str,
     help: &'static str,
-    labels: Labels,
+    labels: Vec<LabeledSpan>,
     source: Arc<NamedSource<String>>,
 }
 
@@ -96,8 +96,8 @@ impl Diagnostic for LintDiagnostic {
         ))
     }
 
-    fn labels(&self) -> Labels {
-        self.labels.clone()
+    fn labels(&self) -> &[LabeledSpan] {
+        &self.labels
     }
 
     fn source_code(&self) -> Option<&dyn SourceCode> {
@@ -196,7 +196,7 @@ fn declared_diagnostic(fixture: &Fixture) -> Error {
 /// The one-label warning against a freshly created source, whose embedded
 /// scan cache is necessarily empty.
 fn cold_declared_diagnostic(fixture: &Fixture) -> Error {
-    let source = Arc::new(NamedSource::new(fixture.name, fixture.source.inner().clone()));
+    let source = Arc::new(fixture.source.as_ref().clone());
     declared_diagnostic_with_source(fixture, source)
 }
 
@@ -204,11 +204,10 @@ fn declared_diagnostic_with_source(fixture: &Fixture, source: Arc<NamedSource<St
     Box::new(LintDiagnostic {
         message: "Variable 'resolve' is declared but never used.",
         help: "Consider removing this declaration.",
-        labels: LabeledSpan::new_with_span(
+        labels: vec![LabeledSpan::new_with_span(
             Some("'resolve' is declared here".to_string()),
             fixture.declaration_span,
-        )
-        .into(),
+        )],
         source,
     })
 }
@@ -218,7 +217,7 @@ fn assigned_diagnostic(fixture: &Fixture) -> Error {
     Box::new(LintDiagnostic {
         message: "Variable 'resolve' is assigned a value but never used.",
         help: "Did you mean to use this variable?",
-        labels: [
+        labels: vec![
             LabeledSpan::new_with_span(
                 Some("'resolve' is declared here".to_string()),
                 fixture.declaration_span,
@@ -227,8 +226,7 @@ fn assigned_diagnostic(fixture: &Fixture) -> Error {
                 Some("it was last assigned here".to_string()),
                 fixture.assignment_span,
             ),
-        ]
-        .into(),
+        ],
         source: Arc::clone(&fixture.source),
     })
 }
@@ -246,7 +244,6 @@ fn bench(c: &mut Criterion) {
             b.iter(|| {
                 let contents = fixture
                     .source
-                    .inner()
                     .read_span(black_box(&fixture.declaration_span), 1, 1)
                     .expect("span within source");
                 black_box(contents);

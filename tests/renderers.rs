@@ -1,13 +1,14 @@
 use std::{borrow::Cow, fmt};
 
 use miette::{
-    Diagnostic, GraphicalReportHandler, GraphicalTheme, JSONReportHandler, LabeledSpan, Labels,
+    Diagnostic, GraphicalReportHandler, GraphicalTheme, JSONReportHandler, LabeledSpan,
     NamedSource, Severity, SourceCode,
 };
 
 #[derive(Debug)]
 struct TestDiagnostic {
     source: NamedSource<String>,
+    labels: [LabeledSpan; 1],
 }
 
 impl fmt::Display for TestDiagnostic {
@@ -31,8 +32,8 @@ impl Diagnostic for TestDiagnostic {
         Some(Cow::Borrowed("remove it"))
     }
 
-    fn labels(&self) -> Labels {
-        Labels::One([LabeledSpan::at(4..5, "here")])
+    fn labels(&self) -> &[LabeledSpan] {
+        &self.labels
     }
 
     fn source_code(&self) -> Option<&dyn SourceCode> {
@@ -41,7 +42,10 @@ impl Diagnostic for TestDiagnostic {
 }
 
 fn diagnostic() -> TestDiagnostic {
-    TestDiagnostic { source: NamedSource::new("test.js", String::from("let ? = 1;")) }
+    TestDiagnostic {
+        source: NamedSource::new("test.js", String::from("let ? = 1;")),
+        labels: [LabeledSpan::at(4..5, "here")],
+    }
 }
 
 #[test]
