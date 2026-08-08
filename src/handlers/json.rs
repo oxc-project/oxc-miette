@@ -74,7 +74,6 @@ impl JSONReportHandler {
             Some(Severity::Advice) => "advice",
         };
         write!(f, r#""severity": "{severity:}","#)?;
-        write!(f, r#""causes": [],"#)?;
         if let Some(url) = diagnostic.url() {
             write!(f, r#""url": "{url}","#)?;
         }
@@ -116,9 +115,8 @@ impl JSONReportHandler {
 
                 write!(f, "}}}}")?;
             }
-            write!(f, "],")?;
+            write!(f, "]")?;
         }
-        write!(f, r#""related": []"#)?;
         write!(f, "}}")
     }
 }
