@@ -16,7 +16,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use super::{handler::GraphicalReportHandler, span::FancySpan};
-use crate::{MietteSpanContents, SpanContents};
+use crate::SpanContents;
 
 #[derive(Debug)]
 pub(super) struct Line<'a> {
@@ -208,7 +208,7 @@ impl GraphicalReportHandler {
     /// doesn't have to be re-read (each read is a scan of the source up to the
     /// span).
     #[expect(clippy::unused_self, reason = "kept as a renderer method for call-site consistency")]
-    pub(super) fn get_lines<'a>(&self, context_data: &MietteSpanContents<'a>) -> Vec<Line<'a>> {
+    pub(super) fn get_lines<'a>(&self, context_data: &SpanContents<'a>) -> Vec<Line<'a>> {
         let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
         let mut line = context_data.line();
         let base = context_data.span().offset() as usize;
@@ -278,7 +278,7 @@ mod tests {
         ];
         let handler = GraphicalReportHandler::new();
         for &(text, expected) in cases {
-            let contents = MietteSpanContents::new(
+            let contents = SpanContents::new(
                 text.as_bytes(),
                 (BASE as u32, text.len() as u32).into(),
                 4,

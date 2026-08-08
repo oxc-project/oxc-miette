@@ -5,12 +5,10 @@
 //! application error container: callers own diagnostics directly or through
 //! boxed trait objects and choose a renderer explicitly.
 
-pub use error::*;
 pub use handlers::*;
 pub use named_source::*;
 pub use protocol::*;
 
-mod error;
 mod handlers;
 mod named_source;
 mod protocol;

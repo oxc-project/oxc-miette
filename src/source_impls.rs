@@ -5,7 +5,7 @@ Default trait implementations for [`SourceCode`].
 use std::str::from_utf8;
 use std::{collections::VecDeque, sync::Arc};
 
-use crate::{MietteError, MietteSpanContents, SourceCode, SourceSpan, SpanContents};
+use crate::{SourceCode, SourceSpan, SpanContents};
 
 #[derive(Clone, Copy)]
 struct ContextLines {
@@ -307,7 +307,7 @@ impl<'a> SpanReader<'a> {
         }
     }
 
-    fn read(mut self) -> Result<MietteSpanContents<'a>, MietteError> {
+    fn read(mut self) -> Option<SpanContents<'a>> {
         while self.offset < self.input.len() {
             let byte = self.input[self.offset];
             if matches!(byte, b'\r' | b'\n') {
@@ -354,20 +354,20 @@ impl<'a> SpanReader<'a> {
         false
     }
 
-    fn finish(self) -> Result<MietteSpanContents<'a>, MietteError> {
+    fn finish(self) -> Option<SpanContents<'a>> {
         if self.offset < self.request.end_threshold() {
-            return Err(MietteError::OutOfBounds);
+            return None;
         }
 
         let start = self.leading.starting_offset(self.request.offset);
         // A zero-length span starting just past the end of the input reaches
         // the threshold but has no content to slice.
         let Some(data) = self.input.get(start..self.offset) else {
-            return Err(MietteError::OutOfBounds);
+            return None;
         };
-        let span_start = u32::try_from(start).map_err(|_| MietteError::OutOfBounds)?;
-        let span_len = u32::try_from(self.offset - start).map_err(|_| MietteError::OutOfBounds)?;
-        Ok(MietteSpanContents::new(
+        let span_start = u32::try_from(start).ok()?;
+        let span_len = u32::try_from(self.offset - start).ok()?;
+        Some(SpanContents::new(
             data,
             (span_start, span_len).into(),
             self.leading.start_line,
@@ -377,7 +377,7 @@ impl<'a> SpanReader<'a> {
     }
 }
 
-impl MietteSpanContents<'_> {
+impl SpanContents<'_> {
     /// The 0-indexed line and column of an absolute source `offset` that lies
     /// within this payload, derived without re-reading the source.
     ///
@@ -386,8 +386,7 @@ impl MietteSpanContents<'_> {
     /// scanning only this payload's prefix up to `offset` — letting a renderer
     /// that already holds a `SpanContents` locate a label inside it instead of
     /// issuing a second full [`SourceCode::read_span`]. Returns `None` when
-    /// `offset` is past this payload (which `read_span` reports as
-    /// `OutOfBounds`). Newline handling mirrors [`SpanReader`] (a `\r\n` pair
+    /// `offset` is past this payload. Newline handling mirrors [`SpanReader`] (a `\r\n` pair
     /// and a lone `\r`/`\n` each count once), scanned with the same `memchr2`
     /// primitive so a long (e.g. minified) line stays cheap.
     // Only the `fancy` graphical renderer consumes this today; without it the
@@ -396,9 +395,8 @@ impl MietteSpanContents<'_> {
         let data = self.data();
         let base = self.span().offset() as usize;
         let mut rel = offset.saturating_sub(base);
-        // A label past the end of the payload is out of bounds; report it like
-        // the `OutOfBounds` the equivalent `read_span` would return, rather than
-        // clamping to a misleading end-of-snippet position.
+        // A label past the end of the payload is out of bounds; reject it rather
+        // than clamping to a misleading end-of-snippet position.
         if rel > data.len() {
             return None;
         }
@@ -595,7 +593,7 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
 
     /// Jump line break to line break while preserving [`SpanReader`]'s exact
     /// edge-case behavior.
-    fn read(mut self) -> Result<MietteSpanContents<'source>, MietteError> {
+    fn read(mut self) -> Option<SpanContents<'source>> {
         let input = self.index.input;
         let window_end = loop {
             let line_break = self.index.break_ending_line(self.line_count, self.position);
@@ -640,17 +638,17 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
         false
     }
 
-    fn finish(self, window_end: usize) -> Result<MietteSpanContents<'source>, MietteError> {
+    fn finish(self, window_end: usize) -> Option<SpanContents<'source>> {
         if window_end < self.request.end_threshold() {
-            return Err(MietteError::OutOfBounds);
+            return None;
         }
         let start = self.leading.starting_offset(self.index, self.request.offset);
         let Some(data) = self.index.input.get(start..window_end) else {
-            return Err(MietteError::OutOfBounds);
+            return None;
         };
-        let span_start = u32::try_from(start).map_err(|_| MietteError::OutOfBounds)?;
-        let span_len = u32::try_from(window_end - start).map_err(|_| MietteError::OutOfBounds)?;
-        Ok(MietteSpanContents::new(
+        let span_start = u32::try_from(start).ok()?;
+        let span_len = u32::try_from(window_end - start).ok()?;
+        Some(SpanContents::new(
             data,
             (span_start, span_len).into(),
             self.leading.start_line,
@@ -690,10 +688,7 @@ impl<'a> SpanScanner<'a> {
     }
 
     /// Read a span while scanning only source bytes no earlier query scanned.
-    pub(crate) fn read_span(
-        &mut self,
-        span: SourceSpan,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
+    pub(crate) fn read_span(&mut self, span: SourceSpan) -> Option<SpanContents<'a>> {
         let request = SpanRequest::new(span);
         let cut = request.prefix_end(self.index.input);
         if self.index.is_empty() {
@@ -713,7 +708,7 @@ impl<'a> SpanScanner<'a> {
         IndexedReader::new(&mut self.index, request, self.context, cut).read()
     }
 
-    fn read_unindexed(&self, request: SpanRequest) -> Result<MietteSpanContents<'a>, MietteError> {
+    fn read_unindexed(&self, request: SpanRequest) -> Option<SpanContents<'a>> {
         SpanReader::new(self.index.input, request, self.context).read()
     }
 }
@@ -724,7 +719,7 @@ impl SourceCode for [u8] {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
+    ) -> Option<SpanContents<'a>> {
         SpanReader::new(
             self,
             SpanRequest::new(*span),
@@ -744,7 +739,7 @@ impl SourceCode for str {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
+    ) -> Option<SpanContents<'a>> {
         <[u8] as SourceCode>::read_span(
             self.as_bytes(),
             span,
@@ -765,7 +760,7 @@ impl SourceCode for &str {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
+    ) -> Option<SpanContents<'a>> {
         <str as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
     }
 
@@ -780,7 +775,7 @@ impl SourceCode for String {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
+    ) -> Option<SpanContents<'a>> {
         <str as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
     }
 
@@ -795,7 +790,7 @@ impl<T: ?Sized + SourceCode> SourceCode for Arc<T> {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
+    ) -> Option<SpanContents<'a>> {
         self.as_ref().read_span(span, context_lines_before, context_lines_after)
     }
 
@@ -811,7 +806,6 @@ impl<T: ?Sized + SourceCode> SourceCode for Arc<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SpanContents;
 
     #[test]
     fn lf_prefix_fast_path_matches_generic_path() {
@@ -827,75 +821,68 @@ mod tests {
     }
 
     #[test]
-    fn basic() -> Result<(), MietteError> {
+    fn basic() {
         let src = String::from("foo\n");
-        let contents = src.read_span(&(0, 4).into(), 0, 0)?;
+        let contents = src.read_span(&(0, 4).into(), 0, 0).unwrap();
         assert_eq!("foo\n", from_utf8(contents.data()).unwrap());
         assert_eq!(0, contents.line());
         assert_eq!(0, contents.column());
-        Ok(())
     }
 
     #[test]
-    fn shifted() -> Result<(), MietteError> {
+    fn shifted() {
         let src = String::from("foobar");
-        let contents = src.read_span(&(3, 3).into(), 1, 1)?;
+        let contents = src.read_span(&(3, 3).into(), 1, 1).unwrap();
         assert_eq!("foobar", from_utf8(contents.data()).unwrap());
         assert_eq!(0, contents.line());
         assert_eq!(0, contents.column());
-        Ok(())
     }
 
     #[test]
-    fn middle() -> Result<(), MietteError> {
+    fn middle() {
         let src = String::from("foo\nbar\nbaz\n");
-        let contents = src.read_span(&(4, 4).into(), 0, 0)?;
+        let contents = src.read_span(&(4, 4).into(), 0, 0).unwrap();
         assert_eq!("bar\n", from_utf8(contents.data()).unwrap());
         assert_eq!(1, contents.line());
         assert_eq!(0, contents.column());
-        Ok(())
     }
 
     #[test]
-    fn middle_of_line() -> Result<(), MietteError> {
+    fn middle_of_line() {
         let src = String::from("foo\nbarbar\nbaz\n");
-        let contents = src.read_span(&(7, 4).into(), 0, 0)?;
+        let contents = src.read_span(&(7, 4).into(), 0, 0).unwrap();
         assert_eq!("bar\n", from_utf8(contents.data()).unwrap());
         assert_eq!(1, contents.line());
         assert_eq!(3, contents.column());
-        Ok(())
     }
 
     #[test]
-    fn with_crlf() -> Result<(), MietteError> {
+    fn with_crlf() {
         let src = String::from("foo\r\nbar\r\nbaz\r\n");
-        let contents = src.read_span(&(5, 5).into(), 0, 0)?;
+        let contents = src.read_span(&(5, 5).into(), 0, 0).unwrap();
         assert_eq!("bar\r\n", from_utf8(contents.data()).unwrap());
         assert_eq!(1, contents.line());
         assert_eq!(0, contents.column());
-        Ok(())
     }
 
     #[test]
-    fn with_context() -> Result<(), MietteError> {
+    fn with_context() {
         let src = String::from("xxx\nfoo\nbar\nbaz\n\nyyy\n");
-        let contents = src.read_span(&(8, 3).into(), 1, 1)?;
+        let contents = src.read_span(&(8, 3).into(), 1, 1).unwrap();
         assert_eq!("foo\nbar\nbaz\n", from_utf8(contents.data()).unwrap());
         assert_eq!(1, contents.line());
         assert_eq!(0, contents.column());
-        Ok(())
     }
 
     #[test]
-    fn multiline_with_context() -> Result<(), MietteError> {
+    fn multiline_with_context() {
         let src = String::from("aaa\nxxx\n\nfoo\nbar\nbaz\n\nyyy\nbbb\n");
-        let contents = src.read_span(&(9, 11).into(), 1, 1)?;
+        let contents = src.read_span(&(9, 11).into(), 1, 1).unwrap();
         assert_eq!("\nfoo\nbar\nbaz\n\n", from_utf8(contents.data()).unwrap());
         assert_eq!(2, contents.line());
         assert_eq!(0, contents.column());
         let span: SourceSpan = (8, 14).into();
         assert_eq!(&span, contents.span());
-        Ok(())
     }
 
     #[test]
@@ -903,21 +890,20 @@ mod tests {
         // Used to panic with a slice out-of-range instead of returning an
         // error (found by differential fuzzing).
         let src = String::from("a");
-        assert!(matches!(src.read_span(&(2, 0).into(), 0, 0), Err(MietteError::OutOfBounds)));
+        assert!(src.read_span(&(2, 0).into(), 0, 0).is_none());
         let src = String::new();
-        assert!(matches!(src.read_span(&(1, 0).into(), 0, 0), Err(MietteError::OutOfBounds)));
+        assert!(src.read_span(&(1, 0).into(), 0, 0).is_none());
     }
 
     #[test]
-    fn multiline_with_context_line_start() -> Result<(), MietteError> {
+    fn multiline_with_context_line_start() {
         let src = String::from("one\ntwo\n\nthree\nfour\nfive\n\nsix\nseven\n");
-        let contents = src.read_span(&(2, 0).into(), 2, 2)?;
+        let contents = src.read_span(&(2, 0).into(), 2, 2).unwrap();
         assert_eq!("one\ntwo\n\n", from_utf8(contents.data()).unwrap());
         assert_eq!(0, contents.line());
         assert_eq!(0, contents.column());
         let span: SourceSpan = (0, 9).into();
         assert_eq!(&span, contents.span());
-        Ok(())
     }
 }
 
@@ -946,26 +932,26 @@ mod line_column_tests {
         }
     }
 
-    /// Assert `MietteSpanContents::line_column_at` matches a real
+    /// Assert `SpanContents::line_column_at` matches a real
     /// `read_span(&(off, 0), 0, 0)` for an offset inside a
     /// `read_span(&(off, len), ctx, ctx)` payload — exactly how the graphical
-    /// renderer consumes it. Full equivalence, *including* the error case:
-    /// `line_column_at` must return `None` iff the direct read is `OutOfBounds`
+    /// renderer consumes it. Full equivalence, including failure:
+    /// `line_column_at` must return `None` iff the direct read returns `None`
     /// (a label past the snippet, e.g. `off == src.len() + 1`). Returns whether
     /// a case was actually checked (the context read succeeded).
     fn check(src: &str, off: usize, len: usize, ctx: usize) -> bool {
-        let Ok(contents) = src.read_span(&(off as u32, len as u32).into(), ctx, ctx) else {
+        let Some(contents) = src.read_span(&(off as u32, len as u32).into(), ctx, ctx) else {
             return false;
         };
         let got = contents.line_column_at(off);
 
         match src.read_span(&(off as u32, 0u32).into(), 0, 0) {
-            Ok(expected) => assert_eq!(
+            Some(expected) => assert_eq!(
                 got,
                 Some((expected.line(), expected.column())),
                 "mismatch for src={src:?} off={off} len={len} ctx={ctx}"
             ),
-            Err(_) => assert_eq!(
+            None => assert_eq!(
                 got, None,
                 "accepted an out-of-bounds label for src={src:?} off={off} len={len} ctx={ctx}"
             ),
@@ -1047,7 +1033,7 @@ mod scanner_tests {
 
     /// Run one query against a (stateful) scanner and assert the result is
     /// identical to a fresh `SpanReader` — data, span, line, column, and
-    /// `line_count` on success, `OutOfBounds` on failure. `history` is the
+    /// `line_count` on success, `None` on failure. `history` is the
     /// queries already issued to this scanner, which its state (and therefore
     /// any failure) depends on.
     fn check(
@@ -1065,9 +1051,9 @@ mod scanner_tests {
         let got = scanner.read_span(source_span);
         let src = String::from_utf8_lossy(input);
         match (&expected, &got) {
-            (Ok(expected), Ok(got)) => {
+            (Some(expected), Some(got)) => {
                 let fields =
-                    |c: &MietteSpanContents<'_>| (*c.span(), c.line(), c.column(), c.line_count());
+                    |c: &SpanContents<'_>| (*c.span(), c.line(), c.column(), c.line_count());
                 assert_eq!(
                     (fields(expected), expected.data()),
                     (fields(got), got.data()),
@@ -1075,7 +1061,7 @@ mod scanner_tests {
                      history={history:?}"
                 );
             }
-            (Err(MietteError::OutOfBounds), Err(MietteError::OutOfBounds)) => {}
+            (None, None) => {}
             _ => panic!(
                 "expected {expected:?}, got {got:?} for src={src:?} span={span:?} \
                  before={before} after={after} history={history:?}"

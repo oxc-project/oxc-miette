@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt};
 
-use crate::{MietteError, MietteSpanContents, SourceCode, SpanContents};
+use crate::{SourceCode, SpanContents};
 
 /// Utility struct for when you have a regular [`SourceCode`] type that doesn't
 /// implement `name`. For example [`String`]. Or if you want to override the
@@ -29,12 +29,6 @@ impl<S: SourceCode + 'static> NamedSource<S> {
         Self { source, name: name.as_ref().to_string() }
     }
 
-    /// Gets the name of this `NamedSource`.
-    #[must_use]
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
     /// Returns a reference the inner [`SourceCode`] type for this
     /// `NamedSource`.
     #[must_use]
@@ -49,10 +43,10 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
         span: &crate::SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError> {
+    ) -> Option<SpanContents<'a>> {
         let inner_contents =
             self.inner().read_span(span, context_lines_before, context_lines_after)?;
-        let contents = MietteSpanContents::new_named(
+        let contents = SpanContents::new_named(
             Cow::Borrowed(self.name.as_str()),
             inner_contents.data(),
             *inner_contents.span(),
@@ -60,7 +54,7 @@ impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
             inner_contents.column(),
             inner_contents.line_count(),
         );
-        Ok(contents)
+        Some(contents)
     }
 
     fn name(&self) -> Option<&str> {

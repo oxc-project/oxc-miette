@@ -11,8 +11,6 @@ use std::{
     slice::{Iter, IterMut},
 };
 
-use crate::MietteError;
-
 /// Adds rich metadata to your Error that can be used by
 /// Rich metadata that renderers use to produce human-friendly error messages.
 pub trait Diagnostic: Error {
@@ -59,7 +57,7 @@ pub trait Diagnostic: Error {
 
     /// Labels to apply to this `Diagnostic`'s [`Diagnostic::source_code`]
     ///
-    /// Returns the owned [`Labels`](crate::Labels) container. For the common one/two-label
+    /// Returns the owned [`Labels`] container. For the common one/two-label
     /// case this is allocation-free (the labels are stored inline), and it
     /// avoids the boxed-iterator allocation the previous signature required.
     fn labels(&self) -> crate::Labels {
@@ -264,9 +262,7 @@ pub trait SourceCode: Send + Sync {
     /// Read the bytes for a specific span from this `SourceCode`, keeping a
     /// certain number of lines before and after the span as context.
     ///
-    /// # Errors
-    ///
-    /// Returns an error when the requested span cannot be read.
+    /// Returns [`None`] when the requested span cannot be read.
     #[expect(
         clippy::trivially_copy_pass_by_ref,
         reason = "retained for public trait compatibility"
@@ -276,7 +272,7 @@ pub trait SourceCode: Send + Sync {
         span: &SourceSpan,
         context_lines_before: usize,
         context_lines_after: usize,
-    ) -> Result<MietteSpanContents<'a>, MietteError>;
+    ) -> Option<SpanContents<'a>>;
 
     /// Returns the name of this source code, if any.
     fn name(&self) -> Option<&str> {
@@ -331,7 +327,7 @@ impl LabeledSpan {
         Self { label, span: span.into(), primary: true }
     }
 
-    /// Change the offset of the span
+    /// Change the offset of the span.
     pub fn set_span_offset(&mut self, offset: ByteOffset) {
         self.span.offset = SourceOffset(offset);
     }
@@ -406,35 +402,11 @@ impl LabeledSpan {
     }
 }
 
-/**
-Contents of a [`SourceCode`] covered by [`SourceSpan`].
-
-Includes line and column information to optimize highlight calculations.
-*/
-pub trait SpanContents<'a> {
-    /// Reference to the data inside the associated span, in bytes.
-    fn data(&self) -> &'a [u8];
-    /// [`SourceSpan`] representing the span covered by this `SpanContents`.
-    fn span(&self) -> &SourceSpan;
-    /// An optional (file?) name for the container of this `SpanContents`.
-    fn name(&self) -> Option<&str> {
-        None
-    }
-    /// The 0-indexed line in the associated [`SourceCode`] where the data
-    /// begins.
-    fn line(&self) -> usize;
-    /// The 0-indexed column in the associated [`SourceCode`] where the data
-    /// begins, relative to `line`.
-    fn column(&self) -> usize;
-    /// Total number of lines covered by this `SpanContents`.
-    fn line_count(&self) -> usize;
-}
-
-/**
-Basic implementation of the [`SpanContents`] trait, for convenience.
-*/
+/// Contents of a [`SourceCode`] covered by a [`SourceSpan`].
+///
+/// Includes line and column information used by renderers.
 #[derive(Clone, Debug)]
-pub struct MietteSpanContents<'a> {
+pub struct SpanContents<'a> {
     // Data from a [`SourceCode`], in bytes.
     data: &'a [u8],
     // span actually covered by this SpanContents.
@@ -449,8 +421,8 @@ pub struct MietteSpanContents<'a> {
     name: Option<Cow<'a, str>>,
 }
 
-impl<'a> MietteSpanContents<'a> {
-    /// Make a new [`MietteSpanContents`] object.
+impl<'a> SpanContents<'a> {
+    /// Make a new [`SpanContents`] object.
     #[must_use]
     pub const fn new(
         data: &'a [u8],
@@ -458,11 +430,11 @@ impl<'a> MietteSpanContents<'a> {
         line: usize,
         column: usize,
         line_count: usize,
-    ) -> MietteSpanContents<'a> {
-        MietteSpanContents { data, span, line, column, line_count, name: None }
+    ) -> Self {
+        Self { data, span, line, column, line_count, name: None }
     }
 
-    /// Make a new [`MietteSpanContents`] object, with a name for its 'file'.
+    /// Make a new [`SpanContents`] object, with a name for its file.
     #[must_use]
     pub const fn new_named(
         name: Cow<'a, str>,
@@ -471,33 +443,37 @@ impl<'a> MietteSpanContents<'a> {
         line: usize,
         column: usize,
         line_count: usize,
-    ) -> MietteSpanContents<'a> {
-        MietteSpanContents { data, span, line, column, line_count, name: Some(name) }
+    ) -> Self {
+        Self { data, span, line, column, line_count, name: Some(name) }
     }
-}
 
-impl<'a> SpanContents<'a> for MietteSpanContents<'a> {
-    fn data(&self) -> &'a [u8] {
+    /// Reference to the covered source data, in bytes.
+    pub const fn data(&self) -> &'a [u8] {
         self.data
     }
 
-    fn span(&self) -> &SourceSpan {
+    /// The span covered by this payload.
+    pub const fn span(&self) -> &SourceSpan {
         &self.span
     }
 
-    fn line(&self) -> usize {
+    /// The 0-indexed line where the payload begins.
+    pub const fn line(&self) -> usize {
         self.line
     }
 
-    fn column(&self) -> usize {
+    /// The 0-indexed column where the payload begins.
+    pub const fn column(&self) -> usize {
         self.column
     }
 
-    fn line_count(&self) -> usize {
+    /// Total number of lines covered by this payload.
+    pub const fn line_count(&self) -> usize {
         self.line_count
     }
 
-    fn name(&self) -> Option<&str> {
+    /// The source name, if one is available.
+    pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
 }
