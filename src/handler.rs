@@ -1,8 +1,8 @@
-use std::{env, fmt};
+use std::fmt;
 
 use crate::{
-    GraphicalReportHandler, GraphicalTheme, NarratableReportHandler, ReportHandler,
-    ThemeCharacters, ThemeStyles, protocol::Diagnostic,
+    GraphicalReportHandler, GraphicalTheme, ReportHandler, ThemeCharacters, ThemeStyles,
+    protocol::Diagnostic,
 };
 
 /// Settings to control the color format used for graphical rendering.
@@ -38,15 +38,12 @@ pub struct MietteHandlerOpts {
     pub(crate) linkify: Option<bool>,
     pub(crate) width: Option<usize>,
     pub(crate) theme: Option<GraphicalTheme>,
-    pub(crate) force_graphical: Option<bool>,
-    pub(crate) force_narrated: Option<bool>,
     pub(crate) rgb_colors: RgbColors,
     pub(crate) color: Option<bool>,
     pub(crate) unicode: Option<bool>,
     pub(crate) footer: Option<String>,
     pub(crate) context_lines: Option<usize>,
     pub(crate) tab_width: Option<usize>,
-    pub(crate) with_cause_chain: Option<bool>,
     pub(crate) break_words: Option<bool>,
     pub(crate) wrap_lines: Option<bool>,
     pub(crate) word_separator: Option<textwrap::WordSeparator>,
@@ -69,10 +66,8 @@ impl MietteHandlerOpts {
         self
     }
 
-    /// Set a graphical theme for the handler when rendering in graphical mode.
-    /// Use [`force_graphical()`](`MietteHandlerOpts::force_graphical) to force
-    /// graphical mode. This option overrides
-    /// [`color()`](`MietteHandlerOpts::color).
+    /// Set a graphical theme for the handler. This option overrides
+    /// [`color`](Self::color).
     #[must_use]
     pub fn graphical_theme(mut self, theme: GraphicalTheme) -> Self {
         self.theme = Some(theme);
@@ -122,20 +117,6 @@ impl MietteHandlerOpts {
         self
     }
 
-    /// Include the cause chain of the top-level error in the report.
-    #[must_use]
-    pub fn with_cause_chain(mut self) -> Self {
-        self.with_cause_chain = Some(true);
-        self
-    }
-
-    /// Do not include the cause chain of the top-level error in the report.
-    #[must_use]
-    pub fn without_cause_chain(mut self) -> Self {
-        self.with_cause_chain = Some(false);
-        self
-    }
-
     /// If true, colors will be used during graphical rendering, regardless
     /// of whether or not the terminal supports them.
     ///
@@ -174,21 +155,6 @@ impl MietteHandlerOpts {
         self
     }
 
-    /// If true, graphical rendering will be used regardless of terminal
-    /// detection.
-    #[must_use]
-    pub fn force_graphical(mut self, force: bool) -> Self {
-        self.force_graphical = Some(force);
-        self
-    }
-
-    /// If true, forces use of the narrated renderer.
-    #[must_use]
-    pub fn force_narrated(mut self, force: bool) -> Self {
-        self.force_narrated = Some(force);
-        self
-    }
-
     /// Set a footer to be displayed at the bottom of the report.
     #[must_use]
     pub fn footer(mut self, footer: String) -> Self {
@@ -213,86 +179,55 @@ impl MietteHandlerOpts {
     /// Builds a [`MietteHandler`] from this builder.
     #[must_use]
     pub fn build(self) -> MietteHandler {
-        let graphical = self.is_graphical();
         let width = self.get_width();
-        if graphical {
-            let linkify = self.use_links();
-            let characters = match self.unicode {
-                Some(true) => ThemeCharacters::unicode(),
-                None if syscall::supports_unicode() => ThemeCharacters::unicode(),
-                Some(false) | None => ThemeCharacters::ascii(),
-            };
-            let styles = if self.color == Some(false) {
-                ThemeStyles::none()
-            } else if let Some(color_has_16m) = syscall::supports_color_has_16m() {
-                match self.rgb_colors {
-                    RgbColors::Always => ThemeStyles::rgb(),
-                    RgbColors::Preferred if color_has_16m => ThemeStyles::rgb(),
-                    _ => ThemeStyles::ansi(),
-                }
-            } else if self.color == Some(true) {
-                match self.rgb_colors {
-                    RgbColors::Always => ThemeStyles::rgb(),
-                    _ => ThemeStyles::ansi(),
-                }
-            } else {
-                ThemeStyles::none()
-            };
-            let theme = self.theme.unwrap_or(GraphicalTheme { characters, styles });
-            let mut handler =
-                GraphicalReportHandler::new_themed(theme).with_width(width).with_links(linkify);
-            if let Some(footer) = self.footer {
-                handler = handler.with_footer(footer);
+        let linkify = self.use_links();
+        let characters = match self.unicode {
+            Some(true) => ThemeCharacters::unicode(),
+            None if syscall::supports_unicode() => ThemeCharacters::unicode(),
+            Some(false) | None => ThemeCharacters::ascii(),
+        };
+        let styles = if self.color == Some(false) {
+            ThemeStyles::none()
+        } else if let Some(color_has_16m) = syscall::supports_color_has_16m() {
+            match self.rgb_colors {
+                RgbColors::Always => ThemeStyles::rgb(),
+                RgbColors::Preferred if color_has_16m => ThemeStyles::rgb(),
+                _ => ThemeStyles::ansi(),
             }
-            if let Some(context_lines) = self.context_lines {
-                handler = handler.with_context_lines(context_lines);
+        } else if self.color == Some(true) {
+            match self.rgb_colors {
+                RgbColors::Always => ThemeStyles::rgb(),
+                _ => ThemeStyles::ansi(),
             }
-            if let Some(w) = self.tab_width {
-                handler = handler.tab_width(w);
-            }
-            if let Some(b) = self.break_words {
-                handler = handler.with_break_words(b);
-            }
-            if let Some(b) = self.wrap_lines {
-                handler = handler.with_wrap_lines(b);
-            }
-            if let Some(s) = self.word_separator {
-                handler = handler.with_word_separator(s);
-            }
-            if let Some(s) = self.word_splitter {
-                handler = handler.with_word_splitter(s);
-            }
-
-            MietteHandler { inner: Box::new(handler) }
         } else {
-            let mut handler = NarratableReportHandler::new();
-            if let Some(footer) = self.footer {
-                handler = handler.with_footer(footer);
-            }
-            if let Some(context_lines) = self.context_lines {
-                handler = handler.with_context_lines(context_lines);
-            }
-            if let Some(with_cause_chain) = self.with_cause_chain {
-                if with_cause_chain {
-                    handler = handler.with_cause_chain();
-                } else {
-                    handler = handler.without_cause_chain();
-                }
-            }
-            MietteHandler { inner: Box::new(handler) }
+            ThemeStyles::none()
+        };
+        let theme = self.theme.unwrap_or(GraphicalTheme { characters, styles });
+        let mut handler =
+            GraphicalReportHandler::new_themed(theme).with_width(width).with_links(linkify);
+        if let Some(footer) = self.footer {
+            handler = handler.with_footer(footer);
         }
-    }
+        if let Some(context_lines) = self.context_lines {
+            handler = handler.with_context_lines(context_lines);
+        }
+        if let Some(w) = self.tab_width {
+            handler = handler.tab_width(w);
+        }
+        if let Some(b) = self.break_words {
+            handler = handler.with_break_words(b);
+        }
+        if let Some(b) = self.wrap_lines {
+            handler = handler.with_wrap_lines(b);
+        }
+        if let Some(s) = self.word_separator {
+            handler = handler.with_word_separator(s);
+        }
+        if let Some(s) = self.word_splitter {
+            handler = handler.with_word_splitter(s);
+        }
 
-    pub(crate) fn is_graphical(&self) -> bool {
-        if let Some(force_narrated) = self.force_narrated {
-            !force_narrated
-        } else if let Some(force_graphical) = self.force_graphical {
-            force_graphical
-        } else if let Ok(env) = env::var("NO_GRAPHICS") {
-            env == "0"
-        } else {
-            true
-        }
+        MietteHandler { inner: Box::new(handler) }
     }
 
     // Detects known terminal apps based on env variables and returns true if

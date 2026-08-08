@@ -8,8 +8,8 @@
 )]
 
 use miette::{
-    Diagnostic, GraphicalReportHandler, GraphicalTheme, MietteError, NamedSource,
-    NarratableReportHandler, Report, SourceSpan,
+    Diagnostic, GraphicalReportHandler, GraphicalTheme, MietteError, NamedSource, Report,
+    SourceSpan,
 };
 use thiserror::Error;
 
@@ -26,8 +26,6 @@ fn fmt_report(diag: Report) -> String {
             .with_footer("this is a footer".into())
             .render_report(&mut out, diag.as_ref())
             .unwrap();
-    } else if std::env::var("NARRATED").is_ok() {
-        NarratableReportHandler::new().render_report(&mut out, diag.as_ref()).unwrap();
     } else if let Ok(w) = std::env::var("REPLACE_TABS") {
         handler()
             // .without_syntax_highlighting()
