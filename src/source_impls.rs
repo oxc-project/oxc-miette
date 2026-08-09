@@ -765,6 +765,12 @@ impl<'a> SpanScanner<'a> {
     }
 }
 
+impl SourceCode for [u8] {
+    fn data(&self) -> &[u8] {
+        self
+    }
+}
+
 impl SourceCode for str {
     fn data(&self) -> &[u8] {
         self.as_bytes()
