@@ -74,55 +74,13 @@ pub enum Severity {
     Error,
 }
 
-/**
-Represents readable source code of some sort.
-
-This trait is able to support simple `SourceCode` types like [`String`]s, as
-well as more involved types like indexes into centralized `SourceMap`-like
-types, file handles, and even network streams.
-
-If you can read it, you can source it, and it's not necessary to read the
-whole thing--meaning you should be able to support `SourceCode`s which are
-gigabytes or larger in size.
-*/
+/// Contiguous source text used by diagnostic renderers.
 pub trait SourceCode: Send + Sync {
-    /// Read the bytes for a specific span from this `SourceCode`, keeping a
-    /// certain number of lines before and after the span as context.
-    ///
-    /// Returns [`None`] when the requested span cannot be read.
-    #[expect(
-        clippy::trivially_copy_pass_by_ref,
-        reason = "retained for public trait compatibility"
-    )]
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Option<SpanContents<'a>>;
+    /// Returns the complete source as bytes.
+    fn data(&self) -> &[u8];
 
     /// Returns the name of this source code, if any.
     fn name(&self) -> Option<&str> {
-        None
-    }
-
-    /// Returns the entire source as one contiguous byte buffer, if it is
-    /// backed by one.
-    ///
-    /// This is an optional fast path: renderers use it to locate several spans
-    /// in a single scan of the source instead of issuing one [`read_span`]
-    /// (a scan from byte 0) per span. Implementations that return `Some` must
-    /// return the same bytes [`read_span`] reads — same content, same offsets
-    /// — and report the source's name via [`name`], since renderers taking
-    /// this path derive span contents from the buffer without calling
-    /// [`read_span`].
-    ///
-    /// The default returns `None`, which keeps every read going through
-    /// [`read_span`].
-    ///
-    /// [`read_span`]: SourceCode::read_span
-    /// [`name`]: SourceCode::name
-    fn contiguous_bytes(&self) -> Option<&[u8]> {
         None
     }
 }
@@ -226,62 +184,6 @@ impl LabeledSpan {
     #[must_use]
     pub const fn primary(&self) -> bool {
         self.primary
-    }
-}
-
-/// Contents of a [`SourceCode`] covered by a [`SourceSpan`].
-///
-/// Includes line and column information used by renderers.
-#[derive(Clone, Debug)]
-pub struct SpanContents<'a> {
-    // Data from a [`SourceCode`], in bytes.
-    data: &'a [u8],
-    // span actually covered by this SpanContents.
-    span: SourceSpan,
-    // The 0-indexed line where the associated [`SourceSpan`] _starts_.
-    line: usize,
-    // The 0-indexed column where the associated [`SourceSpan`] _starts_.
-    column: usize,
-    // Number of line in this snippet.
-    line_count: usize,
-}
-
-impl<'a> SpanContents<'a> {
-    /// Make a new [`SpanContents`] object.
-    #[must_use]
-    pub const fn new(
-        data: &'a [u8],
-        span: SourceSpan,
-        line: usize,
-        column: usize,
-        line_count: usize,
-    ) -> Self {
-        Self { data, span, line, column, line_count }
-    }
-
-    /// Reference to the covered source data, in bytes.
-    pub const fn data(&self) -> &'a [u8] {
-        self.data
-    }
-
-    /// The span covered by this payload.
-    pub const fn span(&self) -> &SourceSpan {
-        &self.span
-    }
-
-    /// The 0-indexed line where the payload begins.
-    pub const fn line(&self) -> usize {
-        self.line
-    }
-
-    /// The 0-indexed column where the payload begins.
-    pub const fn column(&self) -> usize {
-        self.column
-    }
-
-    /// Total number of lines covered by this payload.
-    pub const fn line_count(&self) -> usize {
-        self.line_count
     }
 }
 

@@ -5,7 +5,48 @@ Default trait implementations for [`SourceCode`].
 use std::str::from_utf8;
 use std::{collections::VecDeque, sync::Arc};
 
-use crate::{SourceCode, SourceSpan, SpanContents};
+use crate::{SourceCode, SourceSpan};
+
+#[derive(Clone, Debug)]
+pub struct SpanContents<'a> {
+    data: &'a [u8],
+    span: SourceSpan,
+    line: usize,
+    column: usize,
+    line_count: usize,
+}
+
+impl<'a> SpanContents<'a> {
+    pub const fn new(
+        data: &'a [u8],
+        span: SourceSpan,
+        line: usize,
+        column: usize,
+        line_count: usize,
+    ) -> Self {
+        Self { data, span, line, column, line_count }
+    }
+
+    pub const fn data(&self) -> &'a [u8] {
+        self.data
+    }
+
+    pub const fn span(&self) -> &SourceSpan {
+        &self.span
+    }
+
+    pub const fn line(&self) -> usize {
+        self.line
+    }
+
+    pub const fn column(&self) -> usize {
+        self.column
+    }
+
+    pub const fn line_count(&self) -> usize {
+        self.line_count
+    }
+}
 
 #[derive(Clone, Copy)]
 struct ContextLines {
@@ -275,8 +316,8 @@ impl TrailingContext {
     }
 }
 
-/// A single `read_span` operation. Keeping its counters together makes the
-/// phase transitions and the final payload invariants explicit.
+/// A single span read. Keeping its counters together makes the phase
+/// transitions and the final payload invariants explicit.
 struct SpanReader<'a> {
     input: &'a [u8],
     request: SpanRequest,
@@ -290,6 +331,20 @@ struct SpanReader<'a> {
 }
 
 impl<'a> SpanReader<'a> {
+    #[cfg(test)]
+    fn from_span(
+        input: &'a [u8],
+        span: SourceSpan,
+        context_lines_before: usize,
+        context_lines_after: usize,
+    ) -> Self {
+        Self::new(
+            input,
+            SpanRequest::new(span),
+            ContextLines::new(context_lines_before, context_lines_after),
+        )
+    }
+
     fn new(input: &'a [u8], request: SpanRequest, context: ContextLines) -> Self {
         let offset = request.prefix_end(input);
         let PrefixScan { line_count, leading, current_line_start } =
@@ -381,12 +436,10 @@ impl SpanContents<'_> {
     /// The 0-indexed line and column of an absolute source `offset` that lies
     /// within this payload, derived without re-reading the source.
     ///
-    /// Equivalent to the `line()`/`column()` a fresh
-    /// `read_span(&(offset, 0).into(), 0, 0)` would report, but obtained by
-    /// scanning only this payload's prefix up to `offset` — letting a renderer
-    /// that already holds a `SpanContents` locate a label inside it instead of
-    /// issuing a second full [`SourceCode::read_span`]. Returns `None` when
-    /// `offset` is past this payload. Newline handling mirrors [`SpanReader`] (a `\r\n` pair
+    /// Equivalent to the `line()`/`column()` a fresh zero-context span read
+    /// would report, but obtained by scanning only this payload's prefix up to
+    /// `offset`. Returns `None` when `offset` is past this payload. Newline
+    /// handling mirrors [`SpanReader`] (a `\r\n` pair
     /// and a lone `\r`/`\n` each count once), scanned with the same `memchr2`
     /// primitive so a long (e.g. minified) line stays cheap.
     // Only the `fancy` graphical renderer consumes this today; without it the
@@ -659,15 +712,14 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
 }
 
 /// A line-break index over a contiguous source buffer, built with a single
-/// forward scan and able to answer repeated [`read_span`]-shaped queries
-/// without re-reading the source.
+/// forward scan and able to answer repeated span queries without re-reading
+/// the source.
 ///
 /// [`GraphicalReportHandler`] needs one span lookup per label plus one per
 /// attempted snippet merge. A `SpanScanner` scans each source byte at most
 /// once and records line starts for reuse. Queries that precede the index's
 /// origin fall back to a standalone [`SpanReader`].
 ///
-/// [`read_span`]: crate::SourceCode::read_span
 /// [`GraphicalReportHandler`]: crate::handlers::GraphicalReportHandler
 #[expect(clippy::redundant_pub_crate, reason = "keeps the renderer fast path crate-private")]
 pub(crate) struct SpanScanner<'a> {
@@ -714,92 +766,37 @@ impl<'a> SpanScanner<'a> {
 }
 
 impl SourceCode for [u8] {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Option<SpanContents<'a>> {
-        SpanReader::new(
-            self,
-            SpanRequest::new(*span),
-            ContextLines::new(context_lines_before, context_lines_after),
-        )
-        .read()
-    }
-
-    fn contiguous_bytes(&self) -> Option<&[u8]> {
-        Some(self)
+    fn data(&self) -> &[u8] {
+        self
     }
 }
 
 impl SourceCode for str {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Option<SpanContents<'a>> {
-        <[u8] as SourceCode>::read_span(
-            self.as_bytes(),
-            span,
-            context_lines_before,
-            context_lines_after,
-        )
-    }
-
-    fn contiguous_bytes(&self) -> Option<&[u8]> {
-        Some(self.as_bytes())
+    fn data(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 
 /// Makes `src: &'static str` or `struct S<'a> { src: &'a str }` usable.
 impl SourceCode for &str {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Option<SpanContents<'a>> {
-        <str as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
-    }
-
-    fn contiguous_bytes(&self) -> Option<&[u8]> {
-        Some(self.as_bytes())
+    fn data(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 
 impl SourceCode for String {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Option<SpanContents<'a>> {
-        <str as SourceCode>::read_span(self, span, context_lines_before, context_lines_after)
-    }
-
-    fn contiguous_bytes(&self) -> Option<&[u8]> {
-        Some(self.as_bytes())
+    fn data(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 
 impl<T: ?Sized + SourceCode> SourceCode for Arc<T> {
-    fn read_span<'a>(
-        &'a self,
-        span: &SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Option<SpanContents<'a>> {
-        self.as_ref().read_span(span, context_lines_before, context_lines_after)
+    fn data(&self) -> &[u8] {
+        self.as_ref().data()
     }
 
     fn name(&self) -> Option<&str> {
         self.as_ref().name()
-    }
-
-    fn contiguous_bytes(&self) -> Option<&[u8]> {
-        self.as_ref().contiguous_bytes()
     }
 }
 
@@ -823,7 +820,7 @@ mod tests {
     #[test]
     fn basic() {
         let src = String::from("foo\n");
-        let contents = src.read_span(&(0, 4).into(), 0, 0).unwrap();
+        let contents = SpanReader::from_span(src.as_bytes(), (0, 4).into(), 0, 0).read().unwrap();
         assert_eq!("foo\n", from_utf8(contents.data()).unwrap());
         assert_eq!(0, contents.line());
         assert_eq!(0, contents.column());
@@ -832,7 +829,7 @@ mod tests {
     #[test]
     fn shifted() {
         let src = String::from("foobar");
-        let contents = src.read_span(&(3, 3).into(), 1, 1).unwrap();
+        let contents = SpanReader::from_span(src.as_bytes(), (3, 3).into(), 1, 1).read().unwrap();
         assert_eq!("foobar", from_utf8(contents.data()).unwrap());
         assert_eq!(0, contents.line());
         assert_eq!(0, contents.column());
@@ -841,7 +838,7 @@ mod tests {
     #[test]
     fn middle() {
         let src = String::from("foo\nbar\nbaz\n");
-        let contents = src.read_span(&(4, 4).into(), 0, 0).unwrap();
+        let contents = SpanReader::from_span(src.as_bytes(), (4, 4).into(), 0, 0).read().unwrap();
         assert_eq!("bar\n", from_utf8(contents.data()).unwrap());
         assert_eq!(1, contents.line());
         assert_eq!(0, contents.column());
@@ -850,7 +847,7 @@ mod tests {
     #[test]
     fn middle_of_line() {
         let src = String::from("foo\nbarbar\nbaz\n");
-        let contents = src.read_span(&(7, 4).into(), 0, 0).unwrap();
+        let contents = SpanReader::from_span(src.as_bytes(), (7, 4).into(), 0, 0).read().unwrap();
         assert_eq!("bar\n", from_utf8(contents.data()).unwrap());
         assert_eq!(1, contents.line());
         assert_eq!(3, contents.column());
@@ -859,7 +856,7 @@ mod tests {
     #[test]
     fn with_crlf() {
         let src = String::from("foo\r\nbar\r\nbaz\r\n");
-        let contents = src.read_span(&(5, 5).into(), 0, 0).unwrap();
+        let contents = SpanReader::from_span(src.as_bytes(), (5, 5).into(), 0, 0).read().unwrap();
         assert_eq!("bar\r\n", from_utf8(contents.data()).unwrap());
         assert_eq!(1, contents.line());
         assert_eq!(0, contents.column());
@@ -868,7 +865,7 @@ mod tests {
     #[test]
     fn with_context() {
         let src = String::from("xxx\nfoo\nbar\nbaz\n\nyyy\n");
-        let contents = src.read_span(&(8, 3).into(), 1, 1).unwrap();
+        let contents = SpanReader::from_span(src.as_bytes(), (8, 3).into(), 1, 1).read().unwrap();
         assert_eq!("foo\nbar\nbaz\n", from_utf8(contents.data()).unwrap());
         assert_eq!(1, contents.line());
         assert_eq!(0, contents.column());
@@ -877,7 +874,7 @@ mod tests {
     #[test]
     fn multiline_with_context() {
         let src = String::from("aaa\nxxx\n\nfoo\nbar\nbaz\n\nyyy\nbbb\n");
-        let contents = src.read_span(&(9, 11).into(), 1, 1).unwrap();
+        let contents = SpanReader::from_span(src.as_bytes(), (9, 11).into(), 1, 1).read().unwrap();
         assert_eq!("\nfoo\nbar\nbaz\n\n", from_utf8(contents.data()).unwrap());
         assert_eq!(2, contents.line());
         assert_eq!(0, contents.column());
@@ -890,15 +887,15 @@ mod tests {
         // Used to panic with a slice out-of-range instead of returning an
         // error (found by differential fuzzing).
         let src = String::from("a");
-        assert!(src.read_span(&(2, 0).into(), 0, 0).is_none());
+        assert!(SpanReader::from_span(src.as_bytes(), (2, 0).into(), 0, 0).read().is_none());
         let src = String::new();
-        assert!(src.read_span(&(1, 0).into(), 0, 0).is_none());
+        assert!(SpanReader::from_span(src.as_bytes(), (1, 0).into(), 0, 0).read().is_none());
     }
 
     #[test]
     fn multiline_with_context_line_start() {
         let src = String::from("one\ntwo\n\nthree\nfour\nfive\n\nsix\nseven\n");
-        let contents = src.read_span(&(2, 0).into(), 2, 2).unwrap();
+        let contents = SpanReader::from_span(src.as_bytes(), (2, 0).into(), 2, 2).read().unwrap();
         assert_eq!("one\ntwo\n\n", from_utf8(contents.data()).unwrap());
         assert_eq!(0, contents.line());
         assert_eq!(0, contents.column());
@@ -940,12 +937,14 @@ mod line_column_tests {
     /// (a label past the snippet, e.g. `off == src.len() + 1`). Returns whether
     /// a case was actually checked (the context read succeeded).
     fn check(src: &str, off: usize, len: usize, ctx: usize) -> bool {
-        let Some(contents) = src.read_span(&(off as u32, len as u32).into(), ctx, ctx) else {
+        let Some(contents) =
+            SpanReader::from_span(src.as_bytes(), (off as u32, len as u32).into(), ctx, ctx).read()
+        else {
             return false;
         };
         let got = contents.line_column_at(off);
 
-        match src.read_span(&(off as u32, 0u32).into(), 0, 0) {
+        match SpanReader::from_span(src.as_bytes(), (off as u32, 0u32).into(), 0, 0).read() {
             Some(expected) => assert_eq!(
                 got,
                 Some((expected.line(), expected.column())),

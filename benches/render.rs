@@ -234,24 +234,6 @@ fn assigned_diagnostic(fixture: &Fixture) -> Error {
 fn bench(c: &mut Criterion) {
     let fixtures: Vec<Fixture> = FIXTURES.iter().copied().map(load_fixture).collect();
 
-    // `SourceCode::read_span` is the "find the line/column for this span" scan
-    // that every rendered snippet depends on — the hot path optimized in #211
-    // and #212. A context of 1 line matches the renderer's default.
-    let mut group = c.benchmark_group("read_span");
-    for fixture in &fixtures {
-        group.throughput(Throughput::Bytes(fixture.source_len as u64));
-        group.bench_function(BenchmarkId::from_parameter(fixture.name), |b| {
-            b.iter(|| {
-                let contents = fixture
-                    .source
-                    .read_span(black_box(&fixture.declaration_span), 1, 1)
-                    .expect("span within source");
-                black_box(contents);
-            });
-        });
-    }
-    group.finish();
-
     // The render benches below reuse one `NamedSource` across iterations, so
     // any state the source carries across reports turns them into warm
     // steady-state measurements — matching how oxlint renders a file with

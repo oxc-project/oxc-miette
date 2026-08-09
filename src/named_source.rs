@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{SourceCode, SpanContents};
+use crate::SourceCode;
 
 /// Utility struct for when you have a regular [`SourceCode`] type that doesn't
 /// implement `name`. For example [`String`]. Or if you want to override the
@@ -19,8 +19,8 @@ impl<S: SourceCode> fmt::Debug for NamedSource<S> {
 }
 
 impl<S: SourceCode + 'static> NamedSource<S> {
-    /// Create a new `NamedSource` using a regular [`SourceCode`] and giving
-    /// its returned [`SpanContents`] a name.
+    /// Create a new `NamedSource` using a regular [`SourceCode`] and giving it
+    /// a name.
     #[must_use]
     pub fn new(name: impl AsRef<str>, source: S) -> Self
     where
@@ -31,20 +31,11 @@ impl<S: SourceCode + 'static> NamedSource<S> {
 }
 
 impl<S: SourceCode + 'static> SourceCode for NamedSource<S> {
-    fn read_span<'a>(
-        &'a self,
-        span: &crate::SourceSpan,
-        context_lines_before: usize,
-        context_lines_after: usize,
-    ) -> Option<SpanContents<'a>> {
-        self.source.read_span(span, context_lines_before, context_lines_after)
+    fn data(&self) -> &[u8] {
+        self.source.data()
     }
 
     fn name(&self) -> Option<&str> {
         Some(&self.name)
-    }
-
-    fn contiguous_bytes(&self) -> Option<&[u8]> {
-        self.source.contiguous_bytes()
     }
 }
