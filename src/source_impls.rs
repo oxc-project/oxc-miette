@@ -9,43 +9,11 @@ use crate::{SourceCode, SourceSpan};
 
 #[derive(Debug)]
 pub struct SpanContents<'a> {
-    data: &'a [u8],
-    span: SourceSpan,
-    line: usize,
-    column: usize,
-    line_count: usize,
-}
-
-impl<'a> SpanContents<'a> {
-    pub const fn new(
-        data: &'a [u8],
-        span: SourceSpan,
-        line: usize,
-        column: usize,
-        line_count: usize,
-    ) -> Self {
-        Self { data, span, line, column, line_count }
-    }
-
-    pub const fn data(&self) -> &'a [u8] {
-        self.data
-    }
-
-    pub const fn span(&self) -> &SourceSpan {
-        &self.span
-    }
-
-    pub const fn line(&self) -> usize {
-        self.line
-    }
-
-    pub const fn column(&self) -> usize {
-        self.column
-    }
-
-    pub const fn line_count(&self) -> usize {
-        self.line_count
-    }
+    pub(crate) data: &'a [u8],
+    pub(crate) span: SourceSpan,
+    pub(crate) line: usize,
+    pub(crate) column: usize,
+    pub(crate) line_count: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -422,13 +390,13 @@ impl<'a> SpanReader<'a> {
         };
         let span_start = u32::try_from(start).ok()?;
         let span_len = u32::try_from(self.offset - start).ok()?;
-        Some(SpanContents::new(
+        Some(SpanContents {
             data,
-            (span_start, span_len).into(),
-            self.leading.start_line,
-            if self.context.before == 0 { self.start_column } else { 0 },
-            self.line_count,
-        ))
+            span: (span_start, span_len).into(),
+            line: self.leading.start_line,
+            column: if self.context.before == 0 { self.start_column } else { 0 },
+            line_count: self.line_count,
+        })
     }
 }
 
@@ -436,7 +404,7 @@ impl SpanContents<'_> {
     /// The 0-indexed line and column of an absolute source `offset` that lies
     /// within this payload, derived without re-reading the source.
     ///
-    /// Equivalent to the `line()`/`column()` a fresh zero-context span read
+    /// Equivalent to the line and column a fresh zero-context span read
     /// would report, but obtained by scanning only this payload's prefix up to
     /// `offset`. Returns `None` when `offset` is past this payload. Newline
     /// handling mirrors [`SpanReader`] (a `\r\n` pair
@@ -445,8 +413,8 @@ impl SpanContents<'_> {
     // Only the `fancy` graphical renderer consumes this today; without it the
     // method is dead in a lib-only build (CI lints `-D warnings`).
     pub(crate) fn line_column_at(&self, offset: usize) -> Option<(usize, usize)> {
-        let data = self.data();
-        let base = self.span().offset() as usize;
+        let data = self.data;
+        let base = self.span.offset() as usize;
         let mut rel = offset.saturating_sub(base);
         // A label past the end of the payload is out of bounds; reject it rather
         // than clamping to a misleading end-of-snippet position.
@@ -459,7 +427,7 @@ impl SpanContents<'_> {
         if rel > 0 && rel < data.len() && data[rel - 1] == b'\r' && data[rel] == b'\n' {
             rel -= 1;
         }
-        let mut line = self.line();
+        let mut line = self.line;
         // Byte index just past the most recent line break — the start of the
         // line `offset` falls on. `None` until the first break is seen, meaning
         // `offset` is still on this payload's first line.
@@ -472,7 +440,7 @@ impl SpanContents<'_> {
             // A later line, which by definition starts at column 0.
             Some(start) => (line, rel - start),
             // Still on the first line: offset from this payload's start column.
-            None => (line, self.column() + rel),
+            None => (line, self.column + rel),
         })
     }
 }
@@ -701,13 +669,13 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
         };
         let span_start = u32::try_from(start).ok()?;
         let span_len = u32::try_from(window_end - start).ok()?;
-        Some(SpanContents::new(
+        Some(SpanContents {
             data,
-            (span_start, span_len).into(),
-            self.leading.start_line,
-            if self.context.before == 0 { self.start_column } else { 0 },
-            self.line_count,
-        ))
+            span: (span_start, span_len).into(),
+            line: self.leading.start_line,
+            column: if self.context.before == 0 { self.start_column } else { 0 },
+            line_count: self.line_count,
+        })
     }
 }
 
@@ -815,65 +783,65 @@ mod tests {
     fn basic() {
         let src = String::from("foo\n");
         let contents = SpanReader::from_span(src.as_bytes(), (0, 4).into(), 0, 0).read().unwrap();
-        assert_eq!("foo\n", from_utf8(contents.data()).unwrap());
-        assert_eq!(0, contents.line());
-        assert_eq!(0, contents.column());
+        assert_eq!("foo\n", from_utf8(contents.data).unwrap());
+        assert_eq!(0, contents.line);
+        assert_eq!(0, contents.column);
     }
 
     #[test]
     fn shifted() {
         let src = String::from("foobar");
         let contents = SpanReader::from_span(src.as_bytes(), (3, 3).into(), 1, 1).read().unwrap();
-        assert_eq!("foobar", from_utf8(contents.data()).unwrap());
-        assert_eq!(0, contents.line());
-        assert_eq!(0, contents.column());
+        assert_eq!("foobar", from_utf8(contents.data).unwrap());
+        assert_eq!(0, contents.line);
+        assert_eq!(0, contents.column);
     }
 
     #[test]
     fn middle() {
         let src = String::from("foo\nbar\nbaz\n");
         let contents = SpanReader::from_span(src.as_bytes(), (4, 4).into(), 0, 0).read().unwrap();
-        assert_eq!("bar\n", from_utf8(contents.data()).unwrap());
-        assert_eq!(1, contents.line());
-        assert_eq!(0, contents.column());
+        assert_eq!("bar\n", from_utf8(contents.data).unwrap());
+        assert_eq!(1, contents.line);
+        assert_eq!(0, contents.column);
     }
 
     #[test]
     fn middle_of_line() {
         let src = String::from("foo\nbarbar\nbaz\n");
         let contents = SpanReader::from_span(src.as_bytes(), (7, 4).into(), 0, 0).read().unwrap();
-        assert_eq!("bar\n", from_utf8(contents.data()).unwrap());
-        assert_eq!(1, contents.line());
-        assert_eq!(3, contents.column());
+        assert_eq!("bar\n", from_utf8(contents.data).unwrap());
+        assert_eq!(1, contents.line);
+        assert_eq!(3, contents.column);
     }
 
     #[test]
     fn with_crlf() {
         let src = String::from("foo\r\nbar\r\nbaz\r\n");
         let contents = SpanReader::from_span(src.as_bytes(), (5, 5).into(), 0, 0).read().unwrap();
-        assert_eq!("bar\r\n", from_utf8(contents.data()).unwrap());
-        assert_eq!(1, contents.line());
-        assert_eq!(0, contents.column());
+        assert_eq!("bar\r\n", from_utf8(contents.data).unwrap());
+        assert_eq!(1, contents.line);
+        assert_eq!(0, contents.column);
     }
 
     #[test]
     fn with_context() {
         let src = String::from("xxx\nfoo\nbar\nbaz\n\nyyy\n");
         let contents = SpanReader::from_span(src.as_bytes(), (8, 3).into(), 1, 1).read().unwrap();
-        assert_eq!("foo\nbar\nbaz\n", from_utf8(contents.data()).unwrap());
-        assert_eq!(1, contents.line());
-        assert_eq!(0, contents.column());
+        assert_eq!("foo\nbar\nbaz\n", from_utf8(contents.data).unwrap());
+        assert_eq!(1, contents.line);
+        assert_eq!(0, contents.column);
     }
 
     #[test]
     fn multiline_with_context() {
         let src = String::from("aaa\nxxx\n\nfoo\nbar\nbaz\n\nyyy\nbbb\n");
         let contents = SpanReader::from_span(src.as_bytes(), (9, 11).into(), 1, 1).read().unwrap();
-        assert_eq!("\nfoo\nbar\nbaz\n\n", from_utf8(contents.data()).unwrap());
-        assert_eq!(2, contents.line());
-        assert_eq!(0, contents.column());
+        assert_eq!("\nfoo\nbar\nbaz\n\n", from_utf8(contents.data).unwrap());
+        assert_eq!(2, contents.line);
+        assert_eq!(0, contents.column);
         let span: SourceSpan = (8, 14).into();
-        assert_eq!(&span, contents.span());
+        assert_eq!(span, contents.span);
     }
 
     #[test]
@@ -890,11 +858,11 @@ mod tests {
     fn multiline_with_context_line_start() {
         let src = String::from("one\ntwo\n\nthree\nfour\nfive\n\nsix\nseven\n");
         let contents = SpanReader::from_span(src.as_bytes(), (2, 0).into(), 2, 2).read().unwrap();
-        assert_eq!("one\ntwo\n\n", from_utf8(contents.data()).unwrap());
-        assert_eq!(0, contents.line());
-        assert_eq!(0, contents.column());
+        assert_eq!("one\ntwo\n\n", from_utf8(contents.data).unwrap());
+        assert_eq!(0, contents.line);
+        assert_eq!(0, contents.column);
         let span: SourceSpan = (0, 9).into();
-        assert_eq!(&span, contents.span());
+        assert_eq!(span, contents.span);
     }
 }
 
@@ -941,7 +909,7 @@ mod line_column_tests {
         match SpanReader::from_span(src.as_bytes(), (off as u32, 0u32).into(), 0, 0).read() {
             Some(expected) => assert_eq!(
                 got,
-                Some((expected.line(), expected.column())),
+                Some((expected.line, expected.column)),
                 "mismatch for src={src:?} off={off} len={len} ctx={ctx}"
             ),
             None => assert_eq!(
@@ -1045,11 +1013,10 @@ mod scanner_tests {
         let src = String::from_utf8_lossy(input);
         match (&expected, &got) {
             (Some(expected), Some(got)) => {
-                let fields =
-                    |c: &SpanContents<'_>| (*c.span(), c.line(), c.column(), c.line_count());
+                let fields = |c: &SpanContents<'_>| (c.span, c.line, c.column, c.line_count);
                 assert_eq!(
-                    (fields(expected), expected.data()),
-                    (fields(got), got.data()),
+                    (fields(expected), expected.data),
+                    (fields(got), got.data),
                     "mismatch for src={src:?} span={span:?} before={before} after={after} \
                      history={history:?}"
                 );

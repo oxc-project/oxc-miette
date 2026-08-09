@@ -66,7 +66,7 @@ impl GraphicalReportHandler {
             }
 
             let (left, left_conts) = contexts.last().unwrap();
-            if left_conts.line() + left_conts.line_count() >= right_conts.line() {
+            if left_conts.line + left_conts.line_count >= right_conts.line {
                 // The snippets will overlap, so we create one Big Chunky Boi
                 let left_end = left.offset() + left.len();
                 let right_end = right.offset() + right.len();
@@ -147,13 +147,13 @@ impl GraphicalReportHandler {
         f.write_char(self.theme.characters.hbar)?;
 
         // Derive the primary label location from `contents`: its data begins
-        // at a line boundary at `contents.line()`, and the primary label always
+        // at a line boundary at `contents.line`, and the primary label always
         // lies within it, so only the short prefix needs to be walked.
         let (primary_line, primary_column) = match primary_label {
             Some(label) => {
                 contents.line_column_at(label.inner().offset() as usize).ok_or(fmt::Error)?
             }
-            None => (contents.line(), contents.column()),
+            None => (contents.line, contents.column),
         };
 
         match source_name {
