@@ -16,7 +16,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use super::{handler::GraphicalReportHandler, span::FancySpan};
-use crate::SpanContents;
+use crate::source_impls::SpanContents;
 
 #[derive(Debug)]
 pub(super) struct Line<'a> {
@@ -202,11 +202,7 @@ impl GraphicalReportHandler {
         }
     }
 
-    /// Splits already-read span contents into [`Line`]s. Takes the contents
-    /// produced by the `read_span` call in
-    /// [`render_snippets`](GraphicalReportHandler::render_snippets) so the span
-    /// doesn't have to be re-read (each read is a scan of the source up to the
-    /// span).
+    /// Splits already-scanned span contents into [`Line`]s.
     #[expect(clippy::unused_self, reason = "kept as a renderer method for call-site consistency")]
     pub(super) fn get_lines<'a>(&self, context_data: &SpanContents<'a>) -> Vec<Line<'a>> {
         let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
@@ -258,7 +254,7 @@ mod tests {
     )]
 
     use super::*;
-    use crate::SourceCode;
+    use crate::source_impls::SpanScanner;
 
     type ExpectedLine<'a> = (usize, usize, usize, &'a str);
 
@@ -297,7 +293,8 @@ mod tests {
     #[test]
     fn get_lines_preallocates_the_source_window() {
         let source = "before\ntarget\nafter\nrest";
-        let contents = source.read_span(&(7u32, 6u32).into(), 1, 1).unwrap();
+        let mut scanner = SpanScanner::new(source.as_bytes(), 1, 1);
+        let contents = scanner.read_span((7u32, 6u32).into()).unwrap();
         let lines = GraphicalReportHandler::new().get_lines(&contents);
 
         assert_eq!(lines.len(), 3);

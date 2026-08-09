@@ -1,8 +1,8 @@
 //! Source-snippet layout.
 //!
 //! [`render_snippets`](GraphicalReportHandler::render_snippets) reads every
-//! label's span (sharing a single forward scan when the source exposes its
-//! backing buffer) and merges overlapping spans into contexts.
+//! label's span in a single forward scan and merges overlapping spans into
+//! contexts.
 //! [`render_context`](GraphicalReportHandler::render_context) then draws one
 //! context: the `[file:line:col]` header, each source line (via
 //! [`render_line_text`](GraphicalReportHandler::render_line_text)), and the
@@ -18,7 +18,8 @@ use super::{
     span::{FancySpan, LabelRenderMode},
 };
 use crate::{
-    Diagnostic, LabeledSpan, SourceCode, SourceSpan, SpanContents, source_impls::SpanScanner,
+    Diagnostic, LabeledSpan, SourceCode, SourceSpan,
+    source_impls::{SpanContents, SpanScanner},
 };
 
 impl GraphicalReportHandler {
@@ -34,16 +35,11 @@ impl GraphicalReportHandler {
             return Ok(());
         }
 
-        // When the source exposes its backing buffer, share one forward scan
-        // across every span lookup below (one per label plus one per merge
-        // attempt); each `read_span` otherwise scans the source from byte 0
-        // again.
-        let mut scanner = source.contiguous_bytes().map(|bytes| SpanScanner::new(bytes, 1, 1));
+        // Share one forward scan across every span lookup below (one per label
+        // plus one per merge attempt).
+        let mut scanner = SpanScanner::new(source.data(), 1, 1);
         let source_name = source.name();
-        let mut read = |span: &SourceSpan| match scanner.as_mut() {
-            Some(scanner) => scanner.read_span(*span),
-            None => source.read_span(span, 1, 1),
-        };
+        let mut read = |span: &SourceSpan| scanner.read_span(*span);
 
         if let [label] = labels {
             let contents = read(label.inner()).ok_or(fmt::Error)?;
@@ -150,12 +146,9 @@ impl GraphicalReportHandler {
         f.write_char(self.theme.characters.ltop)?;
         f.write_char(self.theme.characters.hbar)?;
 
-        // The snippet header reports the primary label's line/column. Rather
-        // than issuing a second full `read_span` (which re-scans the source
-        // from byte 0 — as costly as the read that produced `contents`),
-        // derive them from `contents`: its data begins at a line boundary at
-        // line `contents.line()`, and the primary label always lies within it,
-        // so only the short prefix up to the label needs to be walked.
+        // Derive the primary label location from `contents`: its data begins
+        // at a line boundary at `contents.line()`, and the primary label always
+        // lies within it, so only the short prefix needs to be walked.
         let (primary_line, primary_column) = match primary_label {
             Some(label) => {
                 contents.line_column_at(label.inner().offset() as usize).ok_or(fmt::Error)?

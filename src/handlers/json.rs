@@ -1,6 +1,6 @@
 use std::fmt::{self, Write};
 
-use crate::{Severity, protocol::Diagnostic};
+use crate::{Severity, protocol::Diagnostic, source_impls::SpanScanner};
 
 /**
 Renders diagnostics as machine-readable JSON.
@@ -83,11 +83,13 @@ impl JSONReportHandler {
         if let Some(note) = diagnostic.note() {
             write!(f, r#""note": "{}","#, escape(&note))?;
         }
-        if let Some(source) = diagnostic.source_code() {
+        let source = diagnostic.source_code();
+        if let Some(source) = source {
             write!(f, r#""filename": "{}","#, escape(source.name().unwrap_or_default()))?;
         }
         {
             write!(f, r#""labels": ["#)?;
+            let mut scanner = source.map(|source| SpanScanner::new(source.data(), 0, 0));
             let mut add_comma = false;
             for label in diagnostic.labels() {
                 if add_comma {
@@ -103,9 +105,8 @@ impl JSONReportHandler {
                 write!(f, r#""offset": {},"#, label.offset())?;
                 write!(f, r#""length": {},"#, label.len())?;
 
-                if let Some(location) = diagnostic
-                    .source_code()
-                    .and_then(|source| source.read_span(label.inner(), 0, 0))
+                if let Some(location) =
+                    scanner.as_mut().and_then(|scanner| scanner.read_span(*label.inner()))
                 {
                     write!(f, r#""line": {},"#, location.line() + 1)?;
                     write!(f, r#""column": {}"#, location.column() + 1)?;
