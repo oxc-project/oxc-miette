@@ -7,7 +7,7 @@ use std::{collections::VecDeque, sync::Arc};
 
 use crate::{SourceCode, SourceSpan};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SpanContents<'a> {
     data: &'a [u8],
     span: SourceSpan,
@@ -762,12 +762,6 @@ impl<'a> SpanScanner<'a> {
 
     fn read_unindexed(&self, request: SpanRequest) -> Option<SpanContents<'a>> {
         SpanReader::new(self.index.input, request, self.context).read()
-    }
-}
-
-impl SourceCode for [u8] {
-    fn data(&self) -> &[u8] {
-        self
     }
 }
 
