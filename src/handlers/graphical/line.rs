@@ -205,15 +205,15 @@ impl GraphicalReportHandler {
     /// Splits already-scanned span contents into [`Line`]s.
     #[expect(clippy::unused_self, reason = "kept as a renderer method for call-site consistency")]
     pub(super) fn get_lines<'a>(&self, context_data: &SpanContents<'a>) -> Vec<Line<'a>> {
-        let context = from_utf8(context_data.data()).expect("Bad utf8 detected");
-        let mut line = context_data.line();
-        let base = context_data.span().offset() as usize;
+        let context = from_utf8(context_data.data).expect("Bad utf8 detected");
+        let mut line = context_data.line;
+        let base = context_data.span.offset() as usize;
         let bytes = context.as_bytes();
         // The built-in readers advance `line_count` from the payload's first
         // line, which gives the number of newline-terminated `Line`s here.
         // Cap the hint by byte length because custom sources own this metadata.
         let capacity =
-            context_data.line_count().saturating_sub(context_data.line()).max(1).min(bytes.len());
+            context_data.line_count.saturating_sub(context_data.line).max(1).min(bytes.len());
         let mut lines = Vec::with_capacity(capacity);
         let mut start = 0;
         for newline in memchr::memchr_iter(b'\n', bytes) {
@@ -274,13 +274,13 @@ mod tests {
         ];
         let handler = GraphicalReportHandler::new();
         for &(text, expected) in cases {
-            let contents = SpanContents::new(
-                text.as_bytes(),
-                (BASE as u32, text.len() as u32).into(),
-                4,
-                2,
-                expected.len(),
-            );
+            let contents = SpanContents {
+                data: text.as_bytes(),
+                span: (BASE as u32, text.len() as u32).into(),
+                line: 4,
+                column: 2,
+                line_count: expected.len(),
+            };
             let actual = handler
                 .get_lines(&contents)
                 .iter()

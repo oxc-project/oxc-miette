@@ -108,8 +108,8 @@ impl JSONReportHandler {
                 if let Some(location) =
                     scanner.as_mut().and_then(|scanner| scanner.read_span(*label.inner()))
                 {
-                    write!(f, r#""line": {},"#, location.line() + 1)?;
-                    write!(f, r#""column": {}"#, location.column() + 1)?;
+                    write!(f, r#""line": {},"#, location.line + 1)?;
+                    write!(f, r#""column": {}"#, location.column + 1)?;
                 } else {
                     write!(f, r#""line": null,"column": null"#)?;
                 }
