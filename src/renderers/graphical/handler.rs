@@ -5,7 +5,7 @@
 
 use std::io::{self, IsTerminal};
 
-use crate::GraphicalTheme;
+use super::theme::GraphicalTheme;
 
 #[derive(Debug, Clone)]
 pub struct GraphicalReportHandler {

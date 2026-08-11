@@ -3,7 +3,7 @@ use std::sync::Arc;
 use miette::{NamedSource, SourceCode};
 
 #[test]
-fn test_basic_source_code_name_is_none() {
+fn basic_sources_have_no_name() {
     let source = "Hello, world!";
     assert_eq!(source.name(), None);
 
@@ -12,7 +12,7 @@ fn test_basic_source_code_name_is_none() {
 }
 
 #[test]
-fn test_named_source_returns_name() {
+fn named_str_source_returns_name() {
     let source = "Hello, world!";
     let named = NamedSource::new("test.txt", source);
     // Call the trait method explicitly through SourceCode trait
@@ -20,7 +20,7 @@ fn test_named_source_returns_name() {
 }
 
 #[test]
-fn test_named_source_with_string() {
+fn named_string_source_returns_name() {
     let source = String::from("fn main() {}");
     let named = NamedSource::new("main.rs", source);
     // Call the trait method explicitly through SourceCode trait
@@ -28,7 +28,7 @@ fn test_named_source_with_string() {
 }
 
 #[test]
-fn test_arc_named_source_returns_name() {
+fn arc_named_source_returns_name() {
     let source = String::from("fn main() {}");
     let named = Arc::new(NamedSource::new("main.rs", source));
     assert_eq!(SourceCode::name(&named), Some("main.rs"));

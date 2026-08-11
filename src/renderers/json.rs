@@ -1,6 +1,6 @@
 use std::fmt::{self, Write};
 
-use crate::{Severity, protocol::Diagnostic, source_impls::SpanScanner};
+use crate::{Severity, protocol::Diagnostic, source::reader::SpanScanner};
 
 /**
 Renders diagnostics as machine-readable JSON.

@@ -7,6 +7,7 @@
 //! The rendering pipeline is split across the submodules, roughly in the order
 //! output is produced:
 //!
+//! - [`theme`] — colors and drawing characters used by the renderer.
 //! - [`handler`] — the [`GraphicalReportHandler`] type and its builder API.
 //! - [`report`] — the top level: title, help/note, and wrapping.
 //! - [`snippet`] — reads the labelled spans and lays out the source snippets.
@@ -22,5 +23,7 @@ mod line;
 mod report;
 mod snippet;
 mod span;
+mod theme;
 
 pub use handler::GraphicalReportHandler;
+pub use theme::GraphicalTheme;

@@ -16,7 +16,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 use super::{handler::GraphicalReportHandler, span::FancySpan};
-use crate::source_impls::SpanContents;
+use crate::source::reader::SpanContents;
 
 #[derive(Debug)]
 pub(super) struct Line<'a> {
@@ -254,7 +254,7 @@ mod tests {
     )]
 
     use super::*;
-    use crate::source_impls::SpanScanner;
+    use crate::source::reader::SpanScanner;
 
     type ExpectedLine<'a> = (usize, usize, usize, &'a str);
 

@@ -19,7 +19,7 @@ use super::{
 };
 use crate::{
     Diagnostic, LabeledSpan, SourceCode, SourceSpan,
-    source_impls::{SpanContents, SpanScanner},
+    source::reader::{SpanContents, SpanScanner},
 };
 
 impl GraphicalReportHandler {
