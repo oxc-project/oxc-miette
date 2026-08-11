@@ -14,12 +14,12 @@ use std::{
 
 use owo_colors::{OwoColorize, Style};
 
+use super::theme::ThemeCharacters;
 use super::{
     handler::GraphicalReportHandler,
     line::Line,
     span::{FancySpan, LabelRenderMode},
 };
-use crate::handlers::theme::ThemeCharacters;
 
 struct Underline {
     padding: usize,

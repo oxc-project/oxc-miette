@@ -1,11 +1,10 @@
-/*!
-Default trait implementations for [`SourceCode`].
-*/
+//! Source span reading and line indexing.
+
+use std::collections::VecDeque;
 #[cfg(test)]
 use std::str::from_utf8;
-use std::{collections::VecDeque, sync::Arc};
 
-use crate::{SourceCode, SourceSpan};
+use crate::SourceSpan;
 
 #[derive(Debug)]
 pub struct SpanContents<'a> {
@@ -720,7 +719,7 @@ impl<'index, 'source> IndexedReader<'index, 'source> {
 /// once and records line starts for reuse. Queries that precede the index's
 /// origin fall back to a standalone [`SpanReader`].
 ///
-/// [`GraphicalReportHandler`]: crate::handlers::GraphicalReportHandler
+/// [`GraphicalReportHandler`]: crate::GraphicalReportHandler
 #[expect(clippy::redundant_pub_crate, reason = "keeps the renderer fast path crate-private")]
 pub(crate) struct SpanScanner<'a> {
     context: ContextLines,
@@ -762,35 +761,6 @@ impl<'a> SpanScanner<'a> {
 
     fn read_unindexed(&self, request: SpanRequest) -> Option<SpanContents<'a>> {
         SpanReader::new(self.index.input, request, self.context).read()
-    }
-}
-
-impl SourceCode for str {
-    fn data(&self) -> &[u8] {
-        self.as_bytes()
-    }
-}
-
-/// Makes `src: &'static str` or `struct S<'a> { src: &'a str }` usable.
-impl SourceCode for &str {
-    fn data(&self) -> &[u8] {
-        self.as_bytes()
-    }
-}
-
-impl SourceCode for String {
-    fn data(&self) -> &[u8] {
-        self.as_bytes()
-    }
-}
-
-impl<T: ?Sized + SourceCode> SourceCode for Arc<T> {
-    fn data(&self) -> &[u8] {
-        self.as_ref().data()
-    }
-
-    fn name(&self) -> Option<&str> {
-        self.as_ref().name()
     }
 }
 
